@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, Trash2, FolderInput, Plus } from "lucide-react";
+import { Heart, Trash2, FolderInput, Plus, Search, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Check } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import {
   getBookmarks, getFolders, addBookmark, removeBookmark, moveBookmark, createFolder, deleteFolder,
@@ -17,6 +17,12 @@ import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
+const PAGE_SIZE = 6;
+// Cards in the same grid row can have different natural heights (e.g. the star-rating
+// line only renders for vendors with reviews). These selectors reach into VendorCard's
+// <article> from here so every card in a row stretches to match the tallest one, keeping
+// the footer row (and whatever sits below the card) aligned without editing VendorCard.
+const CARD_STRETCH = "[&>article]:flex [&>article]:flex-1 [&>article]:flex-col [&>article>div:last-child]:flex-1";
 
 export default function EngagementPage() {
   const navigate = useNavigate();
@@ -30,11 +36,17 @@ export default function EngagementPage() {
   const [activeFolder, setActiveFolder] = useState("all");
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [bookmarkPage, setBookmarkPage] = useState(1);
 
   const [reviews, setReviews] = useState([]);
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewRating, setReviewRating] = useState("all");
+  const [reviewSort, setReviewSort] = useState("newest");
+  const [reviewPage, setReviewPage] = useState(1);
   const [detailVendor, setDetailVendor] = useState(null);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
   const [pendingDeleteFolder, setPendingDeleteFolder] = useState(null); // folder awaiting delete confirmation
+  const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null); // vendor awaiting unbookmark confirmation
   const [toast, notify] = useToast();
   const bookmarkedVendorIds = new Set(bookmarks.map((b) => b.vendor_id));
 
@@ -44,6 +56,9 @@ export default function EngagementPage() {
     refreshReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  useEffect(() => { setBookmarkPage(1); }, [activeFolder]);
+  useEffect(() => { setReviewPage(1); }, [reviewSearch, reviewRating, reviewSort]);
 
   function refreshBookmarks() {
     getFolders().then((f) => setFolders(f.folders)).catch((e) => { console.error(e.message); notify("Couldn't load your folders.", true); });
@@ -72,9 +87,29 @@ export default function EngagementPage() {
     );
   }
 
-  const visibleBookmarks = activeFolder === "all"
+  const visibleBookmarks = (activeFolder === "all"
     ? bookmarks
-    : bookmarks.filter((b) => b.folder_id === activeFolder);
+    : bookmarks.filter((b) => b.folder_id === activeFolder)
+  ).filter((b) => b.vendor);
+  const bookmarkPageCount = Math.max(1, Math.ceil(visibleBookmarks.length / PAGE_SIZE));
+  const pagedBookmarks = visibleBookmarks.slice((bookmarkPage - 1) * PAGE_SIZE, bookmarkPage * PAGE_SIZE);
+
+  const myReviews = reviews.filter((r) => r.vendor);
+  const visibleReviews = myReviews
+    .filter((r) => reviewRating === "all" || r.rating === Number(reviewRating))
+    .filter((r) => {
+      const q = reviewSearch.trim().toLowerCase();
+      if (!q) return true;
+      return r.vendor.name?.toLowerCase().includes(q) || r.body?.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (reviewSort === "oldest") return new Date(a.created_at) - new Date(b.created_at);
+      if (reviewSort === "highest") return b.rating - a.rating;
+      if (reviewSort === "lowest") return a.rating - b.rating;
+      return new Date(b.created_at) - new Date(a.created_at); // newest
+    });
+  const reviewPageCount = Math.max(1, Math.ceil(visibleReviews.length / PAGE_SIZE));
+  const pagedReviews = visibleReviews.slice((reviewPage - 1) * PAGE_SIZE, reviewPage * PAGE_SIZE);
   const meta = session?.user?.user_metadata || {};
   const userEmail = session?.user?.email || "";
   const avatarUrl = meta.avatar_url || "";
@@ -82,6 +117,11 @@ export default function EngagementPage() {
   const initials = firstName
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
+
+  function handleCancelCreateFolder() {
+    setNewFolderName("");
+    setCreatingFolder(false);
+  }
 
   async function handleCreateFolder() {
     const name = newFolderName.trim();
@@ -124,15 +164,21 @@ export default function EngagementPage() {
   // bookmarked) and the Reviews tab (may or may not be) — so the heart there
   // needs to actually branch, unlike the plain "remove" hearts on the bookmark grid.
   function toggleBookmarkFromDetail(vendorId) {
-    if (bookmarkedVendorIds.has(vendorId)) { handleRemoveBookmark(vendorId); return; }
+    if (bookmarkedVendorIds.has(vendorId)) { setPendingUnbookmarkVendor(detailVendor); return; }
     setPendingSaveVendor(detailVendor);
   }
 
   // Heart toggle for a vendor card outside the bookmark grid (e.g. the Reviews
   // tab), where the vendor may or may not already be bookmarked.
   function toggleBookmarkForVendor(vendor) {
-    if (bookmarkedVendorIds.has(vendor.id)) { handleRemoveBookmark(vendor.id); return; }
+    if (bookmarkedVendorIds.has(vendor.id)) { setPendingUnbookmarkVendor(vendor); return; }
     setPendingSaveVendor(vendor);
+  }
+
+  async function confirmUnbookmark() {
+    const vendorId = pendingUnbookmarkVendor.id;
+    setPendingUnbookmarkVendor(null);
+    await handleRemoveBookmark(vendorId);
   }
 
   async function confirmSaveBookmark(folderId) {
@@ -182,20 +228,9 @@ export default function EngagementPage() {
         {tab === "bookmarks" && (
           <div className="flex flex-col gap-5">
             {/* Folder tabs — horizontal row, Instagram-style */}
-            <div className="flex snap-x items-center gap-2 overflow-x-auto pb-2">
-              <FolderPill label="All" count={bookmarks.length} active={activeFolder === "all"} onClick={() => setActiveFolder("all")} />
-              {folders.map((f) => (
-                <FolderPill
-                  key={f.id} label={f.name}
-                  count={bookmarks.filter((b) => b.folder_id === f.id).length}
-                  active={activeFolder === f.id}
-                  onClick={() => setActiveFolder(f.id)}
-                  onDelete={!f.is_default ? () => setPendingDeleteFolder(f) : null}
-                />
-              ))}
-
+            <div className="no-scrollbar flex snap-x items-center gap-2 overflow-x-auto scroll-smooth pb-2">
               {creatingFolder ? (
-                <div className="flex min-w-[260px] shrink-0 gap-1.5">
+                <div className="flex min-w-[320px] shrink-0 gap-1.5">
                   <input
                     autoFocus
                     value={newFolderName}
@@ -205,8 +240,14 @@ export default function EngagementPage() {
                     className="min-h-11 min-w-0 flex-1 rounded-full border border-sand px-3 text-[12.5px] outline-none focus:border-forest"
                   />
                   <button
+                    onClick={handleCancelCreateFolder}
+                    className="min-h-11 shrink-0 rounded-full border border-muted bg-white px-4 text-[12.5px] font-semibold text-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
                     onClick={handleCreateFolder}
-                    className="min-h-11 shrink-0 rounded-full bg-forest px-4 text-[12.5px] text-white"
+                    className="min-h-11 shrink-0 rounded-full bg-terracotta px-4 text-[12.5px] font-semibold text-white"
                   >
                     Create
                   </button>
@@ -219,50 +260,112 @@ export default function EngagementPage() {
                   <Plus size={13} /> New folder
                 </button>
               )}
+
+              <FolderPill label="All" count={bookmarks.length} active={activeFolder === "all"} onClick={() => setActiveFolder("all")} />
+              {folders.map((f) => (
+                <FolderPill
+                  key={f.id} label={f.name}
+                  count={bookmarks.filter((b) => b.folder_id === f.id).length}
+                  active={activeFolder === f.id}
+                  onClick={() => setActiveFolder(f.id)}
+                  onDelete={!f.is_default ? () => setPendingDeleteFolder(f) : null}
+                />
+              ))}
             </div>
 
-            <section>
+            <section className="flex flex-col gap-5">
               {visibleBookmarks.length === 0 ? (
                 <Empty icon="🔖" text="No bookmarks in this folder yet." />
               ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {visibleBookmarks.filter((b) => b.vendor).map((b) => (
-                    <div key={b.vendor_id} className="flex flex-col gap-2">
-                      <VendorCard
-                        vendor={b.vendor}
-                        inTrip={false}
-                        bookmarked={true}
-                        onToggleBookmark={() => handleRemoveBookmark(b.vendor_id)}
-                        onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
-                        onOpenDetail={setDetailVendor}
-                      />
-                      <FolderMoveSelect row={b} folders={folders} onMove={(folderId) => handleMoveBookmark(b.vendor_id, folderId)} />
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {pagedBookmarks.map((b) => (
+                      <div key={b.vendor_id} className={`flex flex-col gap-2 ${CARD_STRETCH}`}>
+                        <VendorCard
+                          vendor={b.vendor}
+                          inTrip={false}
+                          bookmarked={true}
+                          onToggleBookmark={() => setPendingUnbookmarkVendor(b.vendor)}
+                          onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+                          onOpenDetail={setDetailVendor}
+                        />
+                        <FolderMoveSelect row={b} folders={folders} onMove={(folderId) => handleMoveBookmark(b.vendor_id, folderId)} />
+                      </div>
+                    ))}
+                  </div>
+                  <Pagination page={bookmarkPage} totalPages={bookmarkPageCount} onChange={setBookmarkPage} />
+                </>
               )}
             </section>
           </div>
         )}
 
         {tab === "reviews" && (
-          <section>
-            {reviews.filter((r) => r.vendor).length === 0 ? (
-              <Empty icon="⭐" text="No reviews yet. Be the first to review!" />
-            ) : (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {reviews.filter((r) => r.vendor).map((r) => (
-                  <VendorCard
-                    key={r.id}
-                    vendor={r.vendor}
-                    inTrip={false}
-                    bookmarked={bookmarkedVendorIds.has(r.vendor.id)}
-                    onToggleBookmark={() => toggleBookmarkForVendor(r.vendor)}
-                    onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
-                    onOpenDetail={setDetailVendor}
+          <section className="flex flex-col gap-5">
+            {myReviews.length > 0 && (
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                <div className="relative min-h-11 flex-1">
+                  <Search size={14} color={MUTED} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    value={reviewSearch}
+                    onChange={(e) => setReviewSearch(e.target.value)}
+                    placeholder="Search by place or review text"
+                    className="min-h-11 w-full rounded-full border border-sand bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-forest"
                   />
-                ))}
+                </div>
+                <select
+                  value={reviewRating}
+                  onChange={(e) => setReviewRating(e.target.value)}
+                  aria-label="Filter by rating"
+                  className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
+                >
+                  <option value="all">All ratings</option>
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>{n} star{n > 1 ? "s" : ""}</option>
+                  ))}
+                </select>
+                <select
+                  value={reviewSort}
+                  onChange={(e) => setReviewSort(e.target.value)}
+                  aria-label="Sort reviews"
+                  className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="highest">Highest rated</option>
+                  <option value="lowest">Lowest rated</option>
+                </select>
               </div>
+            )}
+
+            {myReviews.length === 0 ? (
+              <Empty icon="⭐" text="No reviews yet. Be the first to review!" />
+            ) : visibleReviews.length === 0 ? (
+              <Empty icon="🔍" text="No reviews match your filters." />
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {pagedReviews.map((r) => (
+                    <div key={r.id} className={`flex flex-col gap-1.5 ${CARD_STRETCH}`}>
+                      <VendorCard
+                        vendor={r.vendor}
+                        inTrip={false}
+                        bookmarked={bookmarkedVendorIds.has(r.vendor.id)}
+                        onToggleBookmark={() => toggleBookmarkForVendor(r.vendor)}
+                        onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+                        onOpenDetail={setDetailVendor}
+                      />
+                      <div className="flex items-center gap-1 px-0.5 text-[11px] text-muted">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} size={12} color="#A35D47" fill={i < r.rating ? "#A35D47" : "none"} />
+                        ))}
+                        <span>Your review · {new Date(r.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Pagination page={reviewPage} totalPages={reviewPageCount} onChange={setReviewPage} />
+              </>
             )}
           </section>
         )}
@@ -318,6 +421,35 @@ export default function EngagementPage() {
         </div>
       )}
 
+      {pendingUnbookmarkVendor && (
+        <div
+          onClick={() => setPendingUnbookmarkVendor(null)}
+          className="fixed inset-0 z-[1200] flex items-end justify-center bg-forest/60 p-0 animate-backdrop-in sm:items-center sm:p-5"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-t-2xl bg-white p-5 shadow-[0_20px_60px_rgba(64,84,74,0.35)] animate-modal-in sm:max-w-[340px] sm:rounded-2xl"
+          >
+            <h3 className="mb-1.5 mt-0 font-display text-[17px] text-forest">Remove "{pendingUnbookmarkVendor.name}"?</h3>
+            <p className="mb-4 mt-0 text-[13px] text-muted">This will remove it from your saved places.</p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                onClick={() => setPendingUnbookmarkVendor(null)}
+                className="min-h-11 rounded-lg border border-sand bg-white px-4 text-[13px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmUnbookmark}
+                className="min-h-11 rounded-lg bg-[#c0392b] px-4 text-[13px] font-semibold text-white"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toast toast={toast} />
     </div>
   );
@@ -346,17 +478,135 @@ function FolderPill({ label, count, active, onClick, onDelete }) {
 }
 
 function FolderMoveSelect({ row, folders, onMove }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    function handleKey(e) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
   if (folders.length === 0) return null;
+  const current = folders.find((f) => f.id === row.folder_id) || folders[0];
+
   return (
-    <div className="flex items-center gap-1 px-0.5">
-      <FolderInput size={13} color={MUTED} />
-      <select
-        value={row.folder_id || ""}
-        onChange={(e) => onMove(e.target.value || null)}
-        className="min-h-11 min-w-0 flex-1 rounded-md border border-sand px-1.5 text-[11.5px] outline-none focus:border-forest"
+    <div ref={wrapRef} className="relative flex items-center gap-1 px-0.5">
+      <FolderInput size={13} color={MUTED} className="shrink-0" />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 rounded-md border border-sand bg-white px-1.5 text-[11.5px] text-ink outline-none focus:border-forest"
       >
-        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-      </select>
+        <span className="min-w-0 truncate">{current?.name}</span>
+        <ChevronDown size={13} color={MUTED} className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-full z-20 mt-1 max-h-[200px] w-full min-w-[170px] overflow-y-auto rounded-lg border border-sand bg-white py-1 shadow-[0_10px_30px_rgba(64,84,74,0.2)]"
+        >
+          {folders.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="option"
+              aria-selected={f.id === current?.id}
+              onClick={() => { onMove(f.id); setOpen(false); }}
+              className={f.id === current?.id
+                ? "flex min-h-9 w-full items-center gap-2 bg-forest/10 px-3 text-left text-[12.5px] font-semibold text-forest"
+                : "flex min-h-9 w-full items-center gap-2 px-3 text-left text-[12.5px] text-ink hover:bg-chalk"}
+            >
+              <Check size={12} className={f.id === current?.id ? "shrink-0" : "invisible shrink-0"} />
+              <span className="min-w-0 truncate">{f.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function pageList(current, total) {
+  const delta = 1;
+  const middle = [];
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) middle.push(i);
+
+  const pages = [1];
+  if (middle[0] > 2) pages.push("...");
+  pages.push(...middle);
+  if (middle[middle.length - 1] < total - 1) pages.push("...");
+  if (total > 1) pages.push(total);
+  return pages;
+}
+
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-1 pt-2">
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        disabled={page === 1}
+        aria-label="First page"
+        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+      >
+        <ChevronsLeft size={16} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+        aria-label="Previous page"
+        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      {pageList(page, totalPages).map((p, i) => (
+        p === "..." ? (
+          <span key={`ellipsis-${i}`} className="px-1.5 text-[13px] text-muted">…</span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange(p)}
+            aria-current={p === page ? "page" : undefined}
+            className={p === page
+              ? "grid min-h-9 min-w-9 place-items-center rounded-full bg-forest text-[13px] font-semibold text-white"
+              : "grid min-h-9 min-w-9 place-items-center rounded-full text-[13px] text-ink hover:bg-sand/60"}
+          >
+            {p}
+          </button>
+        )
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+        aria-label="Next page"
+        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+      >
+        <ChevronRight size={16} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(totalPages)}
+        disabled={page === totalPages}
+        aria-label="Last page"
+        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+      >
+        <ChevronsRight size={16} />
+      </button>
     </div>
   );
 }
