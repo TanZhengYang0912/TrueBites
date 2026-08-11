@@ -20,8 +20,52 @@ const filter = new Filter();
 
 filter.removeWords("god", "hell", "bloody", "sex");
 
+const MALAYSIAN_BADWORDS = [
+  "babi", "sial", "bodoh", "bangang", "bengap", "celaka", "sohai", "bangsat",
+  "tolol", "bongok", "jahanam", "bedebah", "haramjadah", "keparat",
+  "asu", "jalang", "sundal", "gatal", "gian", "gatai", "pundek",
+  "puki", "pukimak", "kimak", "konek", "kote", "pantat", "punai", "bontot",
+  "jubur", "burit", "fuck","cibai", "chibai", "cheebye", "cb", "ccb", "lancau", "lanjiao",
+  "lancaubabi", "diu", "diulei", "diulehlohmo", "knn", "kns", "kanina",
+  "kanasai", "kolomoye", "kaniaseh", "hampalang", "siao", "gau", "lampa", "yier", "laosai",
+  "thevidiya", "otha", "punda", "koothi", "pundachi",
+  "wtf", "stfu", "ffs", "omfg", "af", "asf", "bullshit", "douchebag",
+  "douche", "scumbag", "jackass", "fucktard", "shitface", "fuckface",
+  "dipshit", "cockhead", "cumdumpster", "thot", "simp", "hoe", "coon",
+  "spic", "chink", "gook", "tranny", "dyke",
+];
+filter.addWords(...MALAYSIAN_BADWORDS);
+
+// Multi-word vulgar phrases — checked separately below, since these can't
+// be matched by the single-word list above.
+const MALAYSIAN_BADWORD_PHRASES = [
+  "gila babi", "kepala hotak", "anak haram", "puki mak", "itik puki",
+  "lubang pantat", "chao chee bye", "diu lei lo mo", "kanina lang",
+  "chao chibai", "thevidiya paiya", "otha mavane", "son of a bitch",
+  "motherfucking", "kepala baba kau",
+];
+
+const LEET_MAP = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s" };
+function normalizeForDetection(word) {
+  return word
+    .toLowerCase()
+    .split("")
+    .map((ch) => LEET_MAP[ch] || ch)
+    .join("")
+    .replace(/(.)\1+/g, "$1");
+}
+
+// Checked against the base list, MALAYSIAN_BADWORDS (word by word), evasive
+// spellings (via normalizeForDetection), and MALAYSIAN_BADWORD_PHRASES
+// (against the full string, since those are multi-word).
 function isProfaneLoose(text) {
-  return filter.isProfane(text) || filter.isProfane(text.replace(/(.)\1+/g, "$1"));
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  if (MALAYSIAN_BADWORD_PHRASES.some((phrase) => lower.includes(phrase))) return true;
+  return text.split(/[^\p{L}\p{N}]+/u).some((word) => {
+    if (!word) return false;
+    return filter.isProfane(word) || filter.isProfane(normalizeForDetection(word));
+  });
 }
 
 // Local-testing escape hatch: DISABLE_AUTH=true in backend/.env makes every
@@ -89,16 +133,19 @@ async function getOrCreateDefaultFolder(userId) {
   return data.id;
 }
 
+// A review hidden for profanity still carries a genuine star rating from a
+// real customer — only reviews an admin hid (fake/spam) are excluded, so the
+// average reflects every real rating, not just the ones with visible text.
 export async function recomputeVendorRating(vendorId) {
   const { data, error } = await supabase
     .from("reviews")
-    .select("rating")
-    .eq("vendor_id", vendorId)
-    .eq("is_hidden", false);
+    .select("rating, is_hidden, hidden_reason")
+    .eq("vendor_id", vendorId);
   if (error) throw error;
 
-  const count = data.length;
-  const average = count ? data.reduce((sum, r) => sum + r.rating, 0) / count : null;
+  const counted = data.filter((r) => !r.is_hidden || r.hidden_reason === "profanity");
+  const count = counted.length;
+  const average = count ? counted.reduce((sum, r) => sum + r.rating, 0) / count : null;
 
   await supabase
     .from("vendors")
@@ -378,7 +425,7 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
     });
   }
 
-  if (!profane) await recomputeVendorRating(req.params.vendorId);
+  await recomputeVendorRating(req.params.vendorId);
   await logActivity({ actor: user, action: "review.create", entityType: "review", entityId: data.id, metadata: { vendor_id: req.params.vendorId, rating } });
   res.status(201).json({ review: { ...data, isOwn: true, likes: 0, dislikes: 0, myVote: null } });
 });
