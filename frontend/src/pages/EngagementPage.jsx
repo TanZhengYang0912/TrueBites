@@ -34,6 +34,7 @@ export default function EngagementPage() {
   const [reviews, setReviews] = useState([]);
   const [detailVendor, setDetailVendor] = useState(null);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
+  const [pendingDeleteFolder, setPendingDeleteFolder] = useState(null); // folder awaiting delete confirmation
   const [toast, notify] = useToast();
   const bookmarkedVendorIds = new Set(bookmarks.map((b) => b.vendor_id));
 
@@ -189,7 +190,7 @@ export default function EngagementPage() {
                   count={bookmarks.filter((b) => b.folder_id === f.id).length}
                   active={activeFolder === f.id}
                   onClick={() => setActiveFolder(f.id)}
-                  onDelete={!f.is_default ? () => handleDeleteFolder(f.id) : null}
+                  onDelete={!f.is_default ? () => setPendingDeleteFolder(f) : null}
                 />
               ))}
 
@@ -286,6 +287,35 @@ export default function EngagementPage() {
           onSave={confirmSaveBookmark}
           onCreateFolder={createFolderAndSave}
         />
+      )}
+
+      {pendingDeleteFolder && (
+        <div
+          onClick={() => setPendingDeleteFolder(null)}
+          className="fixed inset-0 z-[1200] flex items-end justify-center bg-forest/60 p-0 animate-backdrop-in sm:items-center sm:p-5"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-t-2xl bg-white p-5 shadow-[0_20px_60px_rgba(64,84,74,0.35)] animate-modal-in sm:max-w-[340px] sm:rounded-2xl"
+          >
+            <h3 className="mb-1.5 mt-0 font-display text-[17px] text-forest">Delete "{pendingDeleteFolder.name}"?</h3>
+            <p className="mb-4 mt-0 text-[13px] text-muted">Its bookmarks will move to Default. This can't be undone.</p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                onClick={() => setPendingDeleteFolder(null)}
+                className="min-h-11 rounded-lg border border-sand bg-white px-4 text-[13px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleDeleteFolder(pendingDeleteFolder.id); setPendingDeleteFolder(null); }}
+                className="min-h-11 rounded-lg bg-[#c0392b] px-4 text-[13px] font-semibold text-white"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <Toast toast={toast} />
