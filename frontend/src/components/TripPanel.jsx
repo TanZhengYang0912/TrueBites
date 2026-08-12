@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Navigation, GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, ChevronDown, MapPin, LocateFixed, Eye, EyeOff } from "lucide-react";
+import { Navigation, GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, ChevronDown, ChevronUp, MapPin, LocateFixed, Eye, EyeOff, Bike, Bus, Car, Footprints } from "lucide-react";
+import { loadNearbyCollapsed, saveNearbyCollapsed } from "../lib/panelPrefs";
 import LocationInput from "./LocationInput";
 import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
@@ -8,16 +9,18 @@ import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDispla
 import { buildGoogleMapsUrl } from "../lib/googleMapsHandoff";
 
 const NAV_MODES = [
-  { mode: "DRIVING",     label: "Car",        icon: "🚗",  color: "#1d72e8" },
-  { mode: "TWO_WHEELER", label: "Motorcycle", icon: "🏍️", color: "#e87c1d" },
-  { mode: "TRANSIT",     label: "Transit",    icon: "🚌",  color: "#1da84b" },
-  { mode: "WALKING",     label: "Walking",    icon: "🚶",  color: "#8e44ad" },
+  { mode: "DRIVING",     label: "Car",        Icon: Car },
+  // lucide has no motorcycle; Bike is the closest. Unselected rail buttons are
+  // icon-only, so the real name lives in aria-label and title.
+  { mode: "TWO_WHEELER", label: "Motorcycle", Icon: Bike },
+  { mode: "TRANSIT",     label: "Transit",    Icon: Bus },
+  { mode: "WALKING",     label: "Walking",    Icon: Footprints },
 ];
 
 // Bottom sheet on phones, the original floating side panel from md up.
 const PANEL =
   "fixed inset-x-0 bottom-0 z-20 max-h-[60dvh] w-full overflow-y-auto rounded-t-2xl border border-sand bg-white p-4 shadow-2xl " +
-  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:max-h-[78vh] md:w-[300px] md:rounded-xl";
+  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:max-h-[78vh] md:w-[340px] md:rounded-xl";
 
 const COLLAPSED =
   "fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-sand bg-white px-3.5 text-[13px] font-semibold text-forest shadow-[0_4px_20px_rgba(64,84,74,0.18)] " +
@@ -46,7 +49,15 @@ export default function TripPanel({
   collapsed, onToggleCollapsed,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
-  const [showNav, setShowNav] = useState(false);
+  // Lazy initialiser — reads storage once on mount, not on every render.
+  const [nearbyCollapsed, setNearbyCollapsed] = useState(loadNearbyCollapsed);
+
+  function toggleNearby() {
+    setNearbyCollapsed((collapsed) => {
+      saveNearbyCollapsed(!collapsed);
+      return !collapsed;
+    });
+  }
   const [editingId, setEditingId] = useState(null); // id of the stop whose address is being re-typed
   const [addingPlace, setAddingPlace] = useState(false);
 
@@ -69,7 +80,6 @@ export default function TripPanel({
       </button>
     );
   }
-  const activeMode = NAV_MODES.find((m) => m.mode === travelMode);
   const gmaps = buildGoogleMapsUrl(trip, travelMode);
 
   return (
@@ -242,14 +252,23 @@ export default function TripPanel({
         )
       )}
 
-      {/* Nearby to add — tap a row to preview it on the map, tap + to add it. */}
+      {/* Nearby to add — tap a row to preview it on the map, tap + to add it.
+          Collapsible because on a phone this list pushes the route summary and
+          travel mode below the fold. */}
       {onRadiusChange && (
         <div className="mt-2.5 flex items-center gap-1.5">
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.8px] text-terracotta">
+          <button
+            type="button"
+            onClick={toggleNearby}
+            aria-expanded={!nearbyCollapsed}
+            aria-controls="nearby-to-add"
+            className="flex min-h-11 items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.8px] text-terracotta"
+          >
+            {nearbyCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
             Nearby to Add
-          </span>
+          </button>
           <span className="flex-1" />
-          {[1, 2, 5].map((km) => (
+          {!nearbyCollapsed && [1, 2, 5].map((km) => (
             <button
               key={km}
               onClick={() => onRadiusChange(km)}
@@ -262,6 +281,8 @@ export default function TripPanel({
           ))}
         </div>
       )}
+      {!nearbyCollapsed && (
+      <div id="nearby-to-add">
       {onToggleAllVendors && (
         <button
           onClick={onToggleAllVendors}
@@ -303,6 +324,8 @@ export default function TripPanel({
           {hasAnchor ? `Nothing within ${radiusKm}km — try a bigger radius.` : "Set your starting point to see nearby vendors."}
         </div>
       )}
+      </div>
+      )}
 
       {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
@@ -320,44 +343,42 @@ export default function TripPanel({
         </button>
       )}
 
-      {/* Nav mode grid */}
-      {showNav && (
-        <div className="my-2 grid grid-cols-2 gap-1.5">
-          {NAV_MODES.map(({ mode, label, icon, color }) => {
-            const active = travelMode === mode;
-            return (
-              <button
-                key={mode}
-                onClick={() => onTravelMode(active ? null : mode)}
-                className={active
-                  ? "flex min-h-11 flex-col items-center gap-0.5 rounded-lg border-[1.5px] px-1 py-2 text-[11px] text-white"
-                  : "flex min-h-11 flex-col items-center gap-0.5 rounded-lg border-[1.5px] border-sand bg-chalk px-1 py-2 text-[11px] text-ink"}
-                style={active ? { background: color, borderColor: color } : undefined}
-              >
-                <span className="text-xl">{icon}</span>
-                {label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Travel mode. Always visible: it used to hide behind a "Start
+          Navigation" toggle, which made the mode unreachable until you found
+          the button. Selected mode expands to show its label; the rest stay
+          icon-only, with the name on aria-label and title. */}
+      {trip.length >= 2 && (
+      <div
+        role="radiogroup"
+        aria-label="Travel mode"
+        className="my-2 flex items-center gap-1 rounded-full border border-sand bg-chalk p-1"
+      >
+        {NAV_MODES.map(({ mode, label, Icon }) => {
+          const active = travelMode === mode;
+          return (
+            <button
+              key={mode}
+              role="radio"
+              aria-checked={active}
+              aria-label={label}
+              title={label}
+              onClick={() => onTravelMode(active ? null : mode)}
+              className={active
+                ? "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-forest px-3 text-[12.5px] font-semibold text-white transition-all motion-reduce:transition-none"
+                : "flex size-11 min-h-11 shrink-0 items-center justify-center rounded-full text-muted transition-all hover:text-forest motion-reduce:transition-none"}
+            >
+              <Icon size={17} strokeWidth={1.8} />
+              {active && <span className="truncate">{label}</span>}
+            </button>
+          );
+        })}
+      </div>
       )}
 
       {travelMode === "TRANSIT" && vendorStops.length >= 1 && <TransitDetails legs={transitLegs} />}
       {travelMode === "DRIVING" && vendorStops.length >= 1 && (
         <RouteOptions routes={routeOptions} selectedIndex={routeIndex} onSelect={onSelectRoute} />
       )}
-
-      {/* Start Navigation — navy CTA */}
-      <button
-        onClick={() => setShowNav((v) => !v)}
-        disabled={trip.length < 2}
-        className={trip.length < 2
-          ? "mt-1 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] bg-chalk px-3 text-sm font-semibold text-muted"
-          : "mt-1 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] bg-forest px-3 text-sm font-semibold text-white"}
-      >
-        <Navigation size={15} />
-        {activeMode ? `Navigating by ${activeMode.label}` : "Start Navigation"}
-      </button>
 
       {/* Hands off to Google Maps for real turn-by-turn navigation — we don't
           build in-app navigation ourselves. */}
