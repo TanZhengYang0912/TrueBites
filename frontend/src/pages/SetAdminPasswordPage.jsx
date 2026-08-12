@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import PasswordField from "../components/PasswordField";
 import { AUTH_PAGE, AUTH_STACK, AUTH_CARD, AUTH_INPUT, AUTH_PRIMARY, AUTH_ERROR } from "./LoginPage";
+import { logActivity } from "../lib/activityLog";
 
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
@@ -50,6 +51,7 @@ export default function SetAdminPasswordPage() {
     }
 
     setLoading(false);
+    logActivity("auth.password_set");
     navigate("/admin", { replace: true });
   }
 

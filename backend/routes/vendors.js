@@ -2,6 +2,8 @@ import { Router } from "express";
 import express from "express";
 import { supabase } from "../supabase.js";
 import { requireRole } from "../middleware/requireRole.js";
+import { requirePermission } from "../middleware/requirePermission.js";
+import { logActivity } from "../lib/auditLog.js";
 import {
   STORAGE_BUCKET,
   VENDOR_STATUSES,
@@ -10,8 +12,9 @@ import {
 } from "../lib/vendorValidation.js";
 const router = Router();
 
-// Reads stay public (they feed the discovery UI); writes require an admin.
-const adminOnly = requireRole("admin");
+// Reads stay public (they feed the discovery UI); writes require an admin
+// with the "vendors" permission (see lib/permissions.js).
+const adminOnly = [requireRole("admin", "superadmin"), requirePermission("vendors")];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORS MODULE — Toh Lian Thing
@@ -121,6 +124,7 @@ router.post("/vendors", adminOnly, async (req, res) => {
     const status = error.code === "23505" ? 409 : 500; // unique violation → conflict
     return res.status(status).json({ error: "database insert failed", details: error.message });
   }
+  await logActivity({ actor: req.callerUser, action: "vendor.create", entityType: "vendor", entityId: data.id });
   res.status(201).json(data);
 });
 
@@ -141,6 +145,7 @@ router.put("/vendors/:id", adminOnly, async (req, res) => {
     return res.status(500).json({ error: "database update failed", details: error.message });
   }
   if (!data) return res.status(404).json({ error: "vendor not found" });
+  await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: req.params.id });
   res.json(data);
 });
 
@@ -160,6 +165,7 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
   if (error) {
     return res.status(500).json({ error: "database update failed", details: error.message });
   }
+  await logActivity({ actor: req.callerUser, action: "vendor.status_change", entityType: "vendor", entityId: req.params.id, metadata: { status } });
   res.json(data);
 });
 
@@ -218,6 +224,7 @@ router.post(
       await supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
     }
 
+    await logActivity({ actor: req.callerUser, action: "vendor.image_upload", entityType: "vendor", entityId: vendor.id });
     res.status(201).json({ storefront_image_url: publicUrl });
   }
 );
@@ -240,6 +247,7 @@ router.delete("/vendors/:id", adminOnly, async (req, res) => {
     await supabase.storage.from(STORAGE_BUCKET).remove([imagePath]);
   }
 
+  await logActivity({ actor: req.callerUser, action: "vendor.delete", entityType: "vendor", entityId: vendor.id });
   res.json({ deleted: true, id: vendor.id });
 });
 

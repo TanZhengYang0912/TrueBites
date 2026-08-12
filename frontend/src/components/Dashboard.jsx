@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import FilterChips from "./discovery/FilterChips";
 import VendorCard from "./discovery/VendorCard";
@@ -17,7 +17,8 @@ const PAGE_SIZE = 12;
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
 export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop }) {
-  const [session, setSession] = useState(null);
+  const { session: authSession } = useSession();
+  const session = customerSession(authSession);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [creator, setCreator] = useState("all");
@@ -36,12 +37,6 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
     };
   }
   const guardedToggleBookmark = requireAuth(onToggleBookmark);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(customerSession(data.session)));
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => setSession(customerSession(s)));
-    return () => listener.subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -92,17 +87,25 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
       <main className="mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12 xl:px-10">
         <>
             <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-end lg:gap-12">
-              <div>
-                <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">
-                  A local guide to Melaka
-                </p>
-                <h1 className="m-0 max-w-[760px] font-display text-[clamp(32px,4vw,54px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
-                  Hidden gems,{" "}
-                  <span className="italic text-forest">authentic flavours</span>
-                </h1>
-                <p className="mb-0 mt-3 text-sm text-muted">
-                  {vendors.length} places waiting to be discovered
-                </p>
+              <div className="flex items-center gap-4">
+                <img
+                  src="/assets/mascot.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20"
+                />
+                <div>
+                  <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">
+                    A local guide to Melaka
+                  </p>
+                  <h1 className="m-0 max-w-[760px] font-display text-[clamp(32px,4vw,54px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
+                    Hidden gems,{" "}
+                    <span className="italic text-forest">authentic flavours</span>
+                  </h1>
+                  <p className="mb-0 mt-3 text-sm text-muted">
+                    {vendors.length} places waiting to be discovered
+                  </p>
+                </div>
               </div>
               <label className="relative flex items-center">
                 <Search size={18} className="absolute left-3.5 text-muted" />
@@ -116,13 +119,15 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
               </label>
             </div>
 
-            <FilterChips
-              active={category}
-              onSelect={setCategory}
-              creator={creator}
-              onCreatorSelect={setCreator}
-              vendors={vendors}
-            />
+            <div className="mb-6">
+              <FilterChips
+                active={category}
+                onSelect={setCategory}
+                creator={creator}
+                onCreatorSelect={setCreator}
+                vendors={vendors}
+              />
+            </div>
 
             {displayed.length === 0 ? (
               <Empty onClear={() => { setSearch(""); setCategory("all"); setCreator("all"); }} />

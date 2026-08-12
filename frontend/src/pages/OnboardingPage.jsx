@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
 import DobScrollPicker from "../components/DobScrollPicker";
 import { AUTH_INPUT, AUTH_PRIMARY, AUTH_ERROR } from "./LoginPage";
 
@@ -20,7 +21,7 @@ function parseDobIso(iso) {
 // Forced 3-step onboarding right after email/password signup — collects the
 // account's first/last name, DOB, and gender before the user can reach the app.
 export default function OnboardingPage() {
-  const [checking, setChecking] = useState(true);
+  const { session, loading: checking } = useSession();
   const [step, setStep] = useState(0);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -29,25 +30,27 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const prefilled = useRef(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        navigate("/login", { replace: true });
-        return;
-      }
-      // Prefill anything already on the account (name is auto-assigned, DOB and
-      // gender are optional and may be blank). Onboarding is never forced now —
-      // this page is a place to complete a profile, with a Skip option.
-      const meta = data.session.user.user_metadata || {};
-      if (meta.first_name) setFirstName(meta.first_name);
-      if (meta.last_name) setLastName(meta.last_name);
-      if (meta.gender) setGender(meta.gender);
-      const parsed = parseDobIso(meta.date_of_birth);
-      if (parsed) setDob(parsed);
-      setChecking(false);
-    });
-  }, [navigate]);
+    if (checking) return;
+    if (!session) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    // Prefill anything already on the account (name is auto-assigned, DOB and
+    // gender are optional and may be blank). Onboarding is never forced now —
+    // this page is a place to complete a profile, with a Skip option. Guarded
+    // to run once — a later session refresh shouldn't clobber in-progress edits.
+    if (prefilled.current) return;
+    prefilled.current = true;
+    const meta = session.user.user_metadata || {};
+    if (meta.first_name) setFirstName(meta.first_name);
+    if (meta.last_name) setLastName(meta.last_name);
+    if (meta.gender) setGender(meta.gender);
+    const parsed = parseDobIso(meta.date_of_birth);
+    if (parsed) setDob(parsed);
+  }, [checking, session, navigate]);
 
   if (checking) return null;
 

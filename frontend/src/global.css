@@ -480,6 +480,28 @@
     box-shadow: inset 4px 0 0 var(--admin-navy);
   }
 
+  /* Reset native <button> chrome — disabled nav tabs render as a button
+     (not an <a>) so a click can show the "access disabled" toast instead
+     of navigating. */
+  button.admin-nav-item {
+    width: 100%;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .admin-nav-item.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .admin-nav-item.is-disabled:hover {
+    background: none;
+    color: var(--admin-muted);
+  }
+
   .admin-sidebar-footer {
     margin-top: auto;
     padding: 14px 14px 18px;
@@ -491,6 +513,35 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 14px;
+    border-radius: 10px;
+    padding: 6px;
+    margin-inline: -6px;
+    transition: background-color 160ms var(--admin-ease-out), transform 160ms var(--admin-ease-out);
+  }
+
+  /* Reset native <button> chrome — the user card is a button (opens
+     Account) but should look and feel identical to the plain div it used
+     to be, plus react to hover/press like the rest of the sidebar. */
+  .admin-user-card.is-button {
+    width: 100%;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .admin-user-card.is-button:hover {
+    background: var(--admin-hover);
+  }
+
+  .admin-user-card.is-button:active {
+    transform: scale(0.985);
+  }
+
+  .admin-user-card.is-button:focus-visible {
+    outline: 3px solid var(--admin-focus);
+    outline-offset: 2px;
   }
 
   .admin-avatar,
@@ -2992,4 +3043,10 @@
     .admin-shell input:not([type="checkbox"]) { min-height: 2.75rem; min-width: 2.75rem; }
     .admin-shell input[type="checkbox"] { width: 1.5rem; height: 1.5rem; }
   }
+}
+
+/* Hides the scrollbar on the horizontally-scrollable category tab strip
+   while keeping native scroll/drag/wheel behaviour intact. */
+@layer components {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
 }

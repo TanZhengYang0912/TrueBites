@@ -11,6 +11,9 @@ import {
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
+import { logActivity } from "../lib/auditLog.js";
+import { requirePermission } from "../middleware/requirePermission.js";
+import { PERMISSION_KEYS, resolvePermissions, deriveStatus } from "../lib/permissions.js";
 
 const router = Router();
 
@@ -18,9 +21,20 @@ const OUTPUTS_DIR = path.resolve(process.cwd(), "outputs");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN DASHBOARD / VENDORS / AI PROCESSING / SETTINGS / REVIEWS
-// The whole /api/admin router is gated by requireRole("admin") in server.js,
-// so every handler below can assume the caller is a verified admin.
+// The whole /api/admin router is gated by requireRole("admin", "superadmin")
+// in server.js, so every handler below can assume the caller is a verified
+// admin. A few routes (e.g. /staff) additionally require requireSuperAdmin
+// below, since regular admins should not see other staff accounts.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Stricter than the router-level gate: only the superadmin role may pass.
+// requireRole already verified the token and attached req.callerUser.
+function requireSuperAdmin(req, res, next) {
+  if (req.callerUser?.app_metadata?.role !== "superadmin") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
 
 function normalizeStatusFilter(status) {
   if (!status || status === "all") return null;
@@ -253,7 +267,7 @@ router.get("/dashboard", async (_req, res) => {
 
 const ADMIN_CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 
-router.get("/vendors", async (req, res) => {
+router.get("/vendors", requirePermission("vendors"), async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 10));
   const status = String(req.query.status || "all").toLowerCase();
@@ -345,7 +359,7 @@ router.get("/vendors", async (req, res) => {
 
 // Read-only fuzzy scan for the "possible duplicates" review panel — never
 // deletes or merges anything; the admin reviews each pair and decides.
-router.get("/vendors/duplicates", async (req, res) => {
+router.get("/vendors/duplicates", requirePermission("vendors"), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("vendors")
@@ -361,7 +375,7 @@ router.get("/vendors/duplicates", async (req, res) => {
   }
 });
 
-router.patch("/vendors/:id", async (req, res) => {
+router.patch("/vendors/:id", requirePermission("vendors"), async (req, res) => {
   const { id } = req.params;
 
   const { errors, clean } = validateVendorPatch(req.body || {});
@@ -388,6 +402,7 @@ router.patch("/vendors/:id", async (req, res) => {
       if (error.code === "PGRST116") return res.status(404).json({ error: "Vendor not found" });
       throw error;
     }
+    await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
     res.json(data);
   } catch (error) {
     console.error("PATCH /vendors/:id failed:", error);
@@ -395,7 +410,7 @@ router.patch("/vendors/:id", async (req, res) => {
   }
 });
 
-router.get("/ai-records", async (req, res) => {
+router.get("/ai-records", requirePermission("ai"), async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 5));
 
@@ -442,7 +457,7 @@ router.get("/ai-records", async (req, res) => {
   }
 });
 
-router.post("/ai/submit", async (req, res) => {
+router.post("/ai/submit", requirePermission("ai"), async (req, res) => {
   const url = String(req.body?.url || "").trim();
 
   if (!url) {
@@ -464,6 +479,7 @@ router.post("/ai/submit", async (req, res) => {
       });
     }
 
+    await logActivity({ actor: req.callerUser, action: "ai.submit", entityType: "ai_job", metadata: { url } });
     return res.json(payload);
   } catch (error) {
     return res.status(502).json({
@@ -473,7 +489,7 @@ router.post("/ai/submit", async (req, res) => {
   }
 });
 
-router.get("/ai/service-status", async (_req, res) => {
+router.get("/ai/service-status", requirePermission("ai"), async (_req, res) => {
   const base = process.env.AI_SERVICE_BASE || "http://localhost:8000";
 
   try {
@@ -492,7 +508,7 @@ router.get("/ai/service-status", async (_req, res) => {
   }
 });
 
-router.get("/settings", async (_req, res) => {
+router.get("/settings", requirePermission("settings"), async (_req, res) => {
   try {
     const platformSettings = [
       { label: "Platform Name", value: "TrueBites" },
@@ -534,7 +550,7 @@ router.get("/settings", async (_req, res) => {
   }
 });
 
-router.post("/vendors", async (req, res) => {
+router.post("/vendors", requirePermission("vendors"), async (req, res) => {
   const { errors, clean } = validateVendor(req.body || {});
   if (Object.keys(errors).length) {
     return res.status(400).json({ error: "Validation failed", fields: errors });
@@ -580,6 +596,7 @@ router.post("/vendors", async (req, res) => {
       if (status === 409) return res.status(409).json({ error: "A vendor with these details already exists" });
       throw error;
     }
+    await logActivity({ actor: req.callerUser, action: "vendor.create", entityType: "vendor", entityId: data.id });
     res.status(201).json(data);
   } catch (error) {
     console.error("POST /vendors failed:", error);
@@ -598,7 +615,7 @@ function pathFromUrl(bucket, url) {
   return idx === -1 ? null : decodeURIComponent(url.slice(idx + marker.length));
 }
 
-router.delete("/vendors/:id", async (req, res) => {
+router.delete("/vendors/:id", requirePermission("vendors"), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -640,6 +657,7 @@ router.delete("/vendors/:id", async (req, res) => {
     const imagePath = storagePathFromUrl(vendor.storefront_image_url);
     if (imagePath) await supabase.storage.from(STORAGE_BUCKET).remove([imagePath]);
 
+    await logActivity({ actor: req.callerUser, action: "vendor.delete", entityType: "vendor", entityId: id });
     res.json({ success: true, id });
   } catch (error) {
     console.error("DELETE /vendors/:id failed:", error);
@@ -647,7 +665,7 @@ router.delete("/vendors/:id", async (req, res) => {
   }
 });
 
-router.get("/reviews", async (req, res) => {
+router.get("/reviews", requirePermission("reviews"), async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 10));
   const visibility = String(req.query.visibility || "all").toLowerCase();
@@ -686,7 +704,7 @@ router.get("/reviews", async (req, res) => {
   }
 });
 
-router.patch("/reviews/:id/visibility", async (req, res) => {
+router.patch("/reviews/:id/visibility", requirePermission("reviews"), async (req, res) => {
   const { id } = req.params;
   const isHidden = Boolean(req.body?.is_hidden);
 
@@ -700,9 +718,233 @@ router.patch("/reviews/:id/visibility", async (req, res) => {
     if (error) throw error;
 
     await recomputeVendorRating(data.vendor_id);
+    await logActivity({
+      actor: req.callerUser,
+      action: isHidden ? "review.hide" : "review.unhide",
+      entityType: "review",
+      entityId: data.id,
+      metadata: { vendor_id: data.vendor_id },
+    });
     res.json({ id: data.id, isHidden });
   } catch (error) {
     res.status(500).json({ error: "Failed to update review visibility", details: error.message });
+  }
+});
+
+// Superadmin-only: read-only view of staff (admin/superadmin) accounts.
+// Supabase Auth never returns passwords (hashed or plain) via the SDK, so
+// there is nothing secret in this response — only account metadata.
+router.get("/staff", requireSuperAdmin, async (_req, res) => {
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) throw error;
+
+    const items = (data.users || [])
+      .filter((user) => ["admin", "superadmin"].includes(user.app_metadata?.role))
+      .map((user) => ({
+        id: user.id,
+        email: user.email,
+        role: user.app_metadata?.role || "unknown",
+        status: deriveStatus(user),
+        permissions: resolvePermissions(user),
+        createdAt: user.created_at,
+        lastSignInAt: user.last_sign_in_at,
+        emailConfirmedAt: user.email_confirmed_at,
+        mustChangePassword: Boolean(user.user_metadata?.must_change_password),
+      }))
+      .sort((a, b) => (a.email || "").localeCompare(b.email || ""));
+
+    res.json({ items });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load staff accounts", details: error.message });
+  }
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Superadmin-only: creates a new staff (admin) account. Deliberately skips
+// email confirmation and any 2FA step — internal staff accounts, including
+// fake/organizational addresses, need to be usable immediately. The initial
+// password is set to the email itself (a known, temporary value) and
+// must_change_password forces a real password on first login before the
+// account can do anything else — see requireRole's app_metadata check and
+// AdminLoginPage/SetAdminPasswordPage on the frontend.
+router.post("/staff", requireSuperAdmin, async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Enter a valid email address" });
+  }
+
+  const requested = req.body?.permissions;
+  const permissions = Array.isArray(requested)
+    ? requested.filter((p) => PERMISSION_KEYS.includes(p))
+    : [...PERMISSION_KEYS];
+
+  try {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password: email,
+      email_confirm: true,
+      app_metadata: { role: "admin", permissions },
+      user_metadata: { must_change_password: true },
+    });
+    if (error) {
+      const status = /already registered|already exists/i.test(error.message) ? 409 : 500;
+      return res.status(status).json({ error: status === 409 ? "An account with this email already exists" : "Failed to create staff account", details: error.message });
+    }
+
+    await logActivity({ actor: req.callerUser, action: "staff.create", entityType: "staff", entityId: data.user.id, metadata: { email, permissions } });
+
+    res.status(201).json({
+      id: data.user.id,
+      email: data.user.email,
+      role: data.user.app_metadata?.role || "admin",
+      status: "active",
+      permissions,
+      createdAt: data.user.created_at,
+      lastSignInAt: data.user.last_sign_in_at,
+      emailConfirmedAt: data.user.email_confirmed_at,
+      mustChangePassword: true,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create staff account", details: error.message });
+  }
+});
+
+// Superadmin-only: full detail for one staff member — backs the Manage
+// Account panel (status, current access, actions).
+router.get("/staff/:id", requireSuperAdmin, async (req, res) => {
+  const { data, error } = await supabase.auth.admin.getUserById(req.params.id);
+  if (error || !data?.user) return res.status(404).json({ error: "Staff account not found" });
+
+  const user = data.user;
+  res.json({
+    id: user.id,
+    email: user.email,
+    role: user.app_metadata?.role || "unknown",
+    status: deriveStatus(user),
+    permissions: resolvePermissions(user),
+    createdAt: user.created_at,
+    lastSignInAt: user.last_sign_in_at,
+    emailConfirmedAt: user.email_confirmed_at,
+    mustChangePassword: Boolean(user.user_metadata?.must_change_password),
+    isSelf: user.id === req.callerUser.id,
+  });
+});
+
+// Suspending uses Supabase Auth's own ban mechanism, so it actually blocks
+// sign-in — not just a cosmetic flag. ~100 years stands in for "indefinite"
+// since the GoTrue API wants a duration, not a boolean.
+const SUSPEND_DURATION = "876000h";
+
+router.patch("/staff/:id/status", requireSuperAdmin, async (req, res) => {
+  if (req.params.id === req.callerUser.id) {
+    return res.status(400).json({ error: "You cannot suspend your own account" });
+  }
+  const status = String(req.body?.status || "").toLowerCase();
+  if (!["active", "suspended"].includes(status)) {
+    return res.status(400).json({ error: "status must be 'active' or 'suspended'" });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.admin.updateUserById(req.params.id, {
+      ban_duration: status === "suspended" ? SUSPEND_DURATION : "none",
+    });
+    if (error) throw error;
+
+    await logActivity({ actor: req.callerUser, action: status === "suspended" ? "staff.suspend" : "staff.reactivate", entityType: "staff", entityId: req.params.id });
+    res.json({ id: data.user.id, status: deriveStatus(data.user) });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update account status", details: error.message });
+  }
+});
+
+router.patch("/staff/:id/permissions", requireSuperAdmin, async (req, res) => {
+  if (req.params.id === req.callerUser.id) {
+    return res.status(400).json({ error: "You cannot change your own access" });
+  }
+  const requested = req.body?.permissions;
+  if (!Array.isArray(requested) || requested.some((p) => !PERMISSION_KEYS.includes(p))) {
+    return res.status(400).json({ error: `permissions must be a subset of: ${PERMISSION_KEYS.join(", ")}` });
+  }
+
+  try {
+    const { data: existing, error: findErr } = await supabase.auth.admin.getUserById(req.params.id);
+    if (findErr || !existing?.user) return res.status(404).json({ error: "Staff account not found" });
+
+    const { data, error } = await supabase.auth.admin.updateUserById(req.params.id, {
+      app_metadata: { ...existing.user.app_metadata, permissions: requested },
+    });
+    if (error) throw error;
+
+    await logActivity({ actor: req.callerUser, action: "staff.permissions_update", entityType: "staff", entityId: req.params.id, metadata: { permissions: requested } });
+    res.json({ id: data.user.id, permissions: resolvePermissions(data.user) });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update access", details: error.message });
+  }
+});
+
+router.delete("/staff/:id", requireSuperAdmin, async (req, res) => {
+  if (req.params.id === req.callerUser.id) {
+    return res.status(400).json({ error: "You cannot remove your own account" });
+  }
+
+  try {
+    const { data: existing, error: findErr } = await supabase.auth.admin.getUserById(req.params.id);
+    if (findErr || !existing?.user) return res.status(404).json({ error: "Staff account not found" });
+
+    // Logged before the delete — the actor row is gone once deleteUser() succeeds.
+    await logActivity({ actor: req.callerUser, action: "staff.remove", entityType: "staff", entityId: req.params.id, metadata: { email: existing.user.email } });
+
+    const { error } = await supabase.auth.admin.deleteUser(req.params.id);
+    if (error) throw error;
+
+    res.json({ deleted: true, id: req.params.id });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove account", details: error.message });
+  }
+});
+
+// Superadmin-only: full activity log for one staff member (admin/superadmin
+// account). Read-only — surfaced in the Staff Moderation panel when a
+// superadmin clicks a row.
+router.get("/staff/:id/activity", requireSuperAdmin, async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 50));
+
+  try {
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(req.params.id);
+    if (userError || !user?.user) return res.status(404).json({ error: "Staff account not found" });
+
+    const { data, error, count } = await supabase
+      .from("audit_log")
+      .select("id, action, entity_type, entity_id, metadata, created_at", { count: "exact" })
+      .eq("actor_id", req.params.id)
+      .order("created_at", { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw error;
+
+    const items = (data || []).map((row) => ({
+      id: row.id,
+      action: row.action,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+    }));
+
+    res.json({
+      staff: { id: user.user.id, email: user.user.email, role: user.user.app_metadata?.role || "unknown" },
+      items,
+      pagination: {
+        page,
+        pageSize,
+        total: count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / pageSize)),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load activity log", details: error.message });
   }
 });
 

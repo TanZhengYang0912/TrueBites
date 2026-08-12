@@ -1,30 +1,22 @@
 // AUTH MODULE — Admin login (frontend only, no backend route yet).
 // Mirrors LoginPage.jsx but drops Google OAuth and lands on /ai instead of /map.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
+import { isAdmin } from "../lib/roles";
+import { logActivity } from "../lib/activityLog";
 import PasswordField from "../components/PasswordField";
 import { AUTH_PAGE, AUTH_STACK, AUTH_CARD, AUTH_INPUT, AUTH_PRIMARY, AUTH_LINK, AUTH_ERROR } from "./LoginPage";
 
 export default function AdminLoginPage() {
-  const [session, setSession] = useState(null);
+  const { session, loading: initializing } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [initializing, setInitializing] = useState(true);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setInitializing(false); });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -48,8 +40,7 @@ export default function AdminLoginPage() {
 
       // app_metadata can only be set via the service key (see admin setup docs),
       // so a user can never grant themselves admin by editing their own profile.
-      const role = data.user?.app_metadata?.role;
-      if (role !== "admin") {
+      if (!isAdmin({ user: data.user })) {
         await supabase.auth.signOut();
         setLoading(false);
         setErrorMsg("This account is not authorized for admin access.");
@@ -57,6 +48,7 @@ export default function AdminLoginPage() {
       }
 
       setLoading(false);
+      logActivity("auth.login");
 
       if (data.user?.user_metadata?.must_change_password) {
         navigate("/admin-set-password", { replace: true });
@@ -75,8 +67,7 @@ export default function AdminLoginPage() {
 
   // Already logged in as an admin — send them straight to the console.
   if (session) {
-    const role = session.user?.app_metadata?.role;
-    if (role === "admin") {
+    if (isAdmin(session)) {
       if (session.user?.user_metadata?.must_change_password) {
         navigate("/admin-set-password", { replace: true });
       } else {
@@ -118,7 +109,7 @@ export default function AdminLoginPage() {
           {errorMsg && <p className={AUTH_ERROR}>{errorMsg}</p>}
 
           <button className={AUTH_LINK} onClick={() => navigate("/map")}>
-            Return to main page
+            Go to main page instead
           </button>
         </div>
       </div>

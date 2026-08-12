@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
 import { deleteAccount, uploadAvatar } from "../api";
 import DobScrollPicker from "../components/DobScrollPicker";
 import { customerSession } from "../lib/roles";
+import { logActivity } from "../lib/activityLog";
 import { AUTH_INPUT, AUTH_ERROR } from "./LoginPage";
 
 // Profile action buttons — full width on every screen, 44px minimum height.
@@ -27,8 +29,8 @@ function formatDob({ day, month, year }) {
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
 
 export default function ProfilePage() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { session: authSession, loading } = useSession();
+  const session = customerSession(authSession);
   const [loggingOut, setLoggingOut] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,17 +49,6 @@ export default function ProfilePage() {
   const [resetDone, setResetDone] = useState(false);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(customerSession(data.session));
-      setLoading(false);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(customerSession(s));
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
 
   if (loading) {
     return (
@@ -118,10 +109,10 @@ export default function ProfilePage() {
       // Routed through the backend (three-tier) — the server validates and
       // writes to Storage; the browser never touches the data tier directly.
       await uploadAvatar(session.access_token, file);
-      // Refresh the session so the new avatar_url in user_metadata shows up.
+      // Refresh the session so the new avatar_url in user_metadata shows up —
+      // the shared SessionContext listener picks up the resulting
+      // TOKEN_REFRESHED event automatically.
       await supabase.auth.refreshSession();
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
     } catch (err) {
       setErrorMsg(err.message || "Failed to upload photo.");
     } finally {
@@ -226,8 +217,9 @@ export default function ProfilePage() {
     });
     setSaving(false);
     if (error) { setErrorMsg(error.message); return; }
-    const { data } = await supabase.auth.getSession();
-    setSession(data.session);
+    // The shared SessionContext listener picks up the resulting USER_UPDATED
+    // event automatically — no need to re-fetch the session here.
+    logActivity("profile.update");
     setEditing(false);
   }
 

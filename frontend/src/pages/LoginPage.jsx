@@ -1,13 +1,15 @@
 // AUTH MODULE — Joshua
 // Login / register UI backed directly by Supabase Auth (no custom Express routes).
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
 import PasswordField from "../components/PasswordField";
 import TrueBitesLogo from "../components/TrueBitesLogo";
 import { isAdmin } from "../lib/roles";
+import { logActivity } from "../lib/activityLog";
 
 function GoogleIcon() {
   return (
@@ -32,13 +34,33 @@ export const AUTH_LINK = "min-h-11 text-center text-[13px] text-forest underline
 export const AUTH_ERROR = "m-0 break-words rounded-lg border border-[#f5c6c0] bg-[#fdecea] px-3 py-2.5 text-[13px] leading-snug text-[#9a2820]";
 export const AUTH_INFO = "m-0 break-words rounded-lg border border-[#b9e3c6] bg-[#e9f7ee] px-3 py-2.5 text-[13px] leading-snug text-[#1f6b40]";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
+
+// Only called after a failed password sign-in — never proactively — so it
+// can't be used to probe whether an arbitrary email is registered ahead of
+// submitting a password.
+async function isGoogleOnlyAccount(email) {
+  try {
+    const response = await fetch(`${API_BASE}/api/login-hint`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return Boolean(data.googleOnly);
+  } catch {
+    return false;
+  }
+}
+
 const TAB = "flex min-h-13 flex-1 items-center justify-center whitespace-nowrap rounded-lg border px-3.5 py-3 text-sm font-semibold transition-colors motion-reduce:transition-none";
 const TAB_IDLE = `${TAB} border-sand bg-[#F7F6F3] text-ink hover:border-forest`;
 const TAB_ACTIVE = `${TAB} border-forest bg-forest text-white`;
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [session, setSession] = useState(null);
+  const { session, loading: sessionLoading } = useSession();
   const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot" — always opens on Sign In
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,16 +68,6 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [justSignedUp, setJustSignedUp] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -86,11 +98,17 @@ export default function LoginPage() {
           error?.statusText ||
           error?.status ||
           (error && Object.keys(error).length > 0 ? JSON.stringify(error) : "Unknown error from Supabase");
-        const friendlyMessage =
-          mode !== "signup" && errorMessage === "Invalid login credentials"
-            ? "Sorry, you may have entered a wrong email or password! Try checking again!"
-            : errorMessage;
-        setErrorMsg(friendlyMessage);
+
+        if (mode !== "signup" && errorMessage === "Invalid login credentials") {
+          const googleOnly = await isGoogleOnlyAccount(email);
+          setErrorMsg(
+            googleOnly
+              ? "The password you entered is incorrect. Try logging in with Google instead."
+              : "Sorry, you may have entered a wrong email or password! Try checking again!"
+          );
+          return;
+        }
+        setErrorMsg(errorMessage);
         return;
       }
 
@@ -99,6 +117,7 @@ export default function LoginPage() {
           setErrorMsg("This email is already registered. Please sign in instead.");
         } else if (data?.session) {
           // Confirmed immediately (email confirmation off) — collect name/DOB.
+          logActivity("auth.signup");
           setJustSignedUp(true);
           navigate("/onboarding", { replace: true });
         } else {
@@ -107,6 +126,7 @@ export default function LoginPage() {
           setPassword("");
         }
       } else {
+        logActivity("auth.login");
         navigate("/map", { replace: true });
       }
     } catch (err) {
@@ -131,14 +151,20 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setErrorMsg("");
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google" });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/map` },
+    });
     if (error) setErrorMsg(error.message);
   }
 
   // Already logged in — go back to the app (unless we're mid-redirect to onboarding).
   // Admins land here whenever a customer surface asks a "guest" to sign in; send
   // them to their console instead, so no page needs its own admin redirect.
-  if (session && !justSignedUp) {
+  // Waits for the session context's initial read (and any Google OAuth code
+  // exchange it's resolving) before deciding — otherwise a fast redirect back
+  // from Google can render this page as logged-out for a frame.
+  if (!sessionLoading && session && !justSignedUp) {
     navigate(isAdmin(session) ? "/admin" : "/map", { replace: true });
     return null;
   }
@@ -229,7 +255,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? "Please wait…" : mode === "signup" ? "Create Account" : "Sign In"}
+                {loading ? "Please wait…" : mode === "signup" ? "+ Create Account" : "Sign In"}
               </button>
             </form>
           )}

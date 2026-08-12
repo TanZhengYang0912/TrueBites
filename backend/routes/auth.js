@@ -1,6 +1,7 @@
 import { Router } from "express";
 import express from "express";
 import { supabase } from "../supabase.js";
+import { logActivity } from "../lib/auditLog.js";
 
 const router = Router();
 
@@ -61,7 +62,58 @@ router.post("/profile/avatar", express.raw({ type: "image/*", limit: "8mb" }), a
     await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]);
   }
 
+  await logActivity({ actor: user, action: "profile.avatar_update", entityType: "profile", entityId: user.id });
+
   res.status(201).json({ avatar_url: pub.publicUrl });
+});
+
+// Generic activity-logging endpoint for actions that happen entirely on the
+// client via supabase-js (login, signup, password changes) — there's no
+// other backend route in the request path for those, so the frontend calls
+// this right after the Supabase Auth call succeeds. Actor is always the
+// verified token subject, never a client-supplied id.
+router.post("/log-event", async (req, res) => {
+  const user = await userFromToken(req, res);
+  if (!user) return;
+
+  const action = String(req.body?.action || "").trim();
+  if (!action) return res.status(400).json({ error: "action is required" });
+
+  await logActivity({
+    actor: user,
+    action,
+    entityType: "account",
+    entityId: user.id,
+    metadata: req.body?.metadata && typeof req.body.metadata === "object" ? req.body.metadata : null,
+  });
+
+  res.status(204).end();
+});
+
+// Called only after a failed password sign-in, to tell the "wrong password"
+// case apart from "this account only ever signed up with Google, it has no
+// password to get wrong". Deliberately reveals nothing else — a non-existent
+// email gets the same { googleOnly: false } as a normal email/password
+// account, so this can't be used to enumerate registered addresses beyond
+// what a wrong-password error already implies.
+router.post("/login-hint", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!email) return res.json({ googleOnly: false });
+
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) throw error;
+
+    const user = data.users.find((u) => u.email?.toLowerCase() === email);
+    // listUsers() doesn't populate `identities` (it comes back null) — the
+    // linked-provider list lives on app_metadata instead.
+    const providers = user?.app_metadata?.providers || [];
+    const googleOnly = providers.includes("google") && !providers.includes("email");
+
+    res.json({ googleOnly });
+  } catch {
+    res.json({ googleOnly: false });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,6 +133,10 @@ router.delete("/account", async (req, res) => {
   if (userError || !userData?.user) {
     return res.status(401).json({ error: "Invalid or expired session" });
   }
+
+  // Logged before the delete — the actor row (auth.users) is gone once
+  // deleteUser() succeeds, so this is the only chance to capture it.
+  await logActivity({ actor: userData.user, action: "account.delete", entityType: "account", entityId: userData.user.id });
 
   const { error: deleteError } = await supabase.auth.admin.deleteUser(userData.user.id);
   if (deleteError) {

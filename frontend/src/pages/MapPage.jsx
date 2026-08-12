@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { getRestaurants, getTrip } from "../api";
-import { supabase } from "../supabaseClient";
+import { useSession } from "../lib/SessionContext";
 import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
@@ -54,7 +54,8 @@ export default function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = searchParams.get("view") === "map" ? "map" : "dashboard";     // "dashboard" | "map"
   const [vendors, setVendors] = useState([]);
-  const [session, setSession] = useState(null);
+  const { session: authSession } = useSession();
+  const session = customerSession(authSession);
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
   const [folders, setFolders] = useState([]);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
@@ -119,12 +120,6 @@ export default function MapPage() {
   useEffect(() => {
     if (trip.length >= 2 && !travelMode) planTrip(trip, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(customerSession(data.session)));
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => setSession(customerSession(s)));
-    return () => listener.subscription.unsubscribe();
   }, []);
 
   // Bookmarks are server-backed and auth-gated — an anonymous browser sees

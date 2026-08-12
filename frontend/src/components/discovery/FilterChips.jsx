@@ -1,4 +1,5 @@
-import { Coffee, Grid2X2, MoreHorizontal, Soup, Flower2, Users } from "lucide-react";
+import { useRef } from "react";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import {
   CATEGORY_FILTERS,
   MORE_CATEGORY_OPTIONS,
@@ -9,76 +10,84 @@ import {
 const MUTED = "#69717A";
 
 const ICONS = {
-  all: Grid2X2,
-  local: Soup,
-  cafe: Coffee,
-  nyonya: Flower2,
+  all: "🍽️",
+  local: "🍲",
+  cafe: "☕",
+  nyonya: "👘",
+  western: "🥩",
+  middle_eastern: "🌮",
+  chinese: "🍜",
+  korean: "🇰🇷",
 };
 
-const CHIP = "inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition-colors active:scale-97 motion-reduce:transition-none";
+const CHIP = "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition-colors active:scale-97 motion-reduce:transition-none";
 const CHIP_IDLE = `${CHIP} border-sand bg-white text-muted hover:border-forest hover:text-forest`;
 const CHIP_ACTIVE = `${CHIP} border-forest bg-forest text-white`;
 const SELECT = "min-h-11 rounded-md border border-sand bg-white px-3 text-[13px] text-ink outline-none focus:border-forest";
+const SCROLL_BUTTON = "flex h-11 w-8 shrink-0 items-center justify-center rounded-md border border-sand bg-white text-muted transition-colors hover:border-forest hover:text-forest disabled:pointer-events-none disabled:opacity-30";
 
 function countFor(vendors, key) {
   return vendors.filter((vendor) => categoryMatches(vendor, key)).length;
 }
 
 export default function FilterChips({ active, onSelect, creator, onCreatorSelect, vendors = [] }) {
+  const scrollerRef = useRef(null);
   const availableMore = MORE_CATEGORY_OPTIONS.filter((option) => countFor(vendors, option.key) > 0);
+  const allCategories = [...CATEGORY_FILTERS, ...availableMore];
   const creatorCounts = new Map();
   vendors.forEach((vendor) => {
     const handle = creatorHandle(vendor);
     if (handle) creatorCounts.set(handle, (creatorCounts.get(handle) || 0) + 1);
   });
   const creators = [...creatorCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const selectedMore = availableMore.some((option) => option.key === active);
+
+  function scrollByStep(direction) {
+    scrollerRef.current?.scrollBy({ left: direction * 160, behavior: "smooth" });
+  }
 
   return (
     <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {CATEGORY_FILTERS.map(({ key, label }) => {
-          const Icon = ICONS[key];
-          const isActive = active === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSelect(key)}
-              className={isActive ? CHIP_ACTIVE : CHIP_IDLE}
-              aria-pressed={isActive}
-            >
-              {Icon && <Icon size={14} strokeWidth={1.7} />}
-              <span>{label}</span>
-              <small className={isActive ? "opacity-70" : "opacity-55"}>{countFor(vendors, key)}</small>
-            </button>
-          );
-        })}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => scrollByStep(-1)}
+          className={SCROLL_BUTTON}
+          aria-label="Scroll categories left"
+        >
+          <ChevronLeft size={16} />
+        </button>
 
-        {availableMore.length > 0 && (
-          <label className="relative inline-flex items-center">
-            <MoreHorizontal
-              size={15}
-              color={selectedMore ? "#fff" : MUTED}
-              className="pointer-events-none absolute left-2.5"
-            />
-            <select
-              value={selectedMore ? active : ""}
-              onChange={(event) => event.target.value && onSelect(event.target.value)}
-              className={selectedMore
-                ? "min-h-11 rounded-md border border-forest bg-forest pl-8 pr-3 text-[13px] text-white outline-none"
-                : `${SELECT} pl-8`}
-              aria-label="More categories"
-            >
-              <option value="">More</option>
-              {availableMore.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label} ({countFor(vendors, option.key)})
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <div
+          ref={scrollerRef}
+          className="no-scrollbar flex min-w-0 max-w-[calc(100vw-9rem)] items-center gap-2 overflow-x-auto scroll-smooth sm:max-w-[420px] lg:max-w-[560px]"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {allCategories.map(({ key, label }) => {
+            const isActive = active === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onSelect(key)}
+                className={isActive ? CHIP_ACTIVE : CHIP_IDLE}
+                aria-pressed={isActive}
+              >
+                {ICONS[key] && <span aria-hidden="true">{ICONS[key]}</span>}
+                <span>{label}</span>
+                <small className={isActive ? "opacity-70" : "opacity-55"}>{countFor(vendors, key)}</small>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => scrollByStep(1)}
+          className={SCROLL_BUTTON}
+          aria-label="Scroll categories right"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       {/* Divider becomes a full-width rule once the bar stacks */}

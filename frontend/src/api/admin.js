@@ -123,6 +123,48 @@ export async function getAdminReviews({ page = 1, pageSize = 10, visibility = "a
   return requestJson(`/api/admin/reviews?${params}`);
 }
 
+// Superadmin-only — see requireSuperAdmin in backend/routes/admin.js.
+export async function getAdminStaff() {
+  return requestJson("/api/admin/staff");
+}
+
+export async function getAdminStaffActivity(id, { page = 1, pageSize = 50 } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return requestJson(`/api/admin/staff/${id}/activity?${params}`);
+}
+
+export async function createAdminStaff(email, permissions) {
+  return requestJson("/api/admin/staff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, permissions }),
+  });
+}
+
+export async function getAdminStaffDetail(id) {
+  return requestJson(`/api/admin/staff/${id}`);
+}
+
+export async function setStaffStatus(id, status) {
+  return requestJson(`/api/admin/staff/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function setStaffPermissions(id, permissions) {
+  return requestJson(`/api/admin/staff/${id}/permissions`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ permissions }),
+  });
+}
+
+export async function deleteAdminStaff(id) {
+  return requestJson(`/api/admin/staff/${id}`, { method: "DELETE" });
+}
+
 export async function setReviewVisibility(id, isHidden) {
   return requestJson(`/api/admin/reviews/${id}/visibility`, {
     method: "PATCH",

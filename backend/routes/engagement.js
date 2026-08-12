@@ -3,6 +3,7 @@ import express from "express";
 import { Filter } from "bad-words";
 import { supabase } from "../supabase.js";
 import { isAdminUser } from "../lib/customerAccess.js";
+import { logActivity } from "../lib/auditLog.js";
 
 const router = Router();
 
@@ -19,8 +20,52 @@ const filter = new Filter();
 
 filter.removeWords("god", "hell", "bloody", "sex");
 
+const MALAYSIAN_BADWORDS = [
+  "babi", "sial", "bodoh", "bangang", "bengap", "celaka", "sohai", "bangsat",
+  "tolol", "bongok", "jahanam", "bedebah", "haramjadah", "keparat",
+  "asu", "jalang", "sundal", "gatal", "gian", "gatai", "pundek",
+  "puki", "pukimak", "kimak", "konek", "kote", "pantat", "punai", "bontot",
+  "jubur", "burit", "fuck","cibai", "chibai", "cheebye", "cb", "ccb", "lancau", "lanjiao",
+  "lancaubabi", "diu", "diulei", "diulehlohmo", "knn", "kns", "kanina",
+  "kanasai", "kolomoye", "kaniaseh", "hampalang", "siao", "gau", "lampa", "yier", "laosai",
+  "thevidiya", "otha", "punda", "koothi", "pundachi",
+  "wtf", "stfu", "ffs", "omfg", "af", "asf", "bullshit", "douchebag",
+  "douche", "scumbag", "jackass", "fucktard", "shitface", "fuckface",
+  "dipshit", "cockhead", "cumdumpster", "thot", "simp", "hoe", "coon",
+  "spic", "chink", "gook", "tranny", "dyke",
+];
+filter.addWords(...MALAYSIAN_BADWORDS);
+
+// Multi-word vulgar phrases — checked separately below, since these can't
+// be matched by the single-word list above.
+const MALAYSIAN_BADWORD_PHRASES = [
+  "gila babi", "kepala hotak", "anak haram", "puki mak", "itik puki",
+  "lubang pantat", "chao chee bye", "diu lei lo mo", "kanina lang",
+  "chao chibai", "thevidiya paiya", "otha mavane", "son of a bitch",
+  "motherfucking", "kepala baba kau",
+];
+
+const LEET_MAP = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s" };
+function normalizeForDetection(word) {
+  return word
+    .toLowerCase()
+    .split("")
+    .map((ch) => LEET_MAP[ch] || ch)
+    .join("")
+    .replace(/(.)\1+/g, "$1");
+}
+
+// Checked against the base list, MALAYSIAN_BADWORDS (word by word), evasive
+// spellings (via normalizeForDetection), and MALAYSIAN_BADWORD_PHRASES
+// (against the full string, since those are multi-word).
 function isProfaneLoose(text) {
-  return filter.isProfane(text) || filter.isProfane(text.replace(/(.)\1+/g, "$1"));
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  if (MALAYSIAN_BADWORD_PHRASES.some((phrase) => lower.includes(phrase))) return true;
+  return text.split(/[^\p{L}\p{N}]+/u).some((word) => {
+    if (!word) return false;
+    return filter.isProfane(word) || filter.isProfane(normalizeForDetection(word));
+  });
 }
 
 // Local-testing escape hatch: DISABLE_AUTH=true in backend/.env makes every
@@ -88,16 +133,19 @@ async function getOrCreateDefaultFolder(userId) {
   return data.id;
 }
 
+// A review hidden for profanity still carries a genuine star rating from a
+// real customer — only reviews an admin hid (fake/spam) are excluded, so the
+// average reflects every real rating, not just the ones with visible text.
 export async function recomputeVendorRating(vendorId) {
   const { data, error } = await supabase
     .from("reviews")
-    .select("rating")
-    .eq("vendor_id", vendorId)
-    .eq("is_hidden", false);
+    .select("rating, is_hidden, hidden_reason")
+    .eq("vendor_id", vendorId);
   if (error) throw error;
 
-  const count = data.length;
-  const average = count ? data.reduce((sum, r) => sum + r.rating, 0) / count : null;
+  const counted = data.filter((r) => !r.is_hidden || r.hidden_reason === "profanity");
+  const count = counted.length;
+  const average = count ? counted.reduce((sum, r) => sum + r.rating, 0) / count : null;
 
   await supabase
     .from("vendors")
@@ -148,6 +196,7 @@ router.post("/engagement/folders", async (req, res) => {
     return res.status(500).json({ error: "database insert failed", details: error.message });
   }
 
+  await logActivity({ actor: user, action: "bookmark_folder.create", entityType: "bookmark_folder", entityId: data.id, metadata: { name } });
   res.status(201).json({ folder: data });
 });
 
@@ -175,6 +224,7 @@ router.delete("/engagement/folders/:id", async (req, res) => {
   const { error } = await supabase.from("bookmark_folders").delete().eq("id", folder.id);
   if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
 
+  await logActivity({ actor: user, action: "bookmark_folder.delete", entityType: "bookmark_folder", entityId: folder.id });
   res.json({ deleted: true, id: folder.id });
 });
 
@@ -234,6 +284,7 @@ router.post("/engagement/bookmarks", async (req, res) => {
     .single();
   if (error) return res.status(500).json({ error: "database insert failed", details: error.message });
 
+  await logActivity({ actor: user, action: "bookmark.add", entityType: "vendor", entityId: vendorId, metadata: { folder_id: folderId } });
   res.status(201).json({ bookmark: data });
 });
 
@@ -262,6 +313,7 @@ router.patch("/engagement/bookmarks/:vendorId", async (req, res) => {
   if (error) return res.status(500).json({ error: "database update failed", details: error.message });
   if (!data) return res.status(404).json({ error: "Bookmark not found" });
 
+  await logActivity({ actor: user, action: "bookmark.move", entityType: "vendor", entityId: req.params.vendorId, metadata: { folder_id: folderId } });
   res.json({ bookmark: data });
 });
 
@@ -276,6 +328,7 @@ router.delete("/engagement/bookmarks/:vendorId", async (req, res) => {
     .eq("vendor_id", req.params.vendorId);
   if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
 
+  await logActivity({ actor: user, action: "bookmark.remove", entityType: "vendor", entityId: req.params.vendorId });
   res.json({ deleted: true });
 });
 
@@ -372,7 +425,8 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
     });
   }
 
-  if (!profane) await recomputeVendorRating(req.params.vendorId);
+  await recomputeVendorRating(req.params.vendorId);
+  await logActivity({ actor: user, action: "review.create", entityType: "review", entityId: data.id, metadata: { vendor_id: req.params.vendorId, rating } });
   res.status(201).json({ review: { ...data, isOwn: true, likes: 0, dislikes: 0, myVote: null } });
 });
 
@@ -414,6 +468,7 @@ router.patch("/engagement/reviews/:id", async (req, res) => {
   if (error) return res.status(500).json({ error: "database update failed", details: error.message });
 
   await recomputeVendorRating(existing.vendor_id);
+  await logActivity({ actor: user, action: "review.update", entityType: "review", entityId: existing.id, metadata: { vendor_id: existing.vendor_id } });
   res.json({ review: { ...data, isOwn: true } });
 });
 
@@ -438,6 +493,7 @@ router.delete("/engagement/reviews/:id", async (req, res) => {
   if (paths.length) await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove(paths);
 
   await recomputeVendorRating(existing.vendor_id);
+  await logActivity({ actor: user, action: "review.delete", entityType: "review", entityId: existing.id, metadata: { vendor_id: existing.vendor_id } });
   res.json({ deleted: true, id: existing.id });
 });
 
@@ -494,6 +550,7 @@ router.post(
       .single();
     if (error) return res.status(500).json({ error: "database insert failed", details: error.message });
 
+    await logActivity({ actor: user, action: "review.photo_upload", entityType: "review", entityId: review.id });
     res.status(201).json({ photo: data });
   }
 );
@@ -516,6 +573,7 @@ router.post("/engagement/reviews/:id/vote", async (req, res) => {
     .upsert({ review_id: review.id, user_id: user.id, is_like: isLike }, { onConflict: "review_id,user_id" });
   if (error) return res.status(500).json({ error: "database insert failed", details: error.message });
 
+  await logActivity({ actor: user, action: "review.vote", entityType: "review", entityId: review.id, metadata: { is_like: isLike } });
   res.json({ voted: true });
 });
 
@@ -530,6 +588,7 @@ router.delete("/engagement/reviews/:id/vote", async (req, res) => {
     .eq("user_id", user.id);
   if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
 
+  await logActivity({ actor: user, action: "review.unvote", entityType: "review", entityId: req.params.id });
   res.json({ deleted: true });
 });
 

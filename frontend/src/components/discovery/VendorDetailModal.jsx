@@ -5,7 +5,7 @@ import {
   categoryLabel, placeholderImage, creatorHandle,
   priceLabel, walkLabel, distanceLabel,
 } from "../../lib/vendorDisplay";
-import { supabase } from "../../supabaseClient";
+import { useSession } from "../../lib/SessionContext";
 import { getReviews, deleteReview, voteReview, removeVote } from "../../api/engagement";
 import ReviewForm from "../engagement/ReviewForm";
 import ReviewList from "../engagement/ReviewList";
@@ -19,17 +19,12 @@ const MUTED = "#69717A";
 
 export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose }) {
   const navigate = useNavigate();
-  const [session, setSession] = useState(null);
+  const { session: authSession } = useSession();
+  const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [editingReview, setEditingReview] = useState(null); // "new" | review object | null
   const [toast, notify] = useToast();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(customerSession(data.session)));
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => setSession(customerSession(s)));
-    return () => listener.subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     if (!vendor) return;

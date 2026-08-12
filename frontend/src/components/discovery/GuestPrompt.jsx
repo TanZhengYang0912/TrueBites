@@ -1,7 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { MapPin, X } from "lucide-react";
-
-const FOREST = "#40544A";
+import { X } from "lucide-react";
 
 // Shown whenever a guest (no session) tries to bookmark, add a stop tied to
 // their account, or open "My reviews" — actions that need an identity to
@@ -27,7 +25,11 @@ export default function GuestPrompt({ open, onClose }) {
           <X size={18} />
         </button>
 
-        <MapPin size={28} color={FOREST} strokeWidth={1.5} className="mx-auto mb-2.5" />
+        <img
+          src="/assets/mascot_mystery.png"
+          alt=""
+          className="mx-auto mb-2.5 h-9 w-9 object-contain drop-shadow-[0_6px_6px_rgba(32,42,53,0.25)]"
+        />
         <div className="mb-5 font-display text-lg font-bold leading-snug text-forest">
           Sign in for a more personalized experience.
         </div>

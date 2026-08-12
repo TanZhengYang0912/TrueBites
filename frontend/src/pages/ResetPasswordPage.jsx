@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import PasswordField from "../components/PasswordField";
 import TrueBitesLogo from "../components/TrueBitesLogo";
 import { AUTH_PAGE, AUTH_STACK, AUTH_CARD, AUTH_INPUT, AUTH_PRIMARY, AUTH_ERROR } from "./LoginPage";
+import { logActivity } from "../lib/activityLog";
 
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
@@ -51,6 +52,7 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) { setErrorMsg(error.message); return; }
+    logActivity("auth.password_reset");
     setDone(true);
     if (fromProfile) setTimeout(() => navigate("/profile", { replace: true }), 1500);
   }
