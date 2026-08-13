@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
-    "test": "node --test lib/*.test.mjs"
+    "test": "node --test lib/*.test.mjs",
+    "fetch:vendor-photos": "node scripts/fetchVendorPhotos.js"
   },
   "dependencies": {
     "@googlemaps/polyline-codec": "^1.0.28",

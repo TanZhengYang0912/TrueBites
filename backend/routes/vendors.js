@@ -7,6 +7,7 @@ import { logActivity } from "../lib/auditLog.js";
 import {
   STORAGE_BUCKET,
   VENDOR_STATUSES,
+  MAX_GALLERY_IMAGES,
   validateVendor,
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
@@ -25,9 +26,15 @@ const adminOnly = [requireRole("admin", "superadmin"), requirePermission("vendor
 //   alter table vendors add column if not exists status text not null default 'draft';
 //   alter table vendors add column if not exists phone text;
 //   alter table vendors add column if not exists storefront_image_url text;
+//   alter table vendors add column if not exists gallery_image_urls jsonb not null default '[]'::jsonb;
 //   -- Storage: create a PUBLIC bucket named "vendor-images"
 //   -- (uploads go through this server with the service key, so no extra
 //   --  storage policies are needed beyond public read).
+//
+// `storefront_image_url` stays the single cover photo (unchanged contract).
+// `gallery_image_urls` is a JSON array of extra photo URLs (food/interior
+// shots) rendered after the cover in the card-hover / detail-modal carousels
+// — see /vendors/:id/gallery below.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const sanitizeTerm = (t) => String(t).replace(/[,()]/g, " ").trim();
@@ -41,7 +48,7 @@ router.get("/vendors", async (req, res) => {
   let query = supabase
     .from("vendors")
     .select(
-      "id, vendor_name, address, state, latitude, longitude, cuisine_types, operating_hours_raw, price_range, phone, status, storefront_image_url, average_rating, review_count",
+      "id, vendor_name, address, state, latitude, longitude, cuisine_types, operating_hours_raw, price_range, phone, status, storefront_image_url, gallery_image_urls, average_rating, review_count",
       { count: "exact" }
     );
 
@@ -229,10 +236,99 @@ router.post(
   }
 );
 
+// Gallery photos — additional shots (food/interior) shown after the cover in
+// the hover/autoplay carousels. Unlike the cover-image endpoint above, this
+// APPENDS and never deletes a previous object on upload; each photo is
+// removed individually via the DELETE route below.
+router.post(
+  "/vendors/:id/gallery",
+  adminOnly,
+  express.raw({ type: "image/*", limit: "8mb" }),
+  async (req, res) => {
+    const ext = ALLOWED_IMAGE_TYPES[req.headers["content-type"]];
+    if (!ext) {
+      return res.status(400).json({ error: "unsupported image type — use JPEG, PNG, WebP or GIF" });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: "empty upload — send the raw image as the request body" });
+    }
+
+    const { data: vendor, error: findErr } = await supabase
+      .from("vendors")
+      .select("id, gallery_image_urls")
+      .eq("id", req.params.id)
+      .single();
+    if (findErr || !vendor) return res.status(404).json({ error: "vendor not found" });
+
+    const existing = Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [];
+    if (existing.length >= MAX_GALLERY_IMAGES) {
+      return res.status(400).json({ error: `a vendor can have at most ${MAX_GALLERY_IMAGES} gallery photos — remove one first` });
+    }
+
+    const filePath = `vendors/${vendor.id}/gallery-${Date.now()}.${ext}`;
+    const { error: uploadErr } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, req.body, {
+        contentType: req.headers["content-type"],
+        cacheControl: "31536000",
+        upsert: false,
+      });
+    if (uploadErr) {
+      return res.status(500).json({ error: "storage upload failed", details: uploadErr.message });
+    }
+
+    const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath);
+    const gallery_image_urls = [...existing, pub.publicUrl];
+
+    const { error: updateErr } = await supabase
+      .from("vendors")
+      .update({ gallery_image_urls })
+      .eq("id", vendor.id);
+    if (updateErr) {
+      return res.status(500).json({ error: "database update failed", details: updateErr.message });
+    }
+
+    await logActivity({ actor: req.callerUser, action: "vendor.gallery_image_add", entityType: "vendor", entityId: vendor.id });
+    res.status(201).json({ gallery_image_urls });
+  }
+);
+
+router.delete("/vendors/:id/gallery", adminOnly, async (req, res) => {
+  const url = String(req.body?.url || req.query.url || "");
+  if (!url) return res.status(400).json({ error: "url is required" });
+
+  const { data: vendor, error: findErr } = await supabase
+    .from("vendors")
+    .select("id, gallery_image_urls")
+    .eq("id", req.params.id)
+    .single();
+  if (findErr || !vendor) return res.status(404).json({ error: "vendor not found" });
+
+  const existing = Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [];
+  const gallery_image_urls = existing.filter((u) => u !== url);
+  if (gallery_image_urls.length === existing.length) {
+    return res.status(404).json({ error: "that photo isn't in this vendor's gallery" });
+  }
+
+  const { error: updateErr } = await supabase
+    .from("vendors")
+    .update({ gallery_image_urls })
+    .eq("id", vendor.id);
+  if (updateErr) {
+    return res.status(500).json({ error: "database update failed", details: updateErr.message });
+  }
+
+  const path = storagePathFromUrl(url);
+  if (path) await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+
+  await logActivity({ actor: req.callerUser, action: "vendor.gallery_image_remove", entityType: "vendor", entityId: vendor.id });
+  res.json({ gallery_image_urls });
+});
+
 router.delete("/vendors/:id", adminOnly, async (req, res) => {
   const { data: vendor, error: findErr } = await supabase
     .from("vendors")
-    .select("id, storefront_image_url")
+    .select("id, storefront_image_url, gallery_image_urls")
     .eq("id", req.params.id)
     .single();
   if (findErr || !vendor) return res.status(404).json({ error: "vendor not found" });
@@ -242,9 +338,12 @@ router.delete("/vendors/:id", adminOnly, async (req, res) => {
     return res.status(500).json({ error: "database delete failed", details: error.message });
   }
 
-  const imagePath = storagePathFromUrl(vendor.storefront_image_url);
-  if (imagePath) {
-    await supabase.storage.from(STORAGE_BUCKET).remove([imagePath]);
+  const galleryUrls = Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [];
+  const paths = [vendor.storefront_image_url, ...galleryUrls]
+    .map(storagePathFromUrl)
+    .filter(Boolean);
+  if (paths.length) {
+    await supabase.storage.from(STORAGE_BUCKET).remove(paths);
   }
 
   await logActivity({ actor: req.callerUser, action: "vendor.delete", entityType: "vendor", entityId: vendor.id });

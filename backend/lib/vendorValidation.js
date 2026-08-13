@@ -6,6 +6,11 @@
 
 export const STORAGE_BUCKET = "vendor-images";
 
+// Gallery photos (food/interior shots shown after the storefront cover in the
+// card/detail carousels) are capped so one vendor can't blow up page weight
+// or storage cost — 8 is plenty for a hover/autoplay carousel.
+export const MAX_GALLERY_IMAGES = 8;
+
 // Source of truth for the vendor status vocabulary — kept to exactly these
 // three so every vendor is always in a well-defined state: newly-created
 // vendors start as "draft", an admin promotes them to "active" (which is the

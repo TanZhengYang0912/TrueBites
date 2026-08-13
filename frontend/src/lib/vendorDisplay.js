@@ -1,5 +1,3 @@
-import { VENDOR_FOOD_IMAGES } from "../generated/vendorFoodImages.js";
-
 // Shared display helpers for vendor cards, the detail modal, and trip-panel
 // stops. Category keys are derived from cuisine_types first so discovery filters
 // use the database contract instead of a collection of visual guesses.
@@ -104,24 +102,96 @@ function hashStr(s) {
 }
 
 // Deterministic (not random) so the same vendor always shows the same photo
-// across renders/reloads. A real uploaded image still takes precedence over the
-// bundled vendor image. `storefront_image_url` is the real DB/API column (set by
-// an admin upload or the AI pipeline's video thumbnail); `imageUrl` is how the
-// admin console's API mapper names it; `image_url` is kept as a last-resort
-// legacy key in case anything else still produces it.
+// across renders/reloads. A real uploaded/fetched image always takes
+// precedence; the Unsplash category pool is only a last-resort fallback for a
+// vendor that has no storefront photo at all yet (e.g. brand new, not yet run
+// through the photo-fetch scripts). `storefront_image_url` is the real DB/API
+// column; `imageUrl` is how the admin console's API mapper names it;
+// `image_url` is kept as a last-resort legacy key in case anything else still
+// produces it.
 export function placeholderImage(vendor) {
   const real = vendor.storefront_image_url || vendor.imageUrl || vendor.image_url;
   if (real) return real;
-  const curatedImage = VENDOR_FOOD_IMAGES[String(vendor.id)];
-  if (curatedImage) return curatedImage;
   const pool = PLACEHOLDER_IMAGES[categoryOf(vendor)] || PLACEHOLDER_IMAGES.local;
   return pool[hashStr(String(vendor.id)) % pool.length];
+}
+
+// Ordered image list for the card-hover / detail-modal carousels: the
+// storefront cover always leads (same photo `placeholderImage` returns, so
+// the first frame never "pops" when a carousel mounts), followed by any
+// admin-uploaded/fetched gallery photos in upload order. `gallery_image_urls`
+// is the raw DB/API field name; `galleryUrls` is how the admin console's list
+// mapper names it (see admin.js's item mapper) — both are accepted so this
+// works from either data source without a prop-mapping step at the call site.
+export function vendorGallery(vendor) {
+  const cover = placeholderImage(vendor);
+  const images = [cover];
+
+  const uploaded = Array.isArray(vendor.gallery_image_urls)
+    ? vendor.gallery_image_urls
+    : Array.isArray(vendor.galleryUrls)
+      ? vendor.galleryUrls
+      : [];
+  for (const url of uploaded) {
+    if (url && !images.includes(url)) images.push(url);
+  }
+
+  return images;
 }
 
 // "RM8-15 per person" / "RM10" -> "RM8" (first number found); no match -> null.
 export function priceLabel(vendor) {
   const match = (vendor.price_range || "").match(/\d+/);
   return match ? `RM${match[0]}` : null;
+}
+
+// "RM 8 - RM 15 per person" -> "RM8 – RM15"; "RM10 per person" -> "RM10"
+// (single value when min/max are equal or only one number is present).
+// Same number-extraction shape as the admin form's parsePriceRange, just
+// rendered as an en-dash range instead of separate min/max form fields.
+export function priceRangeLabel(vendor) {
+  const str = vendor.price_range || "";
+  const match = str.match(/RM\s*(\d+(?:\.\d+)?)\s*(?:-\s*(?:RM\s*)?(\d+(?:\.\d+)?))?/i);
+  if (!match) return null;
+  const min = match[1];
+  const max = match[2];
+  if (!max || Number(max) === Number(min)) return `RM${min}`;
+  return `RM${min} – RM${max}`;
+}
+
+// Parses the "HH:MM AM/PM - HH:MM AM/PM" shape the admin form already
+// enforces (see HOURS_RE in AdminVendorManagementPage.jsx) into an open/closed
+// status plus a lowercase-formatted label ("6:00 am – 12:00 pm"). Older
+// AI-scraped strings that don't match this shape ("3 - 4", "4 pm, 5.5 pm, 6
+// pm") return null rather than guessing at a status — no badge is better than
+// a wrong one.
+const HOURS_RANGE_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+
+function hoursToMinutes(hh, mm, period) {
+  const h = Number.parseInt(hh, 10) % 12;
+  return (h + (/pm/i.test(period) ? 12 : 0)) * 60 + Number.parseInt(mm, 10);
+}
+
+function formatClock(hh, mm, period) {
+  return `${String(Number.parseInt(hh, 10)).padStart(2, "0")}:${mm} ${period.toLowerCase()}`;
+}
+
+export function hoursStatus(vendor) {
+  const raw = vendor.operating_hours_raw || vendor.operating_hours;
+  const match = HOURS_RANGE_RE.exec(raw || "");
+  if (!match) return null;
+  const [, oh, om, op, ch, cm, cp] = match;
+
+  const openMin = hoursToMinutes(oh, om, op);
+  const closeMin = hoursToMinutes(ch, cm, cp);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  // Closing time <= opening time means the window crosses midnight
+  // (e.g. "4:00 pm - 12:00 am") — treat closing as happening "the next day".
+  const isOpen = closeMin <= openMin
+    ? nowMin >= openMin || nowMin < closeMin
+    : nowMin >= openMin && nowMin < closeMin;
+
+  return { isOpen, label: `${formatClock(oh, om, op)} – ${formatClock(ch, cm, cp)}` };
 }
 
 // Backend already computes this via haversine (see /restaurants/nearby).
