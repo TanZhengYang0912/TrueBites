@@ -279,7 +279,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
     let builder = supabase
       .from("vendors")
       .select(
-        "id,vendor_name,address,state,latitude,longitude,status,cuisine_types,signature_dishes,source_platform,source_video_url,sentiment_score,created_at,last_updated,phone,price_range,operating_hours,operating_hours_raw,location_precision,storefront_image_url",
+        "id,vendor_name,address,state,latitude,longitude,status,cuisine_types,signature_dishes,source_platform,source_video_url,sentiment_score,created_at,last_updated,phone,price_range,operating_hours,operating_hours_raw,location_precision,storefront_image_url,gallery_image_urls",
         { count: "exact" }
       )
       .range((page - 1) * pageSize, page * pageSize - 1);
@@ -341,6 +341,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
       operatingHours: vendor.operating_hours_raw || vendor.operating_hours,
       locationPrecision: vendor.location_precision,
       imageUrl: vendor.storefront_image_url || null,
+      galleryUrls: Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [],
     }));
 
     res.json({
@@ -619,10 +620,11 @@ router.delete("/vendors/:id", requirePermission("vendors"), async (req, res) => 
   const { id } = req.params;
 
   try {
-    // 404 up front, and grab the storefront image so we can clean it up after.
+    // 404 up front, and grab the storefront + gallery images so we can clean
+    // them up after.
     const { data: vendor, error: findErr } = await supabase
       .from("vendors")
-      .select("id, storefront_image_url")
+      .select("id, storefront_image_url, gallery_image_urls")
       .eq("id", id)
       .single();
     if (findErr?.code === "PGRST116" || !vendor) {
@@ -652,10 +654,13 @@ router.delete("/vendors/:id", requirePermission("vendors"), async (req, res) => 
     const { error: delErr } = await supabase.from("vendors").delete().eq("id", id);
     if (delErr) throw delErr;
 
-    // Best-effort removal of the storefront image (don't fail the request if the
-    // storage object is already gone).
-    const imagePath = storagePathFromUrl(vendor.storefront_image_url);
-    if (imagePath) await supabase.storage.from(STORAGE_BUCKET).remove([imagePath]);
+    // Best-effort removal of the storefront + gallery images (don't fail the
+    // request if a storage object is already gone).
+    const galleryUrls = Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [];
+    const imagePaths = [vendor.storefront_image_url, ...galleryUrls]
+      .map(storagePathFromUrl)
+      .filter(Boolean);
+    if (imagePaths.length) await supabase.storage.from(STORAGE_BUCKET).remove(imagePaths);
 
     await logActivity({ actor: req.callerUser, action: "vendor.delete", entityType: "vendor", entityId: id });
     res.json({ success: true, id });

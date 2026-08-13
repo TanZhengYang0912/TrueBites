@@ -1,5 +1,3 @@
-import { VENDOR_FOOD_IMAGES } from "../generated/vendorFoodImages.js";
-
 // Shared display helpers for vendor cards, the detail modal, and trip-panel
 // stops. Category keys are derived from cuisine_types first so discovery filters
 // use the database contract instead of a collection of visual guesses.
@@ -104,18 +102,41 @@ function hashStr(s) {
 }
 
 // Deterministic (not random) so the same vendor always shows the same photo
-// across renders/reloads. A real uploaded image still takes precedence over the
-// bundled vendor image. `storefront_image_url` is the real DB/API column (set by
-// an admin upload or the AI pipeline's video thumbnail); `imageUrl` is how the
-// admin console's API mapper names it; `image_url` is kept as a last-resort
-// legacy key in case anything else still produces it.
+// across renders/reloads. A real uploaded/fetched image always takes
+// precedence; the Unsplash category pool is only a last-resort fallback for a
+// vendor that has no storefront photo at all yet (e.g. brand new, not yet run
+// through the photo-fetch scripts). `storefront_image_url` is the real DB/API
+// column; `imageUrl` is how the admin console's API mapper names it;
+// `image_url` is kept as a last-resort legacy key in case anything else still
+// produces it.
 export function placeholderImage(vendor) {
   const real = vendor.storefront_image_url || vendor.imageUrl || vendor.image_url;
   if (real) return real;
-  const curatedImage = VENDOR_FOOD_IMAGES[String(vendor.id)];
-  if (curatedImage) return curatedImage;
   const pool = PLACEHOLDER_IMAGES[categoryOf(vendor)] || PLACEHOLDER_IMAGES.local;
   return pool[hashStr(String(vendor.id)) % pool.length];
+}
+
+// Ordered image list for the card-hover / detail-modal carousels: the
+// storefront cover always leads (same photo `placeholderImage` returns, so
+// the first frame never "pops" when a carousel mounts), followed by any
+// admin-uploaded/fetched gallery photos in upload order. `gallery_image_urls`
+// is the raw DB/API field name; `galleryUrls` is how the admin console's list
+// mapper names it (see admin.js's item mapper) — both are accepted so this
+// works from either data source without a prop-mapping step at the call site.
+export function vendorGallery(vendor) {
+  const cover = placeholderImage(vendor);
+  const images = [cover];
+
+  const uploaded = Array.isArray(vendor.gallery_image_urls)
+    ? vendor.gallery_image_urls
+    : Array.isArray(vendor.galleryUrls)
+      ? vendor.galleryUrls
+      : [];
+  for (const url of uploaded) {
+    if (url && !images.includes(url)) images.push(url);
+  }
+
+  return images;
 }
 
 // "RM8-15 per person" / "RM10" -> "RM8" (first number found); no match -> null.

@@ -1,16 +1,29 @@
+import { useMemo, useState } from "react";
 import { Bookmark, Check, Footprints, MapPin, Play, Plus, Star, Wallet } from "lucide-react";
 import {
-  categoryLabel, distanceLabel, placeholderImage, creatorHandle,
+  categoryLabel, distanceLabel, vendorGallery, creatorHandle,
   priceLabel, walkLabel,
 } from "../../lib/vendorDisplay";
+import VendorGallery from "./VendorGallery";
 
 const TERRACOTTA = "#A35D47";
 const INK = "#202A35";
 const FOREST = "#40544A";
 
 // Image is taller on phones (one card per row) and returns to the catalog crop
-// once the grid has two or more columns.
-const IMAGE = "relative h-[220px] cursor-pointer bg-sand sm:h-[170px] xl:h-[210px]";
+// once the grid has two or more columns. Taller than the original crop on
+// every breakpoint — every vendor photo is a portrait 9:16/3:4 video frame,
+// so box height directly controls how much of the source survives the
+// object-cover crop (wider box = more of the frame thrown away). At 220px
+// only ~42% of a 1080x1920 source was visible; these heights bring that to
+// ~55-60%, trading grid density for photos that read as storefronts instead
+// of a random cropped sliver.
+const IMAGE = "relative h-[280px] cursor-pointer bg-sand sm:h-[220px] xl:h-[280px]";
+// TikTok captions sit dead-centre in the source frame — biasing the crop
+// toward the top keeps the shopfront signage/structure (which is what's up
+// top in these food-vlog frames) and trades away more of the caption band
+// than a centred crop would.
+const IMAGE_POSITION = "50% 18%";
 
 export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onOpenDetail }) {
   const handle = creatorHandle(vendor);
@@ -19,11 +32,32 @@ export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmar
   const dist = distanceLabel(vendor);
   const area = vendor.address?.split(",")[0]?.trim() || "Melaka";
   const description = vendor.ai_review_summary || vendor.signature_dishes || "A local place worth taking the long way for.";
+  const images = useMemo(() => vendorGallery(vendor), [vendor]);
+  const [hovered, setHovered] = useState(false);
 
   return (
     <article className="min-w-0 overflow-hidden rounded border border-sand bg-white transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-forest hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-      <div className={IMAGE} onClick={() => onOpenDetail(vendor)}>
-        <img src={placeholderImage(vendor)} alt={vendor.name} loading="lazy" className="block size-full object-cover" />
+      <div
+        className={IMAGE}
+        onClick={() => onOpenDetail(vendor)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {/* Cycles through the storefront cover + food photos while the
+            pointer stays over the card; snaps back to the cover on leave. */}
+        <VendorGallery
+          images={images}
+          alt={vendor.name}
+          active={hovered}
+          resetOnInactive
+          interval={1100}
+          objectPosition={IMAGE_POSITION}
+        />
+
+        {/* Unifies photos shot by different creators under different
+            lighting into one consistent-looking set (same treatment as the
+            detail modal's hero), and improves contrast for the badge below. */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.55)_0%,transparent_45%)]" />
 
         <button
           type="button"

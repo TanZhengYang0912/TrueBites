@@ -114,6 +114,25 @@ export async function uploadVendorImage(id, file) {
   });
 }
 
+// Gallery photos (food/interior shots shown after the cover in the card-hover
+// and detail-modal carousels). Unlike uploadVendorImage, this appends rather
+// than replacing — each photo is removed individually by URL.
+export async function uploadVendorGalleryImage(id, file) {
+  return requestJson(`/api/vendors/${id}/gallery`, {
+    method: "POST",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+}
+
+export async function deleteVendorGalleryImage(id, url) {
+  return requestJson(`/api/vendors/${id}/gallery`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
 export async function getAdminSettings() {
   return requestJson("/api/admin/settings");
 }

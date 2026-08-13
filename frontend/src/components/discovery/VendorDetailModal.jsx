@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Heart, Bot, Play, Wallet, Footprints, MapPin, Star } from "lucide-react";
 import {
-  categoryLabel, placeholderImage, creatorHandle,
+  categoryLabel, vendorGallery, creatorHandle,
   priceLabel, walkLabel, distanceLabel,
 } from "../../lib/vendorDisplay";
+import VendorGallery from "./VendorGallery";
 import { useSession } from "../../lib/SessionContext";
 import { getReviews, deleteReview, voteReview, removeVote } from "../../api/engagement";
 import ReviewForm from "../engagement/ReviewForm";
@@ -76,6 +77,8 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
     };
   }, [onClose]);
 
+  const images = useMemo(() => (vendor ? vendorGallery(vendor) : []), [vendor]);
+
   if (!vendor) return null;
 
   const handle = creatorHandle(vendor);
@@ -94,10 +97,18 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         onClick={(e) => e.stopPropagation()}
         className="max-h-dvh w-full overflow-y-auto rounded-t-2xl bg-white shadow-[0_20px_60px_rgba(64,84,74,0.35)] animate-modal-in sm:max-h-[88dvh] sm:max-w-[520px] sm:rounded-2xl"
       >
-        {/* Hero image */}
-        <div className="relative h-44 overflow-hidden rounded-t-2xl sm:h-[220px]">
-          <img src={placeholderImage(vendor)} alt={vendor.name} className="block size-full object-cover" />
-          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
+        {/* Hero image — autoplays through the storefront cover + food photos
+            as soon as the modal opens; arrows/dots let a visitor take over.
+            Taller than before (h-44/220 -> h-52/280) so VendorGallery's
+            object-contain has room to show a 4:3 Places photo close to full
+            width instead of leaving heavy blurred margins either side. */}
+        <div className="relative h-52 overflow-hidden rounded-t-2xl sm:h-[280px]">
+          {/* Same top-biased crop as the card (VendorCard's IMAGE_POSITION)
+              so the cover photo frames identically in both places — a
+              storefront that looks right on the card shouldn't jump to a
+              different crop the moment the modal opens. */}
+          <VendorGallery images={images} alt={vendor.name} interval={2600} showArrows showDots objectPosition="50% 18%" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
           {/* Category badge */}
           <span className="absolute left-3 top-3 rounded-full bg-forest px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-white">
             {categoryLabel(vendor)}

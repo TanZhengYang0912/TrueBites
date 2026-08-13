@@ -1,0 +1,651 @@
+{
+  "generated_at": "2026-08-13T00:24:27.659Z",
+  "applied": true,
+  "totals": {
+    "vendors": 603,
+    "distinct_videos": 565,
+    "shared_groups": 23,
+    "cleared": 47
+  },
+  "vendors": [
+    {
+      "id": "c2789947-e1be-4c81-a33a-7e8ca6026e95",
+      "vendor_name": "Nasi Lemak Ujong Pasir",
+      "video": "7519695435787717895",
+      "caption": "Nasi Lemak Ujong Pasir 2 📍54, Jalan Ujong Pasir, 75050 Melaka ⏰8AM - 4PM ❌Closed on Friday *Muslim-owned #melakafooodandtravel #mlkft #malaysia #food #travel #nasilemak #melaka",
+      "score": 1,
+      "matched_tokens": [
+        "lemak",
+        "ujong",
+        "pasir"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "3a87c9a9-ad31-43b9-a870-2220fd87541b",
+      "vendor_name": "Nasi Lemak Ujung Pasir",
+      "video": "7519695435787717895",
+      "caption": "Nasi Lemak Ujong Pasir 2 📍54, Jalan Ujong Pasir, 75050 Melaka ⏰8AM - 4PM ❌Closed on Friday *Muslim-owned #melakafooodandtravel #mlkft #malaysia #food #travel #nasilemak #melaka",
+      "score": 0.667,
+      "matched_tokens": [
+        "lemak",
+        "pasir"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "5c5ef955-c3f2-4707-9b94-140552f44137",
+      "vendor_name": "Mee Besun Hassan",
+      "video": "7511566211923184914",
+      "caption": "Kedai Hassan Mee Rebus 📍  Taman Jaya Padang Temu, 75050 Malacca ⏰   10am-230pm            Friday Closed 📞 019-654 5691 #malaysiafoodandtravel #mft #meerebus #meerebusmelaka #melakafoodandtravel #foryoupage #fyp",
+      "score": 0.5,
+      "matched_tokens": [
+        "hassan"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "9b614c6e-a6f5-4b98-b361-2981af1d063e",
+      "vendor_name": "Hassan Miribus",
+      "video": "7511566211923184914",
+      "caption": "Kedai Hassan Mee Rebus 📍  Taman Jaya Padang Temu, 75050 Malacca ⏰   10am-230pm            Friday Closed 📞 019-654 5691 #malaysiafoodandtravel #mft #meerebus #meerebusmelaka #melakafoodandtravel #foryoupage #fyp",
+      "score": 0.5,
+      "matched_tokens": [
+        "hassan"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "26884357-f014-484b-a4da-f5884f3498d8",
+      "vendor_name": "Timut And Grill",
+      "video": "7567636897120455954",
+      "caption": "Nama Peniagaan : MAMAMIA STEAMBOAT & GRILL MASJID TANAH Alamat : SI 1305 & SI 1306 JALAN REBANA UTAMA TAMAN SRI REDAN 78300 MASJID TANAH MELAKA Waktu Operasi :KHAMIS HINGGA SELASA (RABU CUTI) 5PTG HINGGA 12 MLM @mamamiasteamboatngrill  #MYFoodie #Foodie #makan #food #makanlokal ",
+      "score": 0.5,
+      "matched_tokens": [
+        "grill"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "9966ddb0-e73f-4445-b837-f099684a6db0",
+      "vendor_name": "Mama Mia",
+      "video": "7567636897120455954",
+      "caption": "Nama Peniagaan : MAMAMIA STEAMBOAT & GRILL MASJID TANAH Alamat : SI 1305 & SI 1306 JALAN REBANA UTAMA TAMAN SRI REDAN 78300 MASJID TANAH MELAKA Waktu Operasi :KHAMIS HINGGA SELASA (RABU CUTI) 5PTG HINGGA 12 MLM @mamamiasteamboatngrill  #MYFoodie #Foodie #makan #food #makanlokal ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "d8e5bb48-9a2d-4797-ab61-fa9f46cfc965",
+      "vendor_name": "Nasi Ayam Singapura",
+      "video": "7254054156602838280",
+      "caption": "5 Nasi Ayam Terbaik Di Melaka Part 2. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "e6fd6f4b-244d-4e53-bccd-70e1b8284217",
+      "vendor_name": "Nasi Ayam Tempayan Serkam",
+      "video": "7254054156602838280",
+      "caption": "5 Nasi Ayam Terbaik Di Melaka Part 2. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "8747b34b-14e4-48bc-93df-dcf46d4dd5db",
+      "vendor_name": "Nasi Ayam Hainan Sungai Udang",
+      "video": "7254054156602838280",
+      "caption": "5 Nasi Ayam Terbaik Di Melaka Part 2. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "0080dedb-c3f5-470c-ae23-d8c63f2c955a",
+      "vendor_name": "Mnaka No. 1",
+      "video": "7254054156602838280",
+      "caption": "5 Nasi Ayam Terbaik Di Melaka Part 2. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "cf331fc4-01ff-4e20-9747-170a44ddf615",
+      "vendor_name": "La Deli",
+      "video": "7469959931978894600",
+      "caption": "First customisable charcuterie deli in Melaka! 😍🥓🍷 Calling all meat-lovin’ foodies—Le Deli in Taman Lagenda is here to change the game! 🤩  Build your own charcuterie board with premium cured meats, gourmet cheeses, and more, sliced just the way you like it 🤤 Add some German beer to the mix and you've got yourself the perfect meal 🍻 👀 Seating for dine-in is limited, so make sure you get there early. What are you waiting for? Don’t miss out on this unique, customisable experience 👇🏼 📍Le Deli Taman Lagenda 18, Jalan Lagenda 1, Taman 1 Lagenda, 75400 Melaka  Non-halal #malaysiafoodandtravel #mft #ledeli #charcuterie #melaka #germanbeer #nonhalal #foryoupage #fyp",
+      "score": 0.5,
+      "matched_tokens": [
+        "deli"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "a0e79af6-e392-4eee-a7f6-d195b6e32fe0",
+      "vendor_name": "La Delicatessen",
+      "video": "7469959931978894600",
+      "caption": "First customisable charcuterie deli in Melaka! 😍🥓🍷 Calling all meat-lovin’ foodies—Le Deli in Taman Lagenda is here to change the game! 🤩  Build your own charcuterie board with premium cured meats, gourmet cheeses, and more, sliced just the way you like it 🤤 Add some German beer to the mix and you've got yourself the perfect meal 🍻 👀 Seating for dine-in is limited, so make sure you get there early. What are you waiting for? Don’t miss out on this unique, customisable experience 👇🏼 📍Le Deli Taman Lagenda 18, Jalan Lagenda 1, Taman 1 Lagenda, 75400 Melaka  Non-halal #malaysiafoodandtravel #mft #ledeli #charcuterie #melaka #germanbeer #nonhalal #foryoupage #fyp",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "5fde8932-f1d5-4072-b790-d1ca18c6e7b9",
+      "vendor_name": "Baban Nyonya",
+      "video": "7424037212662107400",
+      "caption": "Nyonya Art Studio 📍 15, Jalan Hang Kasturi 75250 Melaka ⏰ Open Daily (10am - 7pm) #melakafoodtravel #mlkft #rentkebaya #kebayanyonya #foryoupage #fyp ",
+      "score": 0.5,
+      "matched_tokens": [
+        "nyonya"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "ea358292-a7f7-48e1-bf2f-1c30b99ad7ea",
+      "vendor_name": "Baba & Nyonya Heritage Museum / Rental",
+      "video": "7424037212662107400",
+      "caption": "Nyonya Art Studio 📍 15, Jalan Hang Kasturi 75250 Melaka ⏰ Open Daily (10am - 7pm) #melakafoodtravel #mlkft #rentkebaya #kebayanyonya #foryoupage #fyp ",
+      "score": 0.2,
+      "matched_tokens": [
+        "nyonya"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "63f1572c-92cc-4efb-8eea-2fedb93e1fea",
+      "vendor_name": "Kob",
+      "video": "7622174929747856660",
+      "caption": "tengok rating dia tinggi tu. antara cafe terbaik kat melaka ni. KOB Melaka",
+      "score": 1,
+      "matched_tokens": [
+        "kob"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "1dee3604-1875-4f89-84e8-77e94ab5f9f9",
+      "vendor_name": "King Of Botomik",
+      "video": "7622174929747856660",
+      "caption": "tengok rating dia tinggi tu. antara cafe terbaik kat melaka ni. KOB Melaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "e5b58584-1606-4f19-9003-a7c383c834fb",
+      "vendor_name": "Maharaja Restaurant",
+      "video": "7540180609616973064",
+      "caption": "Ah Hwa Mee Hun Kuey 📍 15e, Jalan Kenanga 3/26, Kampung Tujuh, 75300 Melaka ⏰ Monday - Friday | 10:30am - 5pm #malaysiafoodandtravel #mft #panmee  #mlft #melakafoodandtravel",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "1f233485-5705-4fb4-8fb1-780770c2eb28",
+      "vendor_name": "Maharaja",
+      "video": "7540180609616973064",
+      "caption": "Ah Hwa Mee Hun Kuey 📍 15e, Jalan Kenanga 3/26, Kampung Tujuh, 75300 Melaka ⏰ Monday - Friday | 10:30am - 5pm #malaysiafoodandtravel #mft #panmee  #mlft #melakafoodandtravel",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "68a29219-f1a2-436e-9017-b8412512f0b1",
+      "vendor_name": "Nasi Ayam Taman Anika",
+      "video": "7253680830508240146",
+      "caption": "5 nasi ayam terbaik di melaka. part 1 ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 4,
+      "decision": "cleared"
+    },
+    {
+      "id": "b73061b7-3d00-4ede-bd97-61c359a955d5",
+      "vendor_name": "Nasi Ayam Dapok Rayan",
+      "video": "7253680830508240146",
+      "caption": "5 nasi ayam terbaik di melaka. part 1 ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 4,
+      "decision": "cleared"
+    },
+    {
+      "id": "94fc6a27-7018-419f-bddc-6b5dbcefe1a0",
+      "vendor_name": "Nasi Ayam Liza",
+      "video": "7253680830508240146",
+      "caption": "5 nasi ayam terbaik di melaka. part 1 ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 4,
+      "decision": "cleared"
+    },
+    {
+      "id": "d5de043a-562e-4161-a33a-c2457887ebfa",
+      "vendor_name": "Nasi Ayam Ibu",
+      "video": "7253680830508240146",
+      "caption": "5 nasi ayam terbaik di melaka. part 1 ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 4,
+      "decision": "cleared"
+    },
+    {
+      "id": "4e63a96a-f65b-4d6d-b85c-93d21ca552ea",
+      "vendor_name": "Nasi Ayam Maesah",
+      "video": "7253680830508240146",
+      "caption": "5 nasi ayam terbaik di melaka. part 1 ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 4,
+      "decision": "cleared"
+    },
+    {
+      "id": "58590927-e38e-4ee3-b3d9-47a73eedf945",
+      "vendor_name": "Kocik Kitchen",
+      "video": "7506809708959911175",
+      "caption": "[🤤Authentic Nyonya Cuisine in Melaka!👍🏻] 🤯@nenijee_nyonya_kitchen is a restaurant that serves authentic Nyonya cuisine in Melaka! 📜They have over 500 Google reviews with a 4.8-star rating! 👩🏼‍🍳This restaurant was born because of a son who wanted to continue his mother’s Nyonya cooking legacy! 🥓The Ayam Babi Pongteh is made with chicken and pork belly with a balanced salty-sweet flavor! 🥠Their Paitee is totally different from other Nyonya Paitee as they use bamboo charcoal for the outer layer! 🥘Try their Rendang Pork Ribs Buah Keluak which has an umami flavor from the keluak fruit! 🍗Don’t forget to try their other dish too like the Chicken Rendang and Otak-Otak Nyonya! 😍It’s definitely a must-visit spot when in Melaka! [NeniJee's Nyonya Kitchen] @Nenijee's Nyonya Kitchen  ✅Non-halal 📍27, Tingkat Bawah, Jalan Takh 15, Taman Ayer Keroh Heights 1, Ayer Keroh, 75450 Melaka. 📞+6011-1628 8351 #nenijee #nyonya #pongteh #rendang #melaka #fodie #malaysia #malaysiafoodandtravel #mft #foryoupage #fyp",
+      "score": 0.5,
+      "matched_tokens": [
+        "kitchen"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "958298c9-d3da-47da-9511-e5f423291813",
+      "vendor_name": "Kodeng Blur",
+      "video": "7506809708959911175",
+      "caption": "[🤤Authentic Nyonya Cuisine in Melaka!👍🏻] 🤯@nenijee_nyonya_kitchen is a restaurant that serves authentic Nyonya cuisine in Melaka! 📜They have over 500 Google reviews with a 4.8-star rating! 👩🏼‍🍳This restaurant was born because of a son who wanted to continue his mother’s Nyonya cooking legacy! 🥓The Ayam Babi Pongteh is made with chicken and pork belly with a balanced salty-sweet flavor! 🥠Their Paitee is totally different from other Nyonya Paitee as they use bamboo charcoal for the outer layer! 🥘Try their Rendang Pork Ribs Buah Keluak which has an umami flavor from the keluak fruit! 🍗Don’t forget to try their other dish too like the Chicken Rendang and Otak-Otak Nyonya! 😍It’s definitely a must-visit spot when in Melaka! [NeniJee's Nyonya Kitchen] @Nenijee's Nyonya Kitchen  ✅Non-halal 📍27, Tingkat Bawah, Jalan Takh 15, Taman Ayer Keroh Heights 1, Ayer Keroh, 75450 Melaka. 📞+6011-1628 8351 #nenijee #nyonya #pongteh #rendang #melaka #fodie #malaysia #malaysiafoodandtravel #mft #foryoupage #fyp",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "82759ff0-b69d-4cb2-88c5-177670d08066",
+      "vendor_name": "Nasi Ayam Singapore",
+      "video": "7457137992356875527",
+      "caption": "4 lagi kedai legend kat melaka. datang melaka boleh kesini ya. save siap2 nanti boleh pegi. @ab.raufyusoh  @kerajaannegerimelaka  @tourismmelaka  @melakatv  #VisitMelaka2024 #ExploreMelaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "10b7b833-44d2-43c9-a239-e87ae5b5ee95",
+      "vendor_name": "Roti John",
+      "video": "7457137992356875527",
+      "caption": "4 lagi kedai legend kat melaka. datang melaka boleh kesini ya. save siap2 nanti boleh pegi. @ab.raufyusoh  @kerajaannegerimelaka  @tourismmelaka  @melakatv  #VisitMelaka2024 #ExploreMelaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "d5b131e1-b90f-475e-b11a-618121042440",
+      "vendor_name": "Taman Selera",
+      "video": "7457137992356875527",
+      "caption": "4 lagi kedai legend kat melaka. datang melaka boleh kesini ya. save siap2 nanti boleh pegi. @ab.raufyusoh  @kerajaannegerimelaka  @tourismmelaka  @melakatv  #VisitMelaka2024 #ExploreMelaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "bf40b40b-746f-4053-aaff-d727bc81e17b",
+      "vendor_name": "Restoran Teja",
+      "video": "7457137992356875527",
+      "caption": "4 lagi kedai legend kat melaka. datang melaka boleh kesini ya. save siap2 nanti boleh pegi. @ab.raufyusoh  @kerajaannegerimelaka  @tourismmelaka  @melakatv  #VisitMelaka2024 #ExploreMelaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "0bb74415-500f-499d-861f-e1f19c23d6c0",
+      "vendor_name": "Nasi Dan Sati Padang Sofia",
+      "video": "7603936337741237524",
+      "caption": "6 nasi padang di melaka. dah cuba semua ni ke belum. nanti pegi lah. ",
+      "score": 0.333,
+      "matched_tokens": [
+        "padang"
+      ],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "4507c428-51b8-48da-a73f-3f808b4ad472",
+      "vendor_name": "Bumbu Babah",
+      "video": "7603936337741237524",
+      "caption": "6 nasi padang di melaka. dah cuba semua ni ke belum. nanti pegi lah. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "8e6b55bd-4508-4480-98cb-6a8693a2f216",
+      "vendor_name": "Darly'S Cafe",
+      "video": "7603936337741237524",
+      "caption": "6 nasi padang di melaka. dah cuba semua ni ke belum. nanti pegi lah. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "4f8a3a07-207c-4deb-849a-bf3fbc277f73",
+      "vendor_name": "Juragan Nidam",
+      "video": "7603936337741237524",
+      "caption": "6 nasi padang di melaka. dah cuba semua ni ke belum. nanti pegi lah. ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "411e82f9-8c00-4d26-b6f7-f670b209005f",
+      "vendor_name": "Lecihan",
+      "video": "7416183345689775367",
+      "caption": "Restaurant Baba Kaya 📍 One Malaysian Cuisine 13a, Jln. Bunga Raya, Melaka Tengah, 75100 Melaka ⏰ Closed On Tuesday Mon - Thu (8am - 2pm) Fri - Sun (8am - 230pm) ❗️Pork-free & Alcohol Free❗️ #melakafoodtravel #mlkft #riversiderestaurant #malaysianfood #makanlokal #foryoupage #fyp ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "f9fc28e8-b898-4af3-a905-e99a2d8142dc",
+      "vendor_name": "Donald And Lily'S Nyonya Food",
+      "video": "7416183345689775367",
+      "caption": "Restaurant Baba Kaya 📍 One Malaysian Cuisine 13a, Jln. Bunga Raya, Melaka Tengah, 75100 Melaka ⏰ Closed On Tuesday Mon - Thu (8am - 2pm) Fri - Sun (8am - 230pm) ❗️Pork-free & Alcohol Free❗️ #melakafoodtravel #mlkft #riversiderestaurant #malaysianfood #makanlokal #foryoupage #fyp ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "0a806f9e-1f6a-468d-8ad5-1a4768deb597",
+      "vendor_name": "Cendol Jam Besar",
+      "video": "7629977245657926920",
+      "caption": "Tembikai Tebuk Cendol Jam Besar Berhadapan Menara Jam Besar, Banda Hilir, 75000 Melaka #MYFoodie #Foodie #LaparLokal #StreetFood #Melaka ",
+      "score": 1,
+      "matched_tokens": [
+        "jam",
+        "besar"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "4569fbce-7db9-436a-ac30-ac9c0ad25a88",
+      "vendor_name": "Raja Cendol Taming Sari",
+      "video": "7629977245657926920",
+      "caption": "Tembikai Tebuk Cendol Jam Besar Berhadapan Menara Jam Besar, Banda Hilir, 75000 Melaka #MYFoodie #Foodie #LaparLokal #StreetFood #Melaka ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "8fc7ef11-6de2-43f8-b397-b1c626896839",
+      "vendor_name": "Ibis Melaka Ramadhan Buffet",
+      "video": "7480004072628669704",
+      "caption": "ibis Melaka 📍 249, Jalan Bendahara, Kampung Bukit China, 75100 Melaka 📞 06-222 8888 #malaysiafoodandtravel #mft #melakafoodtravel #mlkft #ibismelaka #melakafood #foodmelaka #foryoupage #fyp",
+      "score": 0.333,
+      "matched_tokens": [
+        "ibis"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "3138d379-c10d-40ca-9deb-b2c84c638213",
+      "vendor_name": "Ibi Ramadhan Buffet",
+      "video": "7480004072628669704",
+      "caption": "ibis Melaka 📍 249, Jalan Bendahara, Kampung Bukit China, 75100 Melaka 📞 06-222 8888 #malaysiafoodandtravel #mft #melakafoodtravel #mlkft #ibismelaka #melakafood #foodmelaka #foryoupage #fyp",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "276f132f-139a-44bb-9893-65c459f7f417",
+      "vendor_name": "Cafe Solo",
+      "video": "7519333308753333512",
+      "caption": "初心咖啡馆 马六甲 SOLO CAFE 📍No.12, 1, Jalan KSB 14, Taman Kota Syahbandar, 75250, Melaka ⏰11AM - 7PM ❌Closed on Monday *Pork-free #malaysiafooodandtravel #mft #solocafe #duckcafe",
+      "score": 1,
+      "matched_tokens": [
+        "solo"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "d6cf3eb7-c866-4db9-9255-d97ca5ec514b",
+      "vendor_name": "Locahouz",
+      "video": "7519333308753333512",
+      "caption": "初心咖啡馆 马六甲 SOLO CAFE 📍No.12, 1, Jalan KSB 14, Taman Kota Syahbandar, 75250, Melaka ⏰11AM - 7PM ❌Closed on Monday *Pork-free #malaysiafooodandtravel #mft #solocafe #duckcafe",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "f7f2ffb9-8c54-4736-b9d0-9ba47b512531",
+      "vendor_name": "Vintage Green Cafe",
+      "video": "7552070028032544016",
+      "caption": "Vintage Green Cafe @ The Daughter 📍 13, Jln. Bunga Raya, Kampung Jawa, 75200 Melaka #malaysiafoodandtravel #mft #kampungjawa #melaka #vintagecafe #bookstorecafe #foryoupage #fyp",
+      "score": 1,
+      "matched_tokens": [
+        "vintage",
+        "green"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "92e8e933-2b16-452a-a749-c912f68352c5",
+      "vendor_name": "The Daily Fix Cafe",
+      "video": "7552070028032544016",
+      "caption": "Vintage Green Cafe @ The Daughter 📍 13, Jln. Bunga Raya, Kampung Jawa, 75200 Melaka #malaysiafoodandtravel #mft #kampungjawa #melaka #vintagecafe #bookstorecafe #foryoupage #fyp",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "4c0a8182-5c6f-4a1f-ab9f-110233015c27",
+      "vendor_name": "Deli Muara Ikan Bakar",
+      "video": "7580924363180920085",
+      "caption": "Ni pun boleh dijadikan panduan. banyak lagi sebenarnya. tp ini sebahagian yg boleh dicuba kalau datang ke melaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "822586f4-ff5e-4ea9-a120-307b419b9ef7",
+      "vendor_name": "Dapur Ijan Tabakam",
+      "video": "7580924363180920085",
+      "caption": "Ni pun boleh dijadikan panduan. banyak lagi sebenarnya. tp ini sebahagian yg boleh dicuba kalau datang ke melaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "6bbee28d-32a1-4c91-9b34-990e146ccc26",
+      "vendor_name": "Ikan Bakar Roselidik",
+      "video": "7580924363180920085",
+      "caption": "Ni pun boleh dijadikan panduan. banyak lagi sebenarnya. tp ini sebahagian yg boleh dicuba kalau datang ke melaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "6bf36182-f5b5-49fb-9225-e1cca25c38a6",
+      "vendor_name": "Mokmin Ikan Bakar",
+      "video": "7580924363180920085",
+      "caption": "Ni pun boleh dijadikan panduan. banyak lagi sebenarnya. tp ini sebahagian yg boleh dicuba kalau datang ke melaka",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 3,
+      "decision": "cleared"
+    },
+    {
+      "id": "d2a80620-e193-40ef-8619-a97cacab770b",
+      "vendor_name": "Jassid Bestarie",
+      "video": "7298562130184342802",
+      "caption": "kalau masuk melaka boleh g kedai2 yg sy listkan ni. 👍😊",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "3e17fe2c-a343-43f8-aec2-63c73825fe02",
+      "vendor_name": "Laksa",
+      "video": "7298562130184342802",
+      "caption": "kalau masuk melaka boleh g kedai2 yg sy listkan ni. 👍😊",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "b47bbd3d-3c96-4b81-8e08-565a45cc9f80",
+      "vendor_name": "Roti Terbang Poji",
+      "video": "7298562130184342802",
+      "caption": "kalau masuk melaka boleh g kedai2 yg sy listkan ni. 👍😊",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "9c18143c-8d3b-47f0-95cc-6f908a361cfd",
+      "vendor_name": "Roti Canai Putra",
+      "video": "7491242215046434056",
+      "caption": "Roti Naan Pak Putra  📍56 & 58, Jalan 4, Taman Kota Laksamana, 75200, Melaka  ⏰ 5:30pm - 1am (Monday Closed)  #malaysiafoodandtravel #mft #rotinaan #melakafood #foodmelaka #foryoupage #fyp",
+      "score": 0.5,
+      "matched_tokens": [
+        "putra"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "d0513b43-3d87-4533-a5fb-2e3dbe85c387",
+      "vendor_name": "Rotinan Paputra",
+      "video": "7491242215046434056",
+      "caption": "Roti Naan Pak Putra  📍56 & 58, Jalan 4, Taman Kota Laksamana, 75200, Melaka  ⏰ 5:30pm - 1am (Monday Closed)  #malaysiafoodandtravel #mft #rotinaan #melakafood #foodmelaka #foryoupage #fyp",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "c8115469-fae5-4598-b068-a54df42402d2",
+      "vendor_name": "Restoran Kok Keong",
+      "video": "7558289723689635090",
+      "caption": "Restoran Kok Keong 📍 11, Jalan Kampung Pantai, 75200 Melaka ⏰ 8am-230pm (Sundays Closed) #melakafoodandtravel #mlkft #malaysiafoodandtravel #mft #yamrice #melakafood",
+      "score": 1,
+      "matched_tokens": [
+        "kok",
+        "keong"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "2395f908-f4d5-4b0c-b1a0-061325686f62",
+      "vendor_name": "Restaurant Kok Kiong",
+      "video": "7558289723689635090",
+      "caption": "Restoran Kok Keong 📍 11, Jalan Kampung Pantai, 75200 Melaka ⏰ 8am-230pm (Sundays Closed) #melakafoodandtravel #mlkft #malaysiafoodandtravel #mft #yamrice #melakafood",
+      "score": 0.5,
+      "matched_tokens": [
+        "kok"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    },
+    {
+      "id": "fb4dc527-3d34-4744-b053-34c0b392cc04",
+      "vendor_name": "Harin Baba Laksa",
+      "video": "7421379833231461640",
+      "caption": "Jonker88 📍 88, Jalan Hang Jebat 75200 Melaka ⏰ Open Daily Sun - Thur 930am - 530pm Fri - Sat 930am - 730pm ❗️Pork-free❗️ #melakafoodtravel #mlkft #asamlaksa #nyonyafood #foryoupage #fyp ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "a8340112-29e4-4878-9bdd-73285246a912",
+      "vendor_name": "Nyonya Asam Laksa",
+      "video": "7421379833231461640",
+      "caption": "Jonker88 📍 88, Jalan Hang Jebat 75200 Melaka ⏰ Open Daily Sun - Thur 930am - 530pm Fri - Sat 930am - 730pm ❗️Pork-free❗️ #melakafoodtravel #mlkft #asamlaksa #nyonyafood #foryoupage #fyp ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "e3f1e0f9-0cc7-4b55-b207-5305900bea32",
+      "vendor_name": "Jonker 88 Nyonya Asam Laksa",
+      "video": "7421379833231461640",
+      "caption": "Jonker88 📍 88, Jalan Hang Jebat 75200 Melaka ⏰ Open Daily Sun - Thur 930am - 530pm Fri - Sat 930am - 730pm ❗️Pork-free❗️ #melakafoodtravel #mlkft #asamlaksa #nyonyafood #foryoupage #fyp ",
+      "score": 0,
+      "matched_tokens": [],
+      "shared_with": 2,
+      "decision": "cleared"
+    },
+    {
+      "id": "d67a27aa-8233-45f3-a273-31f8476b642a",
+      "vendor_name": "Coconut Shake Batu Berendam",
+      "video": "7599119102703062292",
+      "caption": "Coconut Shake Batu Berendam 📍No. 7-1, No.5, Tingkat Bawah, 7-2, Jalan Kanan 1, Taman Ria, 75350 Batu Berendam, Melaka ⏰ OPEN DAILY (9AM-11PM) #melakafoodandtravel #mlkft #coconutshakemelaka #coconutshakebatuberendam",
+      "score": 1,
+      "matched_tokens": [
+        "coconut",
+        "shake",
+        "batu",
+        "berendam"
+      ],
+      "shared_with": 1,
+      "decision": "kept"
+    },
+    {
+      "id": "f82378e9-a704-4863-a613-93b39db034db",
+      "vendor_name": "Koconat Shake Boy",
+      "video": "7599119102703062292",
+      "caption": "Coconut Shake Batu Berendam 📍No. 7-1, No.5, Tingkat Bawah, 7-2, Jalan Kanan 1, Taman Ria, 75350 Batu Berendam, Melaka ⏰ OPEN DAILY (9AM-11PM) #melakafoodandtravel #mlkft #coconutshakemelaka #coconutshakebatuberendam",
+      "score": 0.333,
+      "matched_tokens": [
+        "shake"
+      ],
+      "shared_with": 1,
+      "decision": "cleared"
+    }
+  ]
+}
