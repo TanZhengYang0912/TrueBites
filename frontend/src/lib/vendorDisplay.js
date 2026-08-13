@@ -145,6 +145,55 @@ export function priceLabel(vendor) {
   return match ? `RM${match[0]}` : null;
 }
 
+// "RM 8 - RM 15 per person" -> "RM8 – RM15"; "RM10 per person" -> "RM10"
+// (single value when min/max are equal or only one number is present).
+// Same number-extraction shape as the admin form's parsePriceRange, just
+// rendered as an en-dash range instead of separate min/max form fields.
+export function priceRangeLabel(vendor) {
+  const str = vendor.price_range || "";
+  const match = str.match(/RM\s*(\d+(?:\.\d+)?)\s*(?:-\s*(?:RM\s*)?(\d+(?:\.\d+)?))?/i);
+  if (!match) return null;
+  const min = match[1];
+  const max = match[2];
+  if (!max || Number(max) === Number(min)) return `RM${min}`;
+  return `RM${min} – RM${max}`;
+}
+
+// Parses the "HH:MM AM/PM - HH:MM AM/PM" shape the admin form already
+// enforces (see HOURS_RE in AdminVendorManagementPage.jsx) into an open/closed
+// status plus a lowercase-formatted label ("6:00 am – 12:00 pm"). Older
+// AI-scraped strings that don't match this shape ("3 - 4", "4 pm, 5.5 pm, 6
+// pm") return null rather than guessing at a status — no badge is better than
+// a wrong one.
+const HOURS_RANGE_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+
+function hoursToMinutes(hh, mm, period) {
+  const h = Number.parseInt(hh, 10) % 12;
+  return (h + (/pm/i.test(period) ? 12 : 0)) * 60 + Number.parseInt(mm, 10);
+}
+
+function formatClock(hh, mm, period) {
+  return `${String(Number.parseInt(hh, 10)).padStart(2, "0")}:${mm} ${period.toLowerCase()}`;
+}
+
+export function hoursStatus(vendor) {
+  const raw = vendor.operating_hours_raw || vendor.operating_hours;
+  const match = HOURS_RANGE_RE.exec(raw || "");
+  if (!match) return null;
+  const [, oh, om, op, ch, cm, cp] = match;
+
+  const openMin = hoursToMinutes(oh, om, op);
+  const closeMin = hoursToMinutes(ch, cm, cp);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  // Closing time <= opening time means the window crosses midnight
+  // (e.g. "4:00 pm - 12:00 am") — treat closing as happening "the next day".
+  const isOpen = closeMin <= openMin
+    ? nowMin >= openMin || nowMin < closeMin
+    : nowMin >= openMin && nowMin < closeMin;
+
+  return { isOpen, label: `${formatClock(oh, om, op)} – ${formatClock(ch, cm, cp)}` };
+}
+
 // Backend already computes this via haversine (see /restaurants/nearby).
 export function walkLabel(vendor) {
   return vendor.roughEtaWalking != null ? `${vendor.roughEtaWalking} min` : null;
