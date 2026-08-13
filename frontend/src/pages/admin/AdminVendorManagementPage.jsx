@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
@@ -26,7 +26,6 @@ const COLUMN_SORTS = {
   vendor: ["az", "za"],
   category: ["cat_az", "cat_za"],
   status: ["status", "status_desc"],
-  score: ["score_asc", "score_desc"],
 };
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
@@ -1181,11 +1180,6 @@ export default function AdminVendorManagementPage() {
                   Status <span className="admin-sort-caret">{sortIndicator("status")}</span>
                 </button>
               </th>
-              <th aria-sort={ariaSortFor("score")}>
-                <button type="button" className="admin-th-sort" onClick={() => handleHeaderSort("score")}>
-                  AI Score <span className="admin-sort-caret">{sortIndicator("score")}</span>
-                </button>
-              </th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -1193,7 +1187,7 @@ export default function AdminVendorManagementPage() {
             {loading ? (
               Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                 <tr key={`sk-${i}`} className="admin-skeleton-row">
-                  {Array.from({ length: 8 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <td key={j}><div className="admin-skeleton-bar" /></td>
                   ))}
                 </tr>
@@ -1225,16 +1219,6 @@ export default function AdminVendorManagementPage() {
                     <span className={`admin-status-pill ${st}`}>
                       {vendor.status}
                     </span>
-                  </td>
-                  <td className="admin-table-score">
-                    {vendor.aiScore ? (
-                      <>
-                        <Star size={13} fill="currentColor" />
-                        <span>{Number(vendor.aiScore).toFixed(1)}</span>
-                      </>
-                    ) : (
-                      <span className="admin-dash">—</span>
-                    )}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="admin-table-actions">
