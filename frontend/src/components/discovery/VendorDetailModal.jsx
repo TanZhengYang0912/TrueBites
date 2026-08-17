@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Heart, Bot, Play, Wallet, Footprints, MapPin, Star } from "lucide-react";
+import { X, Heart, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
-  priceLabel, walkLabel, distanceLabel,
+  priceLabel, photoAltText,
 } from "../../lib/vendorDisplay";
 import VendorGallery from "./VendorGallery";
 import { useSession } from "../../lib/SessionContext";
@@ -83,8 +83,6 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
 
   const handle = creatorHandle(vendor);
   const price = priceLabel(vendor);
-  const walk = walkLabel(vendor);
-  const dist = distanceLabel(vendor);
   const tags = (vendor.cuisine_types || vendor.signature_dishes || "")
     .split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -107,7 +105,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
               so the cover photo frames identically in both places — a
               storefront that looks right on the card shouldn't jump to a
               different crop the moment the modal opens. */}
-          <VendorGallery images={images} alt={vendor.name} interval={2600} showArrows showDots objectPosition="50% 18%" />
+          <VendorGallery images={images} alt={(_, i) => photoAltText(vendor, i)} interval={2600} showArrows showDots objectPosition="50% 18%" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
           {/* Category badge */}
           <span className="absolute left-3 top-3 rounded-full bg-forest px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-white">
@@ -136,8 +134,6 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
                 text={`${Number(vendor.average_rating).toFixed(1)} (${vendor.review_count} review${vendor.review_count === 1 ? "" : "s"})`}
               />
             )}
-            {dist && <MetaItem icon={<MapPin size={14} color={TERRACOTTA} />} text={`${dist} away`} />}
-            {walk && <MetaItem icon={<Footprints size={14} color={TERRACOTTA} />} text={walk} />}
             {price && <MetaItem icon={<Wallet size={14} color={TERRACOTTA} />} text={`${price}/person`} />}
           </div>
 

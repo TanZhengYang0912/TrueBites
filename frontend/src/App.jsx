@@ -11,7 +11,6 @@ import SetAdminPasswordPage from "./pages/SetAdminPasswordPage";
 import ProfilePage    from "./pages/ProfilePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import OnboardingPage from "./pages/OnboardingPage";
-import VendorsPage    from "./pages/VendorsPage";
 import DevPinPrecision from "./pages/DevPinPrecision";
 import AIPage         from "./pages/AIPage";
 import EngagementPage from "./pages/EngagementPage";
@@ -102,7 +101,6 @@ export default function App() {
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/vendors"   element={<VendorsPage />} />
 
           {/* Dev-only design preview, tree-shaken out of production builds. */}
           {import.meta.env.DEV && <Route path="/dev/map" element={<DevPinPrecision />} />}

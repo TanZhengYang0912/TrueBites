@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Bookmark, Check, MapPin, Plus, Star, Wallet } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
-  priceRangeLabel, hoursStatus,
+  priceRangeLabel, hoursStatus, photoAltText,
 } from "../../lib/vendorDisplay";
 import VendorGallery from "./VendorGallery";
 
@@ -11,15 +11,13 @@ const INK = "#202A35";
 const OPEN_GREEN = "#2F9E44";
 const CLOSED_RED = "#C92A2A";
 
-// Image is taller on phones (one card per row) and returns to the catalog crop
-// once the grid has two or more columns. Taller than the original crop on
-// every breakpoint — every vendor photo is a portrait 9:16/3:4 video frame,
-// so box height directly controls how much of the source survives the
-// object-cover crop (wider box = more of the frame thrown away). At 220px
-// only ~42% of a 1080x1920 source was visible; these heights bring that to
-// ~55-60%, trading grid density for photos that read as storefronts instead
-// of a random cropped sliver.
-const IMAGE = "relative h-[280px] cursor-pointer bg-sand sm:h-[220px] xl:h-[280px]";
+// Fixed 4:3 aspect ratio (not a fixed pixel height) so proportions hold
+// correctly at every breakpoint — a card's width already changes with the
+// grid's column count (1/2/3-4 per row), and a flat height only ever looked
+// right at one of those widths. Every vendor photo is a portrait 9:16/3:4
+// video frame, so this crops more than a taller box would; the top-biased
+// IMAGE_POSITION below still keeps the shopfront signage in frame.
+const IMAGE = "relative aspect-[4/3] cursor-pointer bg-sand";
 // TikTok captions sit dead-centre in the source frame — biasing the crop
 // toward the top keeps the shopfront signage/structure (which is what's up
 // top in these food-vlog frames) and trades away more of the caption band
@@ -39,19 +37,34 @@ export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmar
     <article className="min-w-0 overflow-hidden rounded border border-sand bg-white transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-forest hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div
         className={IMAGE}
+        role="button"
+        tabIndex={0}
+        aria-label={`View photos of ${vendor.name}`}
         onClick={() => onOpenDetail(vendor)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenDetail(vendor);
+          }
+        }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
       >
         {/* Cycles through the storefront cover + food photos while the
-            pointer stays over the card; snaps back to the cover on leave. */}
+            pointer stays over the card (or it's keyboard-focused); snaps back
+            to the cover when hover/focus ends. On a touch device (no real
+            hover) tapping the photo instead advances it one at a time —
+            tapToAdvance — since there's no hover to preview the gallery with. */}
         <VendorGallery
           images={images}
-          alt={vendor.name}
+          alt={(_, i) => photoAltText(vendor, i)}
           active={hovered}
           resetOnInactive
           interval={1100}
           objectPosition={IMAGE_POSITION}
+          tapToAdvance
         />
 
         {/* Unifies photos shot by different creators under different

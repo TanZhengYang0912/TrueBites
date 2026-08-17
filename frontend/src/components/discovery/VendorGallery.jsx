@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import PhotoUnavailablePlaceholder from "./PhotoUnavailablePlaceholder";
 
 // Shared image carousel behind both surfaces that show vendor photos:
 //   - VendorCard: hover-to-play, no arrows/dots (`active` = pointer is over
@@ -27,6 +28,14 @@ export default function VendorGallery({
   // signage instead of the centre band, which is where TikTok creators burn
   // in their caption text. Defaults to the browser's own centre crop.
   objectPosition = "50% 50%",
+  // Touch devices have no hover, so VendorCard opts into this: a tap on the
+  // image advances to the next photo instead of bubbling to the parent's
+  // onClick (which normally opens the detail view). Only kicks in when the
+  // device genuinely lacks a hover-capable pointer (matchMedia, not touch
+  // event support — a laptop with a touchscreen still has a mouse) and there
+  // is more than one photo to cycle through; otherwise the tap passes through
+  // untouched, so the vendor stays reachable exactly as before.
+  tapToAdvance = false,
   className = "",
 }) {
   const [index, setIndex] = useState(0);
@@ -34,8 +43,18 @@ export default function VendorGallery({
   const reducedMotion = useRef(
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   ).current;
+  const canHover = useRef(
+    typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches
+  ).current;
 
   const goTo = useCallback((i) => setIndex(((i % count) + count) % count), [count]);
+  const cyclesOnTap = tapToAdvance && !canHover && count > 1;
+
+  const handleContainerClick = (e) => {
+    if (!cyclesOnTap) return;
+    e.stopPropagation();
+    goTo(index + 1);
+  };
 
   // Auto-advance while active.
   useEffect(() => {
@@ -52,22 +71,40 @@ export default function VendorGallery({
   }, [active, resetOnInactive]);
 
   return (
-    <div className={`relative size-full overflow-hidden ${className}`}>
+    <div className={`relative size-full overflow-hidden ${className}`} onClick={handleContainerClick}>
       <div
         className="flex size-full transition-transform duration-500 ease-in-out motion-reduce:transition-none"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
-        {images.map((src, i) => (
-          <img
-            key={src}
-            src={src}
-            alt={i === 0 ? alt : `${alt} — photo ${i + 1} of ${count}`}
-            loading="lazy"
-            className="block h-full w-full shrink-0 grow-0 basis-full object-cover"
-            style={{ objectPosition }}
-          />
-        ))}
+        {images.map((src, i) => {
+          const description = typeof alt === "function" ? alt(src, i) : (i === 0 ? alt : `${alt} — photo ${i + 1} of ${count}`);
+          return (
+            <div key={src || `empty-${i}`} className="h-full w-full shrink-0 grow-0 basis-full">
+              {src ? (
+                <img
+                  src={src}
+                  alt={description}
+                  loading="lazy"
+                  className="block size-full object-cover"
+                  style={{ objectPosition }}
+                />
+              ) : (
+                <PhotoUnavailablePlaceholder />
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Non-interactive — a touch user has no hover preview, so this tells
+          them there's more than one photo and roughly where they are, without
+          adding another small tap target (see cyclesOnTap above for the
+          actual interaction: tapping the photo itself advances it). */}
+      {cyclesOnTap && (
+        <span className="pointer-events-none absolute bottom-2 right-2 z-10 rounded-full bg-ink/50 px-2 py-0.5 text-[10px] font-semibold text-white">
+          {index + 1} / {count}
+        </span>
+      )}
 
       {showArrows && count > 1 && (
         <>

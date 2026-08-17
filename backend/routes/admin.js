@@ -279,7 +279,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
     let builder = supabase
       .from("vendors")
       .select(
-        "id,vendor_name,address,state,latitude,longitude,status,cuisine_types,signature_dishes,source_platform,source_video_url,sentiment_score,created_at,last_updated,phone,price_range,operating_hours,operating_hours_raw,location_precision,storefront_image_url,gallery_image_urls",
+        "id,vendor_name,address,state,latitude,longitude,status,cuisine_types,signature_dishes,source_platform,source_video_url,sentiment_score,created_at,last_updated,phone,price_range,operating_hours,operating_hours_raw,location_precision,storefront_image_url,gallery_image_urls,cover_photo_locked",
         { count: "exact" }
       )
       .range((page - 1) * pageSize, page * pageSize - 1);
@@ -332,6 +332,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
       fullAddress: vendor.address,
       status: (vendor.status || "draft").toUpperCase(),
       videos: vendor.source_video_url ? 1 : 0,
+      sourceVideoUrl: vendor.source_video_url || null,
       aiScore: vendor.sentiment_score,
       joined: vendor.created_at?.slice(0, 10) || null,
       sourcePlatform: platformBadge(vendor.source_video_url, vendor.source_platform),
@@ -342,6 +343,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
       locationPrecision: vendor.location_precision,
       imageUrl: vendor.storefront_image_url || null,
       galleryUrls: Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [],
+      coverLocked: vendor.cover_photo_locked === true,
     }));
 
     res.json({

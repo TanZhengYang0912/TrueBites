@@ -42,7 +42,7 @@ import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
 import { STORAGE_BUCKET, storagePathFromUrl } from "../lib/vendorValidation.js";
-import { normalizeMatchText } from "../lib/vendorDuplicates.js";
+import { captionMatchConfidence } from "../lib/photoMatching.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -59,52 +59,18 @@ const REPORT_PATH = path.resolve("scripts/vendor_photo_audit.json");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-// Generic Malay/Melaka food + venue words that appear in almost every caption.
-// Scoring on these would be actively harmful: the caption "5 nasi ayam terbaik
-// di melaka" contains "nasi" and "ayam", so a naive token overlap would score
-// "Nasi Ayam Liza" at 2/3 and let it win a group whose caption names nobody.
-// Only tokens OUTSIDE this list count toward a match.
-const GENERIC_TOKENS = new Set([
-  "nasi", "ayam", "mee", "mi", "laksa", "roti", "ikan", "bakar", "cendol",
-  "satay", "sate", "kopi", "kedai", "restoran", "restaurant", "cafe", "kafe",
-  "warung", "gerai", "medan", "selera", "makan", "makanan", "melaka", "malacca",
-  "best", "terbaik", "sedap", "murah", "viral", "di", "part", "food", "halal",
-  "shop", "stall", "the", "dan", "and",
-]);
-
 const MATCH_THRESHOLD = 0.5;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-function distinctiveTokens(name) {
-  return normalizeMatchText(name)
-    .split(" ")
-    .filter(Boolean)
-    .filter((t) => !GENERIC_TOKENS.has(t) && !/^\d+$/.test(t));
-}
-
-// How confidently does `caption` name `vendorName`?
-//   1.0  -> the whole normalised vendor name appears verbatim in the caption
-//   0-1  -> fraction of the vendor's DISTINCTIVE tokens present in the caption
-//   0    -> nothing distinctive to match on, or no distinctive token found
+// Thin adapter over lib/photoMatching.js's captionMatchConfidence (0-100
+// scale, shared with the on-demand photo-discovery endpoint) so the rest of
+// this script's math/output (0-1 `score`, unchanged since this script last
+// ran and was verified) doesn't need to change.
 function scoreNameAgainstCaption(vendorName, caption) {
-  const name = normalizeMatchText(vendorName);
-  const text = normalizeMatchText(caption);
-  if (!name || !text) return { score: 0, matched: [], distinctive: [] };
-
-  const distinctive = distinctiveTokens(vendorName);
-  if (text.includes(name) && name.length >= 4) {
-    return { score: 1, matched: distinctive, distinctive };
-  }
-
-  // A name made entirely of generic words ("Laksa") identifies nothing — it
-  // must never win a group on the strength of words every caption contains.
-  if (!distinctive.length) return { score: 0, matched: [], distinctive };
-
-  const captionTokens = new Set(text.split(" ").filter(Boolean));
-  const matched = distinctive.filter((t) => captionTokens.has(t));
-  return { score: matched.length / distinctive.length, matched, distinctive };
+  const { confidence, matched, distinctive } = captionMatchConfidence(vendorName, caption);
+  return { score: confidence / 100, matched, distinctive };
 }
 
 async function getCaption(videoUrl) {

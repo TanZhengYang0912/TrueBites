@@ -1,6 +1,12 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-yt-dlp==2024.10.22
+# yt-dlp ships date-versioned releases to track upstream site changes (TikTok
+# etc. break extraction often); the old pin here (2024.10.22) was over a year
+# stale and failing on a large share of current TikTok videos with errors
+# like "Unable to extract webpage video data" — confirmed by batch-testing
+# gallery-frame extraction against real vendor videos, where upgrading to
+# this version (in a test env) fixed the previously-failing ones.
+yt-dlp==2026.7.4
 curl-cffi>=0.7.0
 openai-whisper==20240930
 httpx==0.27.2
@@ -8,3 +14,11 @@ python-multipart==0.0.12
 python-dotenv==1.0.1
 aiofiles==23.2.1
 groq>=1.5.0
+Pillow>=10.4.0
+# Pinned below 5.x for stability — OpenCV 5.0 was a very recent release at
+# the time this was added and removed the classic Haar Cascade API entirely.
+# Not needed here anyway: frameExtractor.py's face-avoidance filter uses
+# cv2.FaceDetectorYN (a small downloaded ONNX model, not the bundled
+# cascades), which is present in this 4.x line too — the pin is just to
+# avoid 5.0's other breaking changes, confirmed working at 4.14.0.94.
+opencv-python-headless>=4.10.0,<5

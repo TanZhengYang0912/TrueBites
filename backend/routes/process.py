@@ -10,10 +10,12 @@ import io
 from pydantic import BaseModel, Field
 from typing import Optional
 
+import os
 from services.downloader import download_audio, validate_url, scrape_profile
 from services.transcriber import transcribe_audio
 from services.summarizer import summarize_transcript
 from services.extractor import extract_info
+from services.frameExtractor import extract_frames
 from services.supabase_client import (
     geocode_address, upsert_vendor, find_duplicate_vendors,
     upload_vendor_image_from_url, set_vendor_storefront_image,
@@ -21,9 +23,19 @@ from services.supabase_client import (
 
 router = APIRouter()
 
+# This service's own externally-reachable base URL — used to hand the Node
+# backend absolute links to extracted frame files (served statically, see
+# main.py's StaticFiles mount) so it can download+re-host whichever one an
+# admin picks, the same way it already does for Mapillary/Flickr/TikTok
+# candidate URLs.
+SELF_BASE_URL = os.getenv("AI_SERVICE_SELF_URL", "http://localhost:8000")
+
 # Dedicated thread pool for profile scraping — isolated from batch pipeline threads
 # so "Fetch Videos" is always fast even when a large batch is running.
 _scrape_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="scrape")
+# Frame extraction downloads a full video + runs several ffmpeg calls — kept
+# separate so a slow extraction never queues up behind (or blocks) scraping.
+_frame_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="frames")
 
 OUTPUTS_DIR = Path(__file__).parent.parent / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
@@ -75,6 +87,10 @@ class VendorSaveEntry(BaseModel):
 
 class SaveToDatabaseRequest(BaseModel):
     vendors: list[VendorSaveEntry]
+
+
+class ExtractFramesRequest(BaseModel):
+    video_url: str
 
 
 class ReviewRequest(BaseModel):
@@ -357,6 +373,42 @@ def run_pipeline(job_id: str, url: str):
 async def api_validate_url(req: ValidateRequest):
     result = validate_url(req.url)
     return result
+
+
+# Vendor Photos feature — on-demand frame extraction from a vendor's own
+# source_video_url, called by the Node backend's videoFrameProvider.js as one
+# of several automatic photo-discovery sources. Synchronous request/response
+# (no job/polling, unlike scrape-profile above) since this is a single
+# bounded operation an admin explicitly triggers and waits for; the blocking
+# download+ffmpeg work runs in _frame_executor so it doesn't stall the event
+# loop for any other in-flight request.
+@router.post("/extract-frames")
+async def api_extract_frames(req: ExtractFramesRequest):
+    validation = validate_url(req.video_url)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail=validation["error"])
+    if validation["url_type"] != "video":
+        raise HTTPException(status_code=400, detail="video_url must be a single video link, not a profile/channel link.")
+
+    job_id = f"frames-{uuid.uuid4()}"
+    loop = asyncio.get_event_loop()
+    try:
+        frames = await loop.run_in_executor(_frame_executor, extract_frames, req.video_url, job_id)
+    except RuntimeError as e:
+        # Download failure (deleted video, network issue, etc) — no candidates,
+        # not a server error; the caller treats this like "provider found nothing".
+        return {"frames": [], "error": str(e)}
+
+    return {
+        "frames": [
+            {
+                "url": f"{SELF_BASE_URL}/outputs/{job_id}/frames/{f['path'].name}",
+                "sharpness": round(f["sharpness"], 1),
+                "brightness": round(f["brightness"], 1),
+            }
+            for f in frames
+        ]
+    }
 
 
 def _run_scrape_job(scrape_id: str, url: str, start: int, end: int, platform: str):
