@@ -6,6 +6,7 @@ import {
   getAdminVendors, updateAdminVendor, uploadVendorGalleryImage, uploadVendorImage,
 } from "../../api/admin";
 import Toast from "../../components/engagement/Toast";
+import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
 
@@ -65,6 +66,7 @@ const emptyForm = {
   status: "draft",
   imageFile: null,
   imagePreview: null,
+  source_video_url: "",
 };
 
 // "RM 10 - RM 20 per person" / "RM10-20 per person" / "RM 20 per person" (equal
@@ -123,6 +125,7 @@ function makeForm(vendor) {
     phone: vendor.phone || "",
     status: (vendor.status || "draft").toLowerCase(),
     imageFile: null,
+    source_video_url: vendor.sourceVideoUrl || "",
     // Seed the dropzone preview from the same resolver the public site uses —
     // for a vendor with no real upload yet, this shows the curated/category
     // photo currently displayed to users, not a blank box.
@@ -570,6 +573,12 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled }) {
         </label>
       </div>
 
+      {/* No manual TikTok/video-link input here by design — a vendor's
+          source_video_url comes only from the existing AI Content Upload
+          workflow. When editing a vendor that already has one (see
+          makeForm below), it still flows through untouched to
+          PhotoDiscoveryPanel's "Find Photos Automatically", the admin just
+          never sees or edits the URL itself. */}
       <ImageDropzone form={form} onFileChange={onFileChange} disabled={disabled} />
     </>
   );
@@ -651,7 +660,7 @@ function DuplicatesPanel({ groups, onClose, onDeleteRequest }) {
   );
 }
 
-function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, notify }) {
+function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, notify }) {
   if (!vendor) return null;
 
   return (
@@ -666,6 +675,21 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
 
         <div className="admin-modal-form">
           <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing} />
+
+          {editing && (
+            <PhotoDiscoveryPanel
+              vendorId={vendor.id}
+              latitude={form.latitude}
+              longitude={form.longitude}
+              sourceVideoUrl={form.source_video_url}
+              coverLocked={vendor.coverLocked}
+              onPhotoCommitted={(role, url) => {
+                if (role === "cover") onCoverDiscovered(url);
+                else onGalleryChange([...(vendor.galleryUrls || []), url]);
+              }}
+              notify={notify}
+            />
+          )}
 
           <GalleryManager
             vendorId={vendor.id}
@@ -709,7 +733,7 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
   );
 }
 
-function AddVendorModal({ onClose, onCreated }) {
+function AddVendorModal({ onClose, onCreated, notify }) {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -718,6 +742,16 @@ function AddVendorModal({ onClose, onCreated }) {
   // possible_duplicate) — shown as a warning with an "Add anyway" override
   // instead of silently blocking, since same-named vendors do legitimately exist.
   const [duplicates, setDuplicates] = useState(null);
+  // Once the vendor row exists, the modal stops being a "form" and becomes a
+  // small gallery-photo-setup step — the gallery upload endpoint needs a real
+  // vendorId, so there's nowhere for it to live before this point.
+  const [createdVendor, setCreatedVendor] = useState(null);
+  const [galleryUrls, setGalleryUrls] = useState([]);
+  const [coverUrl, setCoverUrl] = useState(null);
+  // Tracks whether the cover was set by a manual upload (vs. automatic photo
+  // discovery) — manual always wins, matching the /photos/commit route's own
+  // cover_photo_locked guard on the backend.
+  const [coverLocked, setCoverLocked] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -737,6 +771,7 @@ function AddVendorModal({ onClose, onCreated }) {
     longitude: form.longitude,
     operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
     status: form.status,
+    source_video_url: form.source_video_url,
   });
 
   const doSave = async (force) => {
@@ -745,10 +780,12 @@ function AddVendorModal({ onClose, onCreated }) {
     try {
       const created = await createAdminVendor({ ...buildPayload(), force });
       if (form.imageFile && created?.id) {
-        await uploadVendorImage(created.id, form.imageFile);
+        const { storefront_image_url } = await uploadVendorImage(created.id, form.imageFile);
+        setCoverUrl(storefront_image_url);
+        setCoverLocked(true); // manual upload — the server just locked the cover to match
       }
       onCreated();
-      onClose();
+      setCreatedVendor(created);
     } catch (err) {
       if (err.status === 409 && err.payload?.error === "possible_duplicate") {
         setDuplicates(err.payload.duplicates || []);
@@ -766,6 +803,61 @@ function AddVendorModal({ onClose, onCreated }) {
     if (Object.keys(errs).length) return;
     doSave(false);
   };
+
+  if (createdVendor) {
+    return (
+      <div className="admin-modal-backdrop" onClick={onClose}>
+        <div className="admin-modal-card wide" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-header">
+            <div>
+              <h2>{createdVendor.vendor_name}</h2>
+              <p>Vendor created — add its photos now, or skip and do it later from Edit.</p>
+            </div>
+            <button type="button" className="admin-icon-btn subtle" onClick={onClose}>×</button>
+          </div>
+          <div className="admin-modal-form">
+            <label>
+              <span>Cover Photo</span>
+              <div className="admin-dropzone" style={{ cursor: "default" }}>
+                {coverUrl ? (
+                  <img src={coverUrl} alt="Cover" className="admin-dropzone-preview" />
+                ) : (
+                  <div className="admin-dropzone-empty">
+                    <ImagePlus size={18} />
+                    <span>No cover photo yet — find one automatically below, or add it later from Edit.</span>
+                  </div>
+                )}
+              </div>
+            </label>
+
+            <PhotoDiscoveryPanel
+              vendorId={createdVendor.id}
+              latitude={createdVendor.latitude}
+              longitude={createdVendor.longitude}
+              sourceVideoUrl={createdVendor.source_video_url}
+              coverLocked={coverLocked}
+              onPhotoCommitted={(role, url) => {
+                if (role === "cover") { setCoverUrl(url); setCoverLocked(false); }
+                else setGalleryUrls((cur) => [...cur, url]);
+              }}
+              notify={notify}
+            />
+
+            <GalleryManager
+              vendorId={createdVendor.id}
+              images={galleryUrls}
+              disabled={false}
+              onChange={setGalleryUrls}
+              notify={notify}
+            />
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-primary-btn compact" onClick={onClose}>Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-modal-backdrop" onClick={onClose}>
@@ -848,7 +940,7 @@ export default function AdminVendorManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Real-time search — debounce like VendorsPage.jsx, no Enter/submit needed.
+  // Real-time search — debounced, no Enter/submit needed.
   useEffect(() => {
     const t = setTimeout(() => setQuery(draftQuery.trim()), 350);
     return () => clearTimeout(t);
@@ -932,6 +1024,7 @@ export default function AdminVendorManagementPage() {
         longitude: form.longitude,
         operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
         status: form.status,
+        source_video_url: form.source_video_url,
       });
       if (form.imageFile) {
         await uploadVendorImage(selectedVendor.id, form.imageFile);
@@ -1320,12 +1413,24 @@ export default function AdminVendorManagementPage() {
             items: cur.items.map((v) => (v.id === selectedVendor?.id ? { ...v, galleryUrls } : v)),
           }));
         }}
+        onCoverDiscovered={(url) => {
+          // Same sync as onGalleryChange, above, plus the dropzone preview
+          // (form.imagePreview) so the admin sees the new cover immediately
+          // without needing to click Save Changes first.
+          setForm((cur) => ({ ...cur, imagePreview: url }));
+          setSelectedVendor((cur) => (cur ? { ...cur, imageUrl: url } : cur));
+          setData((cur) => ({
+            ...cur,
+            items: cur.items.map((v) => (v.id === selectedVendor?.id ? { ...v, imageUrl: url } : v)),
+          }));
+        }}
       />
 
       {showAddModal && (
         <AddVendorModal
-          onClose={() => setShowAddModal(false)}
+          onClose={() => { setShowAddModal(false); loadVendors({ page: data.pagination.page }); }}
           onCreated={() => { loadVendors({ page: 1 }); notify("Vendor created successfully."); }}
+          notify={notify}
         />
       )}
 

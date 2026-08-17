@@ -101,4 +101,4 @@ function findAllDuplicateGroups(vendors) {
   return groups.sort((x, y) => y.match_score - x.match_score);
 }
 
-export { normalizeMatchText, findDuplicatesFor, findAllDuplicateGroups };
+export { normalizeMatchText, sequenceRatio, findDuplicatesFor, findAllDuplicateGroups };

@@ -37,7 +37,8 @@ import path from "path";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
-import { STORAGE_BUCKET } from "../lib/vendorValidation.js";
+import { getTikTokOEmbed } from "../lib/photoProviders/tiktokOEmbedProvider.js";
+import { downloadAndStorePhoto } from "../lib/photoProviders/photoStorage.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -68,37 +69,6 @@ if (!CONFIRMED) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
-const CONTENT_TYPE_EXT = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-
-// TikTok's public oEmbed endpoint — no auth, no key, documented for embedding.
-async function getThumbnailUrl(videoUrl) {
-  const url = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`;
-  const res = await fetch(url);
-  if (!res.ok) return null; // 404 = deleted/private video
-  const data = await res.json();
-  return data.thumbnail_url || null;
-}
-
-// Downloads the (short-lived, signed) thumbnail immediately and re-uploads it
-// into permanent Supabase Storage.
-async function uploadThumbnail(vendorId, thumbnailUrl) {
-  const res = await fetch(thumbnailUrl);
-  if (!res.ok) throw new Error(`thumbnail download failed: ${res.status}`);
-
-  const contentType = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
-  const ext = CONTENT_TYPE_EXT[contentType] || "jpg";
-  const buffer = Buffer.from(await res.arrayBuffer());
-
-  const filePath = `vendors/${vendorId}/storefront-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(filePath, buffer, { contentType, cacheControl: "31536000", upsert: false });
-  if (error) throw new Error(`storage upload failed: ${error.message}`);
-
-  const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath);
-  return pub.publicUrl;
-}
 
 function loadLog() {
   if (fs.existsSync(LOG_PATH)) return JSON.parse(fs.readFileSync(LOG_PATH, "utf8"));
@@ -131,11 +101,11 @@ async function main() {
     process.stdout.write(`[${i + 1}/${pending.length}] ${vendor.vendor_name} ... `);
 
     try {
-      const thumbnailUrl = await getThumbnailUrl(vendor.source_video_url);
-      if (!thumbnailUrl) { console.log("⚠️  no oEmbed thumbnail (video deleted/private?)"); noThumbnail++; log.done.push(vendor.id); continue; }
+      const oembed = await getTikTokOEmbed(vendor.source_video_url);
+      if (!oembed) { console.log("⚠️  no oEmbed thumbnail (video deleted/private?)"); noThumbnail++; log.done.push(vendor.id); continue; }
       await sleep(DELAY_MS);
 
-      const publicUrl = await uploadThumbnail(vendor.id, thumbnailUrl);
+      const { url: publicUrl } = await downloadAndStorePhoto(vendor.id, oembed.thumbnailUrl, "storefront");
 
       const { error: updateErr } = await supabase
         .from("vendors")

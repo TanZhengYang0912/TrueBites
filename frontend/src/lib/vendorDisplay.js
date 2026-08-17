@@ -73,47 +73,17 @@ export function categoryMatches(vendor, key) {
 }
 
 // ─── Vendor imagery ─────────────────────────────────────────────────────────────
-// Curated category placeholders remain the final fallback. The static manifest
-// is checked first so the existing vendor UUIDs use the images shipped with this
-// branch without requiring a database or API change.
-const PLACEHOLDER_IMAGES = {
-  nyonya: [
-    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=480&h=360&fit=crop",
-  ],
-  cafe: [
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=480&h=360&fit=crop",
-  ],
-  local: [
-    "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1543353071-873f17a7a088?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1526318472351-c75fcf070305?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=480&h=360&fit=crop",
-  ],
-};
-
-function hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-// Deterministic (not random) so the same vendor always shows the same photo
-// across renders/reloads. A real uploaded/fetched image always takes
-// precedence; the Unsplash category pool is only a last-resort fallback for a
-// vendor that has no storefront photo at all yet (e.g. brand new, not yet run
-// through the photo-fetch scripts). `storefront_image_url` is the real DB/API
-// column; `imageUrl` is how the admin console's API mapper names it;
-// `image_url` is kept as a last-resort legacy key in case anything else still
-// produces it.
+// Returns the real cover photo, or `null` when this vendor has none yet.
+// Deliberately does NOT fall back to a random stock/unrelated photo — showing
+// an unrelated restaurant's photo as if it belonged to this vendor is worse
+// than showing an honest "photo unavailable" state (see
+// PhotoUnavailablePlaceholder.jsx, which every caller of vendorGallery()
+// renders instead of an <img> whenever a slide is null). `storefront_image_url`
+// is the real DB/API column; `imageUrl` is how the admin console's API mapper
+// names it; `image_url` is kept as a last-resort legacy key in case anything
+// else still produces it.
 export function placeholderImage(vendor) {
-  const real = vendor.storefront_image_url || vendor.imageUrl || vendor.image_url;
-  if (real) return real;
-  const pool = PLACEHOLDER_IMAGES[categoryOf(vendor)] || PLACEHOLDER_IMAGES.local;
-  return pool[hashStr(String(vendor.id)) % pool.length];
+  return vendor.storefront_image_url || vendor.imageUrl || vendor.image_url || null;
 }
 
 // Ordered image list for the card-hover / detail-modal carousels: the
@@ -137,6 +107,17 @@ export function vendorGallery(vendor) {
   }
 
   return images;
+}
+
+// Descriptive alt text per photo, e.g. "Storefront of Chacos Berlauk in
+// Melaka" — replaces the previous bare `vendor.name` on every slide, which
+// didn't distinguish the cover from later gallery photos and gave a screen
+// reader no more information than the visible heading already provides.
+// `index` is which slide within vendorGallery()'s ordering (0 = cover).
+export function photoAltText(vendor, index = 0) {
+  const place = vendor.city || vendor.address?.split(",")[0]?.trim() || "Melaka";
+  const role = index === 0 ? "Storefront" : "Photo";
+  return `${role} of ${vendor.vendor_name || vendor.name} in ${place}`;
 }
 
 // "RM8-15 per person" / "RM10" -> "RM8" (first number found); no match -> null.

@@ -61,7 +61,7 @@ Auth is backed directly by **Supabase Auth** (no custom sessions/JWTs of our own
 - **First login after being invited**: every new admin is created with `user_metadata.must_change_password: true` and an initial password equal to their email address. On first successful sign-in they're forced to `/admin-set-password` before reaching anything else (`SetAdminPasswordPage.jsx`).
 - After that, regular admins land on **`/admin`**, the operational console containing Overview, Vendors, AI Content Queue, Reviews, and Settings. Superadmins land on **`/superadmin`** for admin-account management.
 - **Logout is available from the admin landing pages** — the AI and Vendor pages use a Back action to return to the appropriate admin area. This is enforced by convention in the UI, not by removing `supabase.auth.signOut()` capability elsewhere.
-- **Route guard**: `AuthGate` in `App.jsx` runs on every route change. Admin/superadmin sessions are restricted to the admin login, password setup, `/admin`, `/admin/*`, `/ai`, and `/vendors` routes. They cannot reach `/map`, `/profile`, `/onboarding`, or other customer pages by typing the URL directly.
+- **Route guard**: `AuthGate` in `App.jsx` runs on every route change. Admin/superadmin sessions are restricted to the admin login, password setup, `/admin`, `/admin/*`, and `/ai` routes. They cannot reach `/map`, `/profile`, `/onboarding`, or other customer pages by typing the URL directly.
 
 ### Superadmin — admin management
 
@@ -88,7 +88,7 @@ This creates `admin@gmail.com` / `adminn` with `app_metadata.role: "superadmin"`
 
 ### Known limitations
 
-- `/ai` and `/vendors` are gated client-side (`AuthGate`, plus each page not being reachable by customers through normal navigation) but the backend routes behind them (`backend/routes/vendors.js`, the AI service) do not themselves check for an admin token — don't rely on this for anything security-sensitive until that's added.
+- `/ai` is gated client-side (`AuthGate`, plus the page not being reachable by customers through normal navigation) but the backend routes behind it (the AI service) do not themselves check for an admin token — don't rely on this for anything security-sensitive until that's added.
 - There's currently no way to promote an *existing* customer account to admin — `POST /api/admin/admins` only creates brand-new accounts and returns `409` if the email is already registered.
 
 ---
@@ -288,7 +288,6 @@ Collaborative-Assignment/
 │   │   │   ├── SuperAdminPage.jsx      # Auth module        (Joshua)         — invite/list/remove admins + logout
 │   │   │   ├── SetAdminPasswordPage.jsx# Auth module        (Joshua)         — forced first-login password change
 │   │   │   ├── ProfilePage.jsx         # Auth module        (Joshua)         — profile + account deletion
-│   │   │   ├── VendorsPage.jsx         # Vendors module     (Toh Lian Thing) — vendor UI
 │   │   │   ├── AIPage.jsx              # AI module          (Tan Chun Jie)   — video submit + results
 │   │   │   └── EngagementPage.jsx      # Engagement module  (Khor Yik Qi)    — wishlist, reviews, likes
 │   │   └── components/

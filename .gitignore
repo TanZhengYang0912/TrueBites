@@ -43,6 +43,10 @@ __pycache__/
 # AI pipeline runtime outputs (audio files, transcripts) — large binary files
 backend/outputs/
 
+# Downloaded ML model files (e.g. the YuNet face-detection model) — fetched
+# once at runtime and cached locally, not project source.
+backend/models/
+
 # Python virtual environments — large, never commit
 venv/
 venv-new/
