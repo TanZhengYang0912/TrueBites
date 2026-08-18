@@ -430,13 +430,13 @@ export default function MapPage() {
   // for display.
   const nearbyToAdd = anchor
     ? vendors
-        .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
-        .filter((v) => matchesFilters(v, filters))
-        .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
-        .filter((v) => v.distKm <= effectiveRadiusKm)
-        .sort((a, b) => a.distKm - b.distKm)
-        .slice(0, 12)
-        .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
+      .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
+      .filter((v) => matchesFilters(v, filters))
+      .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
+      .filter((v) => v.distKm <= effectiveRadiusKm)
+      .sort((a, b) => a.distKm - b.distKm)
+      .slice(0, 12)
+      .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
     : [];
 
   return (

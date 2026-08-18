@@ -77,7 +77,7 @@ export default function AdminSuggestionsPage() {
   async function handleBatchAction(nextStatus) {
     if (!selectedIds.length) return;
     if (!window.confirm(`Are you sure you want to mark ${selectedIds.length} suggestions as ${nextStatus}?`)) return;
-    
+
     setBatchBusy(true);
     setError("");
     try {
@@ -114,7 +114,7 @@ export default function AdminSuggestionsPage() {
           <Search size={16} className="text-gray-400" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setQuery(search.trim()); }} placeholder="Search vendor name" aria-label="Search suggestions" className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400" />
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filter suggestion status" className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none transition-colors hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300">
@@ -167,13 +167,12 @@ export default function AdminSuggestionsPage() {
                   <td className="px-6 py-4 text-gray-500">{suggestion.location_text}</td>
                   <td className="px-6 py-4 text-gray-500">{suggestion.source_platform}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${
-                      ["rejected", "duplicate", "failed"].includes(suggestion.status) ? "bg-red-100 text-red-700" :
-                      ["published", "draft_created"].includes(suggestion.status) ? "bg-emerald-100 text-emerald-700" :
-                      ["accepted_for_processing", "processing", "admin_review"].includes(suggestion.status) ? "bg-blue-100 text-blue-700" :
-                      ["under_review", "needs_info"].includes(suggestion.status) ? "bg-amber-100 text-amber-700" :
-                      "bg-gray-100 text-gray-600"
-                    }`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${["rejected", "duplicate", "failed"].includes(suggestion.status) ? "bg-red-100 text-red-700" :
+                        ["published", "draft_created"].includes(suggestion.status) ? "bg-emerald-100 text-emerald-700" :
+                          ["accepted_for_processing", "processing", "admin_review"].includes(suggestion.status) ? "bg-blue-100 text-blue-700" :
+                            ["under_review", "needs_info"].includes(suggestion.status) ? "bg-amber-100 text-amber-700" :
+                              "bg-gray-100 text-gray-600"
+                      }`}>
                       {suggestion.status.replace(/_/g, " ")}
                     </span>
                   </td>
