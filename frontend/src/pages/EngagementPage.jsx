@@ -14,6 +14,7 @@ import { customerSession } from "../lib/roles";
 import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
+import Footer from "../components/Footer";
 
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
@@ -390,6 +391,8 @@ export default function EngagementPage() {
           </section>
         )}
       </main>
+
+      <Footer />
 
       {detailVendor && (
         <VendorDetailModal

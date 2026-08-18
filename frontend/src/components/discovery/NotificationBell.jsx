@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, RotateCcw } from "lucide-react";
-import { getNotifications, markNotificationsSeen, markNotificationRead, resetNotificationsSeen } from "../../api/engagement";
+import { useNavigate } from "react-router-dom";
+import { Bell, RotateCcw, ShieldAlert } from "lucide-react";
+import { getNotifications, markNotificationsSeen, markNotificationRead, resetNotificationsSeen, getAccountStatus } from "../../api/engagement";
 import { unreadCount, isUnread } from "../../lib/notifications";
 import { categoryLabel } from "../../lib/vendorDisplay";
 
@@ -8,12 +9,14 @@ import { categoryLabel } from "../../lib/vendorDisplay";
 // on mount so all three surfaces (Dashboard, MapPage, EngagementPage) get the
 // bell without threading props through any of them.
 export default function NotificationBell({ onOpenVendor }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [lastSeenAt, setLastSeenAt] = useState(null);
   const [readIds, setReadIds] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [suspension, setSuspension] = useState(null);
   const wrapRef = useRef(null);
 
   // Fetches once on mount; a newly-published vendor won't appear until this
@@ -33,6 +36,7 @@ export default function NotificationBell({ onOpenVendor }) {
 
   useEffect(() => {
     load();
+    getAccountStatus().then(setSuspension).catch(() => {});
   }, []);
 
   // Close on outside click and on Escape — a dropdown that traps the page is
@@ -131,6 +135,19 @@ export default function NotificationBell({ onOpenVendor }) {
           </div>
 
           <div className="max-h-[320px] overflow-y-auto">
+            {suspension?.suspended && (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); navigate("/account-suspended"); }}
+                className="flex w-full items-start gap-2 border-b border-sand bg-terracotta/10 px-3 py-2 text-left hover:bg-terracotta/15"
+              >
+                <ShieldAlert size={13} className="mt-1 shrink-0 text-terracotta" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12.5px] font-bold text-terracotta">Account suspended</span>
+                  <span className="block text-[11px] text-terracotta/80">Tap to see the reason and what you can do</span>
+                </span>
+              </button>
+            )}
             {error ? (
               <div className="px-3 py-4 text-[12px] text-danger">{error}</div>
             ) : items.length === 0 ? (

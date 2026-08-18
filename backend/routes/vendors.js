@@ -2,7 +2,6 @@ import { Router } from "express";
 import express from "express";
 import { supabase } from "../supabase.js";
 import { requireRole } from "../middleware/requireRole.js";
-import { requirePermission } from "../middleware/requirePermission.js";
 import { logActivity } from "../lib/auditLog.js";
 import {
   STORAGE_BUCKET,
@@ -30,9 +29,8 @@ async function recordVendorPhoto({ vendorId, url, storagePath, role, source, pro
   }
 }
 
-// Reads stay public (they feed the discovery UI); writes require an admin
-// with the "vendors" permission (see lib/permissions.js).
-const adminOnly = [requireRole("admin", "superadmin"), requirePermission("vendors")];
+// Reads stay public (they feed the discovery UI); writes require an admin.
+const adminOnly = [requireRole("admin")];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORS MODULE — Toh Lian Thing

@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../lib/SessionContext";
-import { isSuperAdmin, hasPermission } from "../../lib/roles";
 import {
   Bell,
   BrainCircuit,
-  KeyRound,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -13,45 +12,43 @@ import {
   Settings,
   SquareArrowOutUpRight,
   Store,
+  Users,
   X,
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
+import { getAppealsPendingCount } from "../../api/admin";
 
-// `perm` maps a tab to the app_metadata.permissions key that gates it (see
-// lib/roles.js). Overview has no perm — every admin can always see it.
-const BASE_NAV_ITEMS = [
+const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/admin/vendors2", label: "Vendors", icon: Store, perm: "vendors" },
-  { to: "/admin/ai", label: "AI Content Queue", icon: BrainCircuit, perm: "ai" },
-  { to: "/admin/reviews", label: "Review Moderation", icon: MessageSquareWarning, perm: "reviews" },
-  { to: "/admin/settings", label: "Platform Settings", icon: Settings, perm: "settings" },
+  { to: "/admin/vendors2", label: "Vendors", icon: Store },
+  { to: "/admin/ai", label: "AI Content Queue", icon: BrainCircuit },
+  { to: "/admin/reviews", label: "Review Moderation", icon: MessageSquareWarning },
+  { to: "/admin/users", label: "User Moderation", icon: Users },
+  { to: "/admin/audit-log", label: "My Audit Log", icon: History },
+  { to: "/admin/settings", label: "Platform Settings", icon: Settings },
 ];
-
-const ACCESS_DENIED_MESSAGE = "Your moderator has disabled access for this function. Please contact your moderator to gain access.";
-
-// Superadmin-only tab — lets the seeded superadmin account view (read-only)
-// the credentials of other staff/admin accounts. Hidden for regular admins.
-const STAFF_NAV_ITEM = { to: "/admin/staff", label: "Staff Moderation", icon: KeyRound };
 
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [topbarAction, setTopbarAction] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [deniedMsg, setDeniedMsg] = useState("");
   const { session } = useSession();
   const adminEmail = session?.user?.email || "";
-  const navItems = isSuperAdmin(session) ? [...BASE_NAV_ITEMS, STAFF_NAV_ITEM] : BASE_NAV_ITEMS;
+  const [pendingAppeals, setPendingAppeals] = useState(0);
+
+  function refreshAppealBadge() {
+    getAppealsPendingCount().then(({ count }) => setPendingAppeals(count)).catch(() => {});
+  }
 
   // Navigating from the drawer should close it, or the new page opens hidden
   // behind the overlay on a phone.
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
-  useEffect(() => {
-    if (!deniedMsg) return;
-    const t = setTimeout(() => setDeniedMsg(""), 3200);
-    return () => clearTimeout(t);
-  }, [deniedMsg]);
+  // Refetched on every navigation too, not just mount — cheap query, and it
+  // means the badge catches up after an admin resolves an appeal and moves
+  // to a different tab, without needing the two pages to talk to each other.
+  useEffect(() => { refreshAppealBadge(); }, [location.pathname]);
 
   async function handleSignOut() {
     // Navigate to the (public) admin login route before clearing the
@@ -63,13 +60,13 @@ export default function AdminLayout() {
     await supabase.auth.signOut();
   }
   // Notifications and Account are reachable only via the bell icon / user
-  // card, not a sidebar tab, so they aren't in navItems — checked first or
+  // card, not a sidebar tab, so they aren't in NAV_ITEMS — checked first or
   // they'd fall through to "Overview".
   const pageName = location.pathname.startsWith("/admin/notifications")
     ? "Notifications"
     : location.pathname.startsWith("/admin/account")
     ? "Account"
-    : navItems.find((item) =>
+    : NAV_ITEMS.find((item) =>
         item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
       )?.label || "Overview";
 
@@ -78,8 +75,9 @@ export default function AdminLayout() {
     Vendors: "Manage food vendor listings and approval",
     "AI Content Queue": "Review AI-extracted vendor content before it goes live",
     "Review Moderation": "Moderate user reviews and keep vendor content trustworthy",
+    "User Moderation": "View customer accounts and their activity history",
+    "My Audit Log": "Everything you've personally done in the admin console",
     "Platform Settings": "Platform configuration and preferences",
-    "Staff Moderation": "View credentials of existing staff accounts (read-only)",
     Notifications: "Items that need an admin decision",
     Account: "Your account details and password",
   };
@@ -110,35 +108,22 @@ export default function AdminLayout() {
         </div>
 
         <nav className="admin-nav">
-          {navItems.map(({ to, label, icon: Icon, end, perm }) => {
-            if (perm && !hasPermission(session, perm)) {
-              return (
-                <button
-                  key={to}
-                  type="button"
-                  className="admin-nav-item is-disabled"
-                  aria-disabled="true"
-                  onClick={() => setDeniedMsg(ACCESS_DENIED_MESSAGE)}
-                >
-                  <Icon size={16} />
-                  <span>{label}</span>
-                </button>
-              );
-            }
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `admin-nav-item${isActive ? " active" : ""}`
-                }
-              >
-                <Icon size={16} />
-                <span>{label}</span>
-              </NavLink>
-            );
-          })}
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `admin-nav-item${isActive ? " active" : ""}`
+              }
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+              {to === "/admin/users" && pendingAppeals > 0 && (
+                <span className="admin-nav-badge">{pendingAppeals > 9 ? "9+" : pendingAppeals}</span>
+              )}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -192,32 +177,9 @@ export default function AdminLayout() {
         </header>
 
         <main className="admin-content">
-          <Outlet context={{ setTopbarAction }} />
+          <Outlet context={{ setTopbarAction, refreshAppealBadge }} />
         </main>
       </div>
-
-      {deniedMsg && (
-        <div
-          role="alert"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 1200,
-            maxWidth: 320,
-            padding: "10px 16px",
-            borderRadius: 10,
-            background: "var(--admin-danger-text)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 600,
-            lineHeight: 1.4,
-            boxShadow: "0 8px 24px rgba(15,23,42,0.18)",
-          }}
-        >
-          {deniedMsg}
-        </div>
-      )}
     </div>
   );
 }

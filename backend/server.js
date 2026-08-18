@@ -22,7 +22,7 @@ app.use("/api", aiRoutes);
 app.use("/api", engagementRoutes);
 // Every admin route requires a verified admin session (skipped only when
 // DISABLE_AUTH=true for local testing — see middleware/requireRole.js).
-app.use("/api/admin", requireRole("admin", "superadmin"), adminRoutes);
+app.use("/api/admin", requireRole("admin"), adminRoutes);
 
 app.listen(PORT, () => {
   console.log(`✅  TrueBites backend running on http://localhost:${PORT}`);

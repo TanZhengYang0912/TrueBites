@@ -147,3 +147,17 @@ export async function resetNotificationsSeen() {
     headers: await authHeaders(),
   });
 }
+
+// ── Account status ──
+export async function getAccountStatus() {
+  return requestJson("/api/account/status", { headers: await authHeaders() });
+}
+
+export async function submitAppeal(message) {
+  const { "Content-Type": ct, body } = jsonBody({ message });
+  return requestJson("/api/account/appeal", {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": ct }),
+    body,
+  });
+}

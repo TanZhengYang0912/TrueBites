@@ -1,15 +1,23 @@
-import TrueBitesLogo from "../TrueBitesLogo";
+import { Link } from "react-router-dom";
+import TrueBitesLogo from "./TrueBitesLogo";
 
-// Forest footer: TRUEBITES wordmark + official tagline + location/AI/year.
-const LINKS = ["About", "Privacy", "Contact Melaka Tourism"];
+const LINKS = [
+  { label: "About Us", to: "/about" },
+  { label: "Terms and Conditions", to: "/terms" },
+  { label: "Rules and Guidelines", to: "/guidelines" },
+  { label: "Contact Us", to: "/contact" },
+  { label: "Careers", to: "/careers" },
+];
 
-export default function LandingFooter() {
+// Shared footer for the discovery app's scrolling pages (Dashboard,
+// Engagement, Profile, Login). The landing page keeps its own richer
+// LandingFooter (components/landing/LandingFooter.jsx) — this one is a
+// lighter reuse of the same visual language for the rest of the app.
+export default function Footer() {
   return (
     <footer className="bg-forest px-5 py-12 md:px-12 md:py-16">
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-8">
-        {/* Top row: wordmark + nav links */}
+      <div className="mx-auto flex max-w-[1360px] flex-col gap-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-          {/* Wordmark */}
           <div>
             <TrueBitesLogo size="footer" tone="light" />
             <div className="mt-3.5 font-body text-xs uppercase tracking-[1.1px] text-terracotta-light">
@@ -17,20 +25,21 @@ export default function LandingFooter() {
             </div>
           </div>
 
-          {/* Footer links */}
-          <div className="flex flex-wrap items-center gap-x-9 gap-y-3">
+          <nav className="flex flex-wrap items-center gap-x-9 gap-y-3" aria-label="Footer">
             {LINKS.map((link) => (
-              <span key={link} className="cursor-pointer font-body text-xs tracking-[0.5px] text-white/50">
-                {link}
-              </span>
+              <Link
+                key={link.to}
+                to={link.to}
+                className="font-body text-xs tracking-[0.5px] text-white/50 transition-colors hover:text-white"
+              >
+                {link.label}
+              </Link>
             ))}
-          </div>
+          </nav>
         </div>
 
-        {/* Divider */}
         <div className="h-px bg-white/8" />
 
-        {/* Bottom row */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="font-body text-xs tracking-[0.3px] text-white/40">
             Melaka, Malaysia · AI-Powered · Est. 2024

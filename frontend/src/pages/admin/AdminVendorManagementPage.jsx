@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
@@ -9,6 +9,7 @@ import Toast from "../../components/engagement/Toast";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
+import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
@@ -927,6 +928,7 @@ export default function AdminVendorManagementPage() {
   const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
   const [dupDeleteId, setDupDeleteId] = useState(null);
   const [dupDeleting, setDupDeleting] = useState(false);
+  const [exportingVendors, setExportingVendors] = useState(false);
 
   const loadDuplicates = () =>
     getAdminVendorDuplicates()
@@ -957,6 +959,32 @@ export default function AdminVendorManagementPage() {
     );
     return () => setTopbarAction(null);
   }, [setTopbarAction]);
+
+  // Exports every vendor matching the current filters — not just the page
+  // on screen — so the PDF reflects the same search/category/status/sort
+  // the admin is looking at.
+  const handleExportVendors = async () => {
+    setExportingVendors(true);
+    try {
+      const vendors = await fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
+        params: { status, category, sort, q: query },
+      });
+      const filterBits = [
+        status !== "all" ? `Status: ${status}` : null,
+        category !== "all" ? `Category: ${category}` : null,
+        query ? `Search: "${query}"` : null,
+      ].filter(Boolean);
+      await openVendorsPdf({
+        title: "Vendor Directory",
+        subtitle: filterBits.length ? filterBits.join(" · ") : "All vendors",
+        vendors,
+      });
+    } catch (err) {
+      notify(err.message, true);
+    } finally {
+      setExportingVendors(false);
+    }
+  };
 
   const loadVendors = (overrides = {}) => {
     const page = overrides.page ?? data.pagination.page ?? 1;
@@ -1213,6 +1241,17 @@ export default function AdminVendorManagementPage() {
             {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
           </button>
         )}
+
+        <button
+          type="button"
+          className="admin-secondary-btn compact"
+          onClick={handleExportVendors}
+          disabled={exportingVendors}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          <FileDown size={13} />
+          {exportingVendors ? "Preparing PDF…" : "Export PDF"}
+        </button>
       </div>
 
       {error ? (
