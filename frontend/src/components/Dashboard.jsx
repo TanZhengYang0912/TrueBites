@@ -5,6 +5,7 @@ import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import FilterChips from "./discovery/FilterChips";
 import VendorCard from "./discovery/VendorCard";
+import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
 import { matchesFilters } from "../lib/vendorFilters";
@@ -17,6 +18,7 @@ const PAGE_SIZE = 12;
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
 export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, focusVendorId, onFocusVendorHandled }) {
+export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [search, setSearch] = useState("");
@@ -125,7 +127,11 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
               />
             </div>
 
-            {displayed.length === 0 ? (
+            {loading && vendors.length === 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: PAGE_SIZE }).map((_, i) => <VendorCardSkeleton key={i} />)}
+              </div>
+            ) : displayed.length === 0 ? (
               <Empty onClear={() => { setSearch(""); setCategory("all"); setCreator("all"); }} />
             ) : (
               <>
@@ -156,6 +162,10 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
           inTrip={isInTrip(detailVendor.id)} bookmarked={bookmarks.has(detailVendor.id)}
           onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
           onClose={() => setDetailVendor(null)}
+          onVendorUpdated={(vendorId, patch) => {
+            onVendorUpdated?.(vendorId, patch);
+            setDetailVendor((cur) => (cur && cur.id === vendorId ? { ...cur, ...patch } : cur));
+          }}
         />
       )}
 

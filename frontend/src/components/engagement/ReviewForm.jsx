@@ -9,6 +9,7 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notify }) {
   const [rating, setRating] = useState(initial?.rating || 0);
   const [body, setBody] = useState(initial?.body || "");
+  const [isAnonymous, setIsAnonymous] = useState(initial?.is_anonymous || false);
   const [photoFile, setPhotoFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -34,9 +35,9 @@ export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notif
     setSaving(true);
     setError("");
     try {
-      const { review } = initial
-        ? await updateReview(initial.id, { rating, body })
-        : await createReview(vendorId, { rating, body });
+      const { review, vendor } = initial
+        ? await updateReview(initial.id, { rating, body, is_anonymous: isAnonymous })
+        : await createReview(vendorId, { rating, body, is_anonymous: isAnonymous });
 
       let photos = initial?.review_photos || [];
       if (photoFile) {
@@ -44,7 +45,7 @@ export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notif
         photos = [...photos, photo];
       }
 
-      onSaved({ ...review, review_photos: photos, isOwn: true, likes: initial?.likes ?? 0, dislikes: initial?.dislikes ?? 0, myVote: initial?.myVote ?? null });
+      onSaved({ ...review, is_anonymous: isAnonymous, review_photos: photos, isOwn: true, likes: initial?.likes ?? 0, dislikes: initial?.dislikes ?? 0, myVote: initial?.myVote ?? null }, vendor);
       notify?.(initial ? "Review updated successfully!" : "Review submitted successfully!");
     } catch (err) {
       setError(err.message);
@@ -63,6 +64,15 @@ export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notif
         rows={3}
         className="w-full resize-y rounded-[10px] border border-sand px-3 py-2.5 text-[13.5px] outline-none focus:border-forest"
       />
+      <label className="flex min-h-6 w-fit cursor-pointer items-center gap-1.5 text-[12.5px] text-muted">
+        <input
+          type="checkbox"
+          checked={isAnonymous}
+          onChange={(e) => setIsAnonymous(e.target.checked)}
+          className="size-3.5"
+        />
+        Post anonymously
+      </label>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex min-h-11 cursor-pointer items-center gap-1.5 text-[12.5px] text-muted">
           <Camera size={15} />

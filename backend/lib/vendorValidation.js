@@ -6,6 +6,11 @@
 
 export const STORAGE_BUCKET = "vendor-images";
 
+// Gallery photos (food/interior shots shown after the storefront cover in the
+// card/detail carousels) are capped so one vendor can't blow up page weight
+// or storage cost — 8 is plenty for a hover/autoplay carousel.
+export const MAX_GALLERY_IMAGES = 8;
+
 // Source of truth for the vendor status vocabulary — kept to exactly these
 // three so every vendor is always in a well-defined state: newly-created
 // vendors start as "draft", an admin promotes them to "active" (which is the
@@ -99,6 +104,15 @@ export function validateVendor(body = {}) {
   if (!dishes) errors.signature_dishes = "Signature dishes are required";
   else clean.signature_dishes = dishes;
 
+  // Optional — lets an admin attach the vendor's own TikTok video (free,
+  // accurate photo source via the oEmbed-based discovery panel) even for a
+  // vendor that wasn't originally scraped from one.
+  const videoUrl = str(body.source_video_url);
+  if (videoUrl) {
+    if (!/tiktok\.com/i.test(videoUrl)) errors.source_video_url = "Must be a tiktok.com video link";
+    else clean.source_video_url = videoUrl;
+  }
+
   return { errors, clean };
 }
 
@@ -160,6 +174,15 @@ export function validateVendorPatch(body = {}) {
   // Free-text fields — passed through trimmed, no format rules.
   for (const k of ["state", "cuisine_types", "signature_dishes", "price_range", "operating_hours_raw"]) {
     if (has(k)) clean[k] = str(body[k]);
+  }
+
+  // Optional — see the matching comment in validateVendor. An empty string
+  // explicitly clears it (unlike the other has() fields, `null`/undefined
+  // just means "not included in this patch").
+  if (body.source_video_url !== undefined) {
+    const videoUrl = str(body.source_video_url);
+    if (videoUrl && !/tiktok\.com/i.test(videoUrl)) errors.source_video_url = "Must be a tiktok.com video link";
+    else clean.source_video_url = videoUrl || null;
   }
 
   return { errors, clean };

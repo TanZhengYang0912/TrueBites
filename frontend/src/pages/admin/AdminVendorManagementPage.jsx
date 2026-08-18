@@ -1,16 +1,14 @@
-import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import {
-  createAdminVendor, deleteAdminVendor, getAdminVendorDuplicates, getAdminVendors,
-  updateAdminVendor, uploadVendorImage,
+  createAdminVendor, deleteAdminVendor, deleteVendorGalleryImage, getAdminVendorDuplicates,
+  getAdminVendors, updateAdminVendor, uploadVendorGalleryImage, uploadVendorImage,
 } from "../../api/admin";
 import Toast from "../../components/engagement/Toast";
+import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
-
-const MAPS_KEY = import.meta.env.VITE_MAPS_BROWSER_KEY;
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
@@ -29,10 +27,14 @@ const COLUMN_SORTS = {
   vendor: ["az", "za"],
   category: ["cat_az", "cat_za"],
   status: ["status", "status_desc"],
-  score: ["score_asc", "score_desc"],
 };
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
+
+// Mirrors MAX_GALLERY_IMAGES in backend/lib/vendorValidation.js — the server
+// is the real enforcement point, this just keeps the "Add" tile from
+// appearing once a vendor is already full.
+const MAX_GALLERY_IMAGES = 8;
 
 // Every 30-min slot in 12-hour form, zero-padded — "12:00 AM", "12:30 AM", "01:00 AM" … "11:30 PM".
 // Matches the DB's stored hour format; picking from this list can never produce
@@ -64,6 +66,7 @@ const emptyForm = {
   status: "draft",
   imageFile: null,
   imagePreview: null,
+  source_video_url: "",
 };
 
 // "RM 10 - RM 20 per person" / "RM10-20 per person" / "RM 20 per person" (equal
@@ -122,6 +125,7 @@ function makeForm(vendor) {
     phone: vendor.phone || "",
     status: (vendor.status || "draft").toLowerCase(),
     imageFile: null,
+    source_video_url: vendor.sourceVideoUrl || "",
     // Seed the dropzone preview from the same resolver the public site uses —
     // for a vendor with no real upload yet, this shows the curated/category
     // photo currently displayed to users, not a blank box.
@@ -302,57 +306,185 @@ function ImageDropzone({ form, onFileChange, disabled }) {
   );
 }
 
-// Google Places Autocomplete on the Address field, restricted to Melaka.
-// Picking a suggestion fires the standard form `onChange` three times (address,
-// latitude, longitude), so lat/lng auto-fill through the exact same plumbing
-// every other field uses — no extra prop wiring. Degrades to a plain text
-// input when the Maps `places` library isn't available (no key / offline).
-function AddressAutocomplete({ form, error, onChange, disabled }) {
-  const placesLib = useMapsLibrary("places");
-  const inputRef = useRef(null);
-  // Keep the latest onChange without re-running the effect (which would tear
-  // down and rebuild the Autocomplete widget on every keystroke).
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+// Extra photos (food/interior shots) shown after the cover in the customer-
+// facing card-hover and detail-modal carousels. Only usable once the vendor
+// already has an id — a brand-new vendor gets its cover through the dropzone
+// above and picks up a gallery afterwards, from this same edit view.
+// Each add/remove hits the server immediately (no "Save" step, matching how
+// the cover-image dropzone itself uploads on file pick) and reports the
+// server's authoritative gallery_image_urls back up through `onChange`.
+function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
+  const fileInputRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [galleryError, setGalleryError] = useState("");
 
-  useEffect(() => {
-    if (!placesLib || !inputRef.current || disabled || !window.google?.maps) return;
+  const pickFile = async (file) => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      setGalleryError("Please choose a JPEG, PNG, WebP or GIF image.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setGalleryError("Image must be under 8 MB.");
+      return;
+    }
+    setGalleryError("");
+    setBusy(true);
+    try {
+      const { gallery_image_urls } = await uploadVendorGalleryImage(vendorId, file);
+      onChange(gallery_image_urls);
+    } catch (err) {
+      notify?.(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-    const autocomplete = new placesLib.Autocomplete(inputRef.current, {
-      fields: ["formatted_address", "geometry", "name"],
-      componentRestrictions: { country: "my" },
-      bounds: new window.google.maps.LatLngBounds(
-        { lat: MELAKA_BOUNDS.latMin, lng: MELAKA_BOUNDS.lngMin },
-        { lat: MELAKA_BOUNDS.latMax, lng: MELAKA_BOUNDS.lngMax },
-      ),
-      strictBounds: true,
-    });
-
-    const listener = autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      const loc = place.geometry?.location;
-      if (!loc) return;
-      const fire = onChangeRef.current;
-      fire({ target: { name: "address", value: place.formatted_address || place.name || "" } });
-      fire({ target: { name: "latitude", value: String(loc.lat()) } });
-      fire({ target: { name: "longitude", value: String(loc.lng()) } });
-    });
-
-    return () => listener.remove();
-  }, [placesLib, disabled]);
+  const removeImage = async (url) => {
+    setBusy(true);
+    try {
+      const { gallery_image_urls } = await deleteVendorGalleryImage(vendorId, url);
+      onChange(gallery_image_urls);
+    } catch (err) {
+      notify?.(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <label>
+      <span>Gallery Photos ({images.length}/{MAX_GALLERY_IMAGES})</span>
+      <div className="admin-gallery-grid">
+        {images.map((url) => (
+          <div className="admin-gallery-thumb" key={url}>
+            <img src={url} alt="" loading="lazy" />
+            {!disabled && (
+              <button
+                type="button"
+                className="admin-gallery-thumb-remove"
+                onClick={() => removeImage(url)}
+                disabled={busy}
+                aria-label="Remove photo"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+        ))}
+        {!disabled && images.length < MAX_GALLERY_IMAGES && (
+          <button
+            type="button"
+            className="admin-gallery-add"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+          >
+            <ImagePlus size={16} />
+            <span>{busy ? "Uploading…" : "Add"}</span>
+          </button>
+        )}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ""; }}
+        style={{ display: "none" }}
+      />
+      <FieldError message={galleryError} />
+    </label>
+  );
+}
+
+// Free address autocomplete on the Address field, restricted to Melaka —
+// backed by Photon (https://photon.komoot.io), a keyless public search API
+// over OpenStreetMap data. No billing account, no API key, cannot incur cost
+// (unlike the Google Places Autocomplete this replaces, which stopped working
+// once this project's Google Cloud billing got disabled). Picking a
+// suggestion fires the standard form `onChange` three times (address,
+// latitude, longitude), so lat/lng auto-fill through the exact same plumbing
+// every other field uses — no extra prop wiring. Degrades gracefully to a
+// plain text input if Photon is unreachable (offline, etc).
+function AddressAutocomplete({ form, error, onChange, disabled }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const debounceRef = useRef(null);
+  const requestSeq = useRef(0);
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function handleInput(e) {
+    onChange(e);
+    const value = e.target.value;
+    clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) { setSuggestions([]); setOpen(false); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      const seq = ++requestSeq.current;
+      try {
+        const params = new URLSearchParams({
+          q: value,
+          limit: "5",
+          lat: "2.1896",
+          lon: "102.2501",
+          bbox: `${MELAKA_BOUNDS.lngMin},${MELAKA_BOUNDS.latMin},${MELAKA_BOUNDS.lngMax},${MELAKA_BOUNDS.latMax}`,
+        });
+        const res = await fetch(`https://photon.komoot.io/api/?${params}`);
+        const data = await res.json();
+        if (seq !== requestSeq.current) return; // a newer keystroke already superseded this request
+        setSuggestions(data.features || []);
+        setOpen(true);
+      } catch {
+        if (seq === requestSeq.current) setSuggestions([]);
+      }
+    }, 350);
+  }
+
+  function pick(feature) {
+    const p = feature.properties;
+    const label = [p.name, p.street, p.city, p.state, p.country].filter(Boolean).join(", ");
+    const [lng, lat] = feature.geometry.coordinates;
+    setOpen(false);
+    setSuggestions([]);
+    onChange({ target: { name: "address", value: label } });
+    onChange({ target: { name: "latitude", value: String(lat) } });
+    onChange({ target: { name: "longitude", value: String(lng) } });
+  }
+
+  return (
+    <label ref={boxRef} className="admin-address-field">
       <span>Address</span>
       <input
-        ref={inputRef}
         name="address"
         value={form.address}
-        onChange={onChange}
+        onChange={handleInput}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         disabled={disabled}
         placeholder="Start typing a Melaka address…"
+        autoComplete="off"
       />
       {!disabled && <span className="admin-field-hint">Pick a suggestion to auto-fill the map coordinates.</span>}
+      {open && suggestions.length > 0 && (
+        <ul className="admin-address-suggestions">
+          {suggestions.map((feature, i) => {
+            const p = feature.properties;
+            const label = [p.name, p.street, p.city, p.state].filter(Boolean).join(", ");
+            return (
+              <li key={`${p.osm_type}-${p.osm_id}-${i}`}>
+                <button type="button" onClick={() => pick(feature)}>{label}</button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <FieldError message={error} />
     </label>
   );
@@ -441,6 +573,12 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled }) {
         </label>
       </div>
 
+      {/* No manual TikTok/video-link input here by design — a vendor's
+          source_video_url comes only from the existing AI Content Upload
+          workflow. When editing a vendor that already has one (see
+          makeForm below), it still flows through untouched to
+          PhotoDiscoveryPanel's "Find Photos Automatically", the admin just
+          never sees or edits the URL itself. */}
       <ImageDropzone form={form} onFileChange={onFileChange} disabled={disabled} />
     </>
   );
@@ -522,7 +660,7 @@ function DuplicatesPanel({ groups, onClose, onDeleteRequest }) {
   );
 }
 
-function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClose, onChange, onFileChange, onEditToggle, onSave }) {
+function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, notify }) {
   if (!vendor) return null;
 
   return (
@@ -538,6 +676,29 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
         <div className="admin-modal-form">
           <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing} />
 
+          {editing && (
+            <PhotoDiscoveryPanel
+              vendorId={vendor.id}
+              latitude={form.latitude}
+              longitude={form.longitude}
+              sourceVideoUrl={form.source_video_url}
+              coverLocked={vendor.coverLocked}
+              onPhotoCommitted={(role, url) => {
+                if (role === "cover") onCoverDiscovered(url);
+                else onGalleryChange([...(vendor.galleryUrls || []), url]);
+              }}
+              notify={notify}
+            />
+          )}
+
+          <GalleryManager
+            vendorId={vendor.id}
+            images={vendor.galleryUrls || []}
+            disabled={!editing}
+            onChange={onGalleryChange}
+            notify={notify}
+          />
+
           {!editing && (
             <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--admin-muted)" }}>
               <span>Source: {vendor.sourcePlatform}</span>
@@ -551,7 +712,7 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
           <div className="admin-modal-actions">
             {editing ? (
               <>
-                <button type="button" className="admin-secondary-btn compact" onClick={onEditToggle}>Cancel</button>
+                <button type="button" className="admin-secondary-btn compact" onClick={onCancelEdit}>Cancel</button>
                 <button type="button" className="admin-primary-btn compact" onClick={onSave} disabled={saving}>
                   {saving ? "Saving…" : "Save Changes"}
                 </button>
@@ -559,7 +720,7 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
             ) : (
               <>
                 <button type="button" className="admin-secondary-btn compact" onClick={onClose}>Close</button>
-                <button type="button" className="admin-primary-btn compact" onClick={onEditToggle}>
+                <button type="button" className="admin-primary-btn compact" onClick={onStartEdit}>
                   <Pencil size={14} />
                   <span>Edit Vendor</span>
                 </button>
@@ -572,7 +733,7 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
   );
 }
 
-function AddVendorModal({ onClose, onCreated }) {
+function AddVendorModal({ onClose, onCreated, notify }) {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -581,6 +742,16 @@ function AddVendorModal({ onClose, onCreated }) {
   // possible_duplicate) — shown as a warning with an "Add anyway" override
   // instead of silently blocking, since same-named vendors do legitimately exist.
   const [duplicates, setDuplicates] = useState(null);
+  // Once the vendor row exists, the modal stops being a "form" and becomes a
+  // small gallery-photo-setup step — the gallery upload endpoint needs a real
+  // vendorId, so there's nowhere for it to live before this point.
+  const [createdVendor, setCreatedVendor] = useState(null);
+  const [galleryUrls, setGalleryUrls] = useState([]);
+  const [coverUrl, setCoverUrl] = useState(null);
+  // Tracks whether the cover was set by a manual upload (vs. automatic photo
+  // discovery) — manual always wins, matching the /photos/commit route's own
+  // cover_photo_locked guard on the backend.
+  const [coverLocked, setCoverLocked] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -600,6 +771,7 @@ function AddVendorModal({ onClose, onCreated }) {
     longitude: form.longitude,
     operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
     status: form.status,
+    source_video_url: form.source_video_url,
   });
 
   const doSave = async (force) => {
@@ -608,10 +780,12 @@ function AddVendorModal({ onClose, onCreated }) {
     try {
       const created = await createAdminVendor({ ...buildPayload(), force });
       if (form.imageFile && created?.id) {
-        await uploadVendorImage(created.id, form.imageFile);
+        const { storefront_image_url } = await uploadVendorImage(created.id, form.imageFile);
+        setCoverUrl(storefront_image_url);
+        setCoverLocked(true); // manual upload — the server just locked the cover to match
       }
       onCreated();
-      onClose();
+      setCreatedVendor(created);
     } catch (err) {
       if (err.status === 409 && err.payload?.error === "possible_duplicate") {
         setDuplicates(err.payload.duplicates || []);
@@ -629,6 +803,61 @@ function AddVendorModal({ onClose, onCreated }) {
     if (Object.keys(errs).length) return;
     doSave(false);
   };
+
+  if (createdVendor) {
+    return (
+      <div className="admin-modal-backdrop" onClick={onClose}>
+        <div className="admin-modal-card wide" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-header">
+            <div>
+              <h2>{createdVendor.vendor_name}</h2>
+              <p>Vendor created — add its photos now, or skip and do it later from Edit.</p>
+            </div>
+            <button type="button" className="admin-icon-btn subtle" onClick={onClose}>×</button>
+          </div>
+          <div className="admin-modal-form">
+            <label>
+              <span>Cover Photo</span>
+              <div className="admin-dropzone" style={{ cursor: "default" }}>
+                {coverUrl ? (
+                  <img src={coverUrl} alt="Cover" className="admin-dropzone-preview" />
+                ) : (
+                  <div className="admin-dropzone-empty">
+                    <ImagePlus size={18} />
+                    <span>No cover photo yet — find one automatically below, or add it later from Edit.</span>
+                  </div>
+                )}
+              </div>
+            </label>
+
+            <PhotoDiscoveryPanel
+              vendorId={createdVendor.id}
+              latitude={createdVendor.latitude}
+              longitude={createdVendor.longitude}
+              sourceVideoUrl={createdVendor.source_video_url}
+              coverLocked={coverLocked}
+              onPhotoCommitted={(role, url) => {
+                if (role === "cover") { setCoverUrl(url); setCoverLocked(false); }
+                else setGalleryUrls((cur) => [...cur, url]);
+              }}
+              notify={notify}
+            />
+
+            <GalleryManager
+              vendorId={createdVendor.id}
+              images={galleryUrls}
+              disabled={false}
+              onChange={setGalleryUrls}
+              notify={notify}
+            />
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-primary-btn compact" onClick={onClose}>Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-modal-backdrop" onClick={onClose}>
@@ -711,7 +940,7 @@ export default function AdminVendorManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Real-time search — debounce like VendorsPage.jsx, no Enter/submit needed.
+  // Real-time search — debounced, no Enter/submit needed.
   useEffect(() => {
     const t = setTimeout(() => setQuery(draftQuery.trim()), 350);
     return () => clearTimeout(t);
@@ -795,14 +1024,16 @@ export default function AdminVendorManagementPage() {
         longitude: form.longitude,
         operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
         status: form.status,
+        source_video_url: form.source_video_url,
       });
       if (form.imageFile) {
         await uploadVendorImage(selectedVendor.id, form.imageFile);
       }
       const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
       setData(refreshed);
-      const updated = refreshed.items.find((i) => i.id === selectedVendor.id);
-      if (updated) { setSelectedVendor(updated); setForm(makeForm(updated)); }
+      // Saving closes the modal outright — same reasoning as Cancel, it
+      // shouldn't drop back into the read-only View screen.
+      setSelectedVendor(null);
       setEditing(false);
       notify("Vendor updated successfully.");
     } catch (err) {
@@ -1042,11 +1273,6 @@ export default function AdminVendorManagementPage() {
                   Status <span className="admin-sort-caret">{sortIndicator("status")}</span>
                 </button>
               </th>
-              <th aria-sort={ariaSortFor("score")}>
-                <button type="button" className="admin-th-sort" onClick={() => handleHeaderSort("score")}>
-                  AI Score <span className="admin-sort-caret">{sortIndicator("score")}</span>
-                </button>
-              </th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -1054,7 +1280,7 @@ export default function AdminVendorManagementPage() {
             {loading ? (
               Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                 <tr key={`sk-${i}`} className="admin-skeleton-row">
-                  {Array.from({ length: 8 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <td key={j}><div className="admin-skeleton-bar" /></td>
                   ))}
                 </tr>
@@ -1086,16 +1312,6 @@ export default function AdminVendorManagementPage() {
                     <span className={`admin-status-pill ${st}`}>
                       {vendor.status}
                     </span>
-                  </td>
-                  <td className="admin-table-score">
-                    {vendor.aiScore ? (
-                      <>
-                        <Star size={13} fill="currentColor" />
-                        <span>{Number(vendor.aiScore).toFixed(1)}</span>
-                      </>
-                    ) : (
-                      <span className="admin-dash">—</span>
-                    )}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="admin-table-actions">
@@ -1166,13 +1382,19 @@ export default function AdminVendorManagementPage() {
         saving={saving}
         error={error}
         onClose={() => setSelectedVendor(null)}
-        onEditToggle={() => {
-          // Always resync from the source-of-truth vendor — discards any
-          // unsaved edits when cancelling out of edit mode too.
+        onStartEdit={() => {
           if (selectedVendor) setForm(makeForm(selectedVendor));
           setErrors({});
           setError("");
-          setEditing((v) => !v);
+          setEditing(true);
+        }}
+        onCancelEdit={() => {
+          // Cancelling out of Edit closes the modal outright — it shouldn't
+          // drop back into the read-only View screen the admin never asked for.
+          setErrors({});
+          setError("");
+          setSelectedVendor(null);
+          setEditing(false);
         }}
         onChange={(e) => {
           const { name, value } = e.target;
@@ -1180,12 +1402,35 @@ export default function AdminVendorManagementPage() {
         }}
         onFileChange={(file) => setForm((cur) => ({ ...cur, imageFile: file }))}
         onSave={handleSave}
+        notify={notify}
+        onGalleryChange={(galleryUrls) => {
+          // Keep both the open detail view and the underlying row in sync so
+          // a reopened modal (or the table, if it ever grows a gallery
+          // preview) reflects the change without a full refetch.
+          setSelectedVendor((cur) => (cur ? { ...cur, galleryUrls } : cur));
+          setData((cur) => ({
+            ...cur,
+            items: cur.items.map((v) => (v.id === selectedVendor?.id ? { ...v, galleryUrls } : v)),
+          }));
+        }}
+        onCoverDiscovered={(url) => {
+          // Same sync as onGalleryChange, above, plus the dropzone preview
+          // (form.imagePreview) so the admin sees the new cover immediately
+          // without needing to click Save Changes first.
+          setForm((cur) => ({ ...cur, imagePreview: url }));
+          setSelectedVendor((cur) => (cur ? { ...cur, imageUrl: url } : cur));
+          setData((cur) => ({
+            ...cur,
+            items: cur.items.map((v) => (v.id === selectedVendor?.id ? { ...v, imageUrl: url } : v)),
+          }));
+        }}
       />
 
       {showAddModal && (
         <AddVendorModal
-          onClose={() => setShowAddModal(false)}
+          onClose={() => { setShowAddModal(false); loadVendors({ page: data.pagination.page }); }}
           onCreated={() => { loadVendors({ page: 1 }); notify("Vendor created successfully."); }}
+          notify={notify}
         />
       )}
 
@@ -1233,10 +1478,5 @@ export default function AdminVendorManagementPage() {
     </section>
   );
 
-  // Load the Google Maps `places` library for the address autocomplete only
-  // when a browser key is configured; otherwise render as-is and the address
-  // field falls back to a plain text input.
-  return MAPS_KEY ? (
-    <APIProvider apiKey={MAPS_KEY} libraries={["places"]}>{content}</APIProvider>
-  ) : content;
+  return content;
 }

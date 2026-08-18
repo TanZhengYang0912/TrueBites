@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Heart, Bot, Play, Wallet, Footprints, MapPin, Star } from "lucide-react";
+import { X, Heart, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
 import {
-  categoryLabel, placeholderImage, creatorHandle,
-  priceLabel, walkLabel, distanceLabel,
+  categoryLabel, vendorGallery, creatorHandle,
+  priceLabel, photoAltText,
 } from "../../lib/vendorDisplay";
+import VendorGallery from "./VendorGallery";
 import { useSession } from "../../lib/SessionContext";
 import { getReviews, deleteReview, voteReview, removeVote } from "../../api/engagement";
 import ReviewForm from "../engagement/ReviewForm";
@@ -17,25 +18,33 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 
-export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose }) {
+export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated }) {
   const navigate = useNavigate();
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [editingReview, setEditingReview] = useState(null); // "new" | review object | null
+  const [stats, setStats] = useState({ average_rating: vendor?.average_rating, review_count: vendor?.review_count });
   const [toast, notify] = useToast();
 
   useEffect(() => {
     if (!vendor) return;
     setReviewsLoading(true);
     setEditingReview(null);
+    setStats({ average_rating: vendor.average_rating, review_count: vendor.review_count });
     getReviews(vendor.id)
       .then((r) => setReviews(r.reviews))
       .catch((e) => { console.error("failed to load reviews:", e.message); notify("Couldn't load reviews for this vendor.", true); })
       .finally(() => setReviewsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor?.id]);
+
+  function applyVendorStats(newStats) {
+    if (!newStats) return;
+    setStats(newStats);
+    onVendorUpdated?.(vendor.id, newStats);
+  }
 
   const myReview = reviews.find((r) => r.isOwn);
 
@@ -50,19 +59,21 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
 
   async function handleDeleteReview(id) {
     try {
-      await deleteReview(id);
+      const res = await deleteReview(id);
       const r = await getReviews(vendor.id);
       setReviews(r.reviews);
+      applyVendorStats(res.vendor);
       notify("Review deleted successfully!");
     } catch (e) { notify(e.message, true); }
   }
 
-  function handleReviewSaved(review) {
+  function handleReviewSaved(review, vendorStats) {
     setReviews((prev) => {
       const exists = prev.some((r) => r.id === review.id);
       return exists ? prev.map((r) => (r.id === review.id ? review : r)) : [review, ...prev];
     });
     setEditingReview(null);
+    applyVendorStats(vendorStats);
   }
 
   useEffect(() => {
@@ -76,12 +87,12 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
     };
   }, [onClose]);
 
+  const images = useMemo(() => (vendor ? vendorGallery(vendor) : []), [vendor]);
+
   if (!vendor) return null;
 
   const handle = creatorHandle(vendor);
   const price = priceLabel(vendor);
-  const walk = walkLabel(vendor);
-  const dist = distanceLabel(vendor);
   const tags = (vendor.cuisine_types || vendor.signature_dishes || "")
     .split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -94,10 +105,18 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         onClick={(e) => e.stopPropagation()}
         className="max-h-dvh w-full overflow-y-auto rounded-t-2xl bg-white shadow-[0_20px_60px_rgba(64,84,74,0.35)] animate-modal-in sm:max-h-[88dvh] sm:max-w-[520px] sm:rounded-2xl"
       >
-        {/* Hero image */}
-        <div className="relative h-44 overflow-hidden rounded-t-2xl sm:h-[220px]">
-          <img src={placeholderImage(vendor)} alt={vendor.name} className="block size-full object-cover" />
-          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
+        {/* Hero image — autoplays through the storefront cover + food photos
+            as soon as the modal opens; arrows/dots let a visitor take over.
+            Taller than before (h-44/220 -> h-52/280) so VendorGallery's
+            object-contain has room to show a 4:3 Places photo close to full
+            width instead of leaving heavy blurred margins either side. */}
+        <div className="relative h-52 overflow-hidden rounded-t-2xl sm:h-[280px]">
+          {/* Same top-biased crop as the card (VendorCard's IMAGE_POSITION)
+              so the cover photo frames identically in both places — a
+              storefront that looks right on the card shouldn't jump to a
+              different crop the moment the modal opens. */}
+          <VendorGallery images={images} alt={(_, i) => photoAltText(vendor, i)} interval={2600} showArrows showDots objectPosition="50% 18%" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
           {/* Category badge */}
           <span className="absolute left-3 top-3 rounded-full bg-forest px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-white">
             {categoryLabel(vendor)}
@@ -119,14 +138,12 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         <div className="flex flex-col gap-3.5 px-5 pb-5 pt-4.5">
           {/* Meta row */}
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-muted">
-            {vendor.review_count > 0 && (
+            {stats.review_count > 0 && (
               <MetaItem
                 icon={<Star size={14} color={TERRACOTTA} fill={TERRACOTTA} />}
-                text={`${Number(vendor.average_rating).toFixed(1)} (${vendor.review_count} review${vendor.review_count === 1 ? "" : "s"})`}
+                text={`${Number(stats.average_rating).toFixed(1)} (${stats.review_count} review${stats.review_count === 1 ? "" : "s"})`}
               />
             )}
-            {dist && <MetaItem icon={<MapPin size={14} color={TERRACOTTA} />} text={`${dist} away`} />}
-            {walk && <MetaItem icon={<Footprints size={14} color={TERRACOTTA} />} text={walk} />}
             {price && <MetaItem icon={<Wallet size={14} color={TERRACOTTA} />} text={`${price}/person`} />}
           </div>
 

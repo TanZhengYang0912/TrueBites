@@ -19,10 +19,19 @@ const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 const PAGE_SIZE = 6;
 // Cards in the same grid row can have different natural heights (e.g. the star-rating
-// line only renders for vendors with reviews). These selectors reach into VendorCard's
-// <article> from here so every card in a row stretches to match the tallest one, keeping
-// the footer row (and whatever sits below the card) aligned without editing VendorCard.
-const CARD_STRETCH = "[&>article]:flex [&>article]:flex-1 [&>article]:flex-col [&>article>div:last-child]:flex-1";
+// line only renders for vendors with reviews). The grid already stretches each row's
+// wrapper divs to match the tallest one — this just lets VendorCard's <article> grow
+// into that stretched height too, without forcing its own internals into a flex layout
+// (that previously fought with the photo's aspect-ratio box and blew it up to full size).
+const CARD_STRETCH = "[&>article]:flex-1";
+// Fuses the (shared, untouched) VendorCard with a page-specific footer strip
+// below it — squares off the card's bottom edge and cancels its hover-lift so
+// the footer reads as part of one card instead of a stray line floating under it.
+const CARD_MERGE_FOOTER = "[&>article]:rounded-b-none [&>article]:border-b-0 [&>article]:hover:translate-y-0";
+// Fixed height (not padding-driven) so every footer in a row is identical
+// regardless of content — a long folder name or review date must never make
+// one card taller than its neighbours the way the main discovery grid never does.
+const CARD_FOOTER = "flex h-11 shrink-0 items-center gap-1.5 overflow-hidden rounded-b border border-t-0 border-sand bg-chalk px-3 text-[11px] text-muted";
 
 export default function EngagementPage() {
   const navigate = useNavigate();
@@ -196,6 +205,16 @@ export default function EngagementPage() {
     await confirmSaveBookmark(folder.id);
   }
 
+  // Reviews are submitted from the vendor-detail modal, whose vendor object
+  // is a nested copy embedded per-row in `bookmarks`/`reviews` (and possibly
+  // duplicated again in `detailVendor`) — patch every copy so the card grid
+  // reflects the new rating/count without a full refetch.
+  function patchVendorStats(vendorId, patch) {
+    setBookmarks((cur) => cur.map((b) => (b.vendor_id === vendorId ? { ...b, vendor: { ...b.vendor, ...patch } } : b)));
+    setReviews((cur) => cur.map((r) => (r.vendor?.id === vendorId ? { ...r, vendor: { ...r.vendor, ...patch } } : r)));
+    setDetailVendor((cur) => (cur && cur.id === vendorId ? { ...cur, ...patch } : cur));
+  }
+
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
       <DiscoveryHeader
@@ -281,7 +300,7 @@ export default function EngagementPage() {
                 <>
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {pagedBookmarks.map((b) => (
-                      <div key={b.vendor_id} className={`flex flex-col gap-2 ${CARD_STRETCH}`}>
+                      <div key={b.vendor_id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                         <VendorCard
                           vendor={b.vendor}
                           inTrip={false}
@@ -347,7 +366,7 @@ export default function EngagementPage() {
               <>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {pagedReviews.map((r) => (
-                    <div key={r.id} className={`flex flex-col gap-1.5 ${CARD_STRETCH}`}>
+                    <div key={r.id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                       <VendorCard
                         vendor={r.vendor}
                         inTrip={false}
@@ -356,7 +375,7 @@ export default function EngagementPage() {
                         onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
                         onOpenDetail={setDetailVendor}
                       />
-                      <div className="flex items-center gap-1 px-0.5 text-[11px] text-muted">
+                      <div className={CARD_FOOTER}>
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star key={i} size={12} color="#A35D47" fill={i < r.rating ? "#A35D47" : "none"} />
                         ))}
@@ -380,6 +399,7 @@ export default function EngagementPage() {
           onToggleBookmark={() => toggleBookmarkFromDetail(detailVendor.id)}
           onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
           onClose={() => setDetailVendor(null)}
+          onVendorUpdated={patchVendorStats}
         />
       )}
 
@@ -500,14 +520,14 @@ function FolderMoveSelect({ row, folders, onMove }) {
   const current = folders.find((f) => f.id === row.folder_id) || folders[0];
 
   return (
-    <div ref={wrapRef} className="relative flex items-center gap-1 px-0.5">
+    <div ref={wrapRef} className={`relative ${CARD_FOOTER}`}>
       <FolderInput size={13} color={MUTED} className="shrink-0" />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 rounded-md border border-sand bg-white px-1.5 text-[11.5px] text-ink outline-none focus:border-forest"
+        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 text-[11.5px] font-medium text-ink outline-none"
       >
         <span className="min-w-0 truncate">{current?.name}</span>
         <ChevronDown size={13} color={MUTED} className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"} />

@@ -84,7 +84,8 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible,
-  a:focus-visible {
+  a:focus-visible,
+  [role="button"]:focus-visible {
     outline: 2px solid var(--color-terracotta);
     outline-offset: 3px;
   }
@@ -1134,12 +1135,6 @@
     background: var(--admin-hover);
   }
 
-  .admin-table-vendor {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
   .admin-table-thumb {
     width: 44px;
     height: 44px;
@@ -1880,31 +1875,47 @@
     color: var(--admin-muted);
   }
 
-  /* Keep Google's suggestion menu above the admin modal. */
-  .pac-container {
+  .admin-address-field {
+    position: relative;
+  }
+
+  /* Suggestion dropdown for the free Photon-backed address autocomplete
+     (replaces the old Google Places Autocomplete widget's own "pac-container"
+     menu — same z-index concern, so it sits above the admin modal). */
+  .admin-address-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
     z-index: 10000;
+    margin-top: 4px;
+    padding: 4px;
+    list-style: none;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    max-height: 220px;
+    overflow-y: auto;
   }
 
-  .admin-geocode-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+  .admin-address-suggestions li button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--admin-text);
+    font-size: 13px;
+    cursor: pointer;
   }
 
-  .admin-geocode-result {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-  }
-
-  .admin-geocode-result.success {
-    color: var(--admin-success-text);
-  }
-
-  .admin-geocode-result.error {
-    color: var(--admin-danger-text);
+  .admin-address-suggestions li button:hover,
+  .admin-address-suggestions li button:focus-visible {
+    background: var(--admin-panel-soft);
+    outline: none;
   }
 
   .admin-dropzone {
@@ -1952,6 +1963,199 @@
     width: 100%;
     height: 140px;
     object-fit: cover;
+  }
+
+  /* Gallery photos (food/interior shots shown after the cover in the
+     card-hover / detail-modal carousels) — a thumbnail grid next to the
+     single-cover dropzone above, sized to match its 44px table-thumb cousin
+     but a little larger since these are the primary click target here. */
+  .admin-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+  }
+
+  .admin-gallery-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--admin-panel-soft);
+    border: 1px solid var(--admin-border);
+  }
+
+  .admin-gallery-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .admin-gallery-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(23, 33, 43, 0.65);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 140ms;
+  }
+
+  .admin-gallery-thumb-remove:hover {
+    background: var(--admin-danger-text);
+  }
+
+  .admin-gallery-thumb-remove:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .admin-gallery-add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1.5px dashed var(--admin-border);
+    border-radius: 8px;
+    background: var(--admin-panel-soft);
+    color: var(--admin-muted);
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: border-color 140ms, background 140ms, color 140ms;
+  }
+
+  .admin-gallery-add:hover {
+    border-color: var(--admin-navy);
+    color: var(--admin-navy);
+  }
+
+  .admin-gallery-add:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .admin-photo-discovery {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    background: var(--admin-panel-soft);
+  }
+
+  .admin-photo-discovery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--admin-navy);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-spin {
+    animation: admin-spin-rotate 0.8s linear infinite;
+  }
+
+  @keyframes admin-spin-rotate {
+    to { transform: rotate(360deg); }
+  }
+
+  .admin-photo-discovery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .admin-photo-skeleton {
+    aspect-ratio: 4 / 3;
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--admin-border) 25%, var(--admin-panel) 50%, var(--admin-border) 75%);
+    background-size: 200% 100%;
+    animation: admin-skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes admin-skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .admin-photo-candidate {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    background: var(--admin-panel);
+  }
+
+  .admin-photo-candidate-preview {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--admin-panel-soft);
+  }
+
+  .admin-photo-candidate-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .admin-confidence-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+  }
+
+  .admin-confidence-badge.high {
+    background: var(--admin-success-bg);
+    color: var(--admin-success-text);
+  }
+
+  .admin-confidence-badge.medium {
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning-text);
+  }
+
+  .admin-photo-candidate-meta {
+    display: grid;
+    gap: 2px;
+    font-size: 11px;
+    color: var(--admin-muted);
+  }
+
+  .admin-photo-candidate-meta strong {
+    font-size: 12.5px;
+    color: var(--admin-text);
+  }
+
+  .admin-photo-candidate-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .admin-photo-candidate-actions .admin-secondary-btn {
+    flex: 1;
   }
 
   .admin-detail-row {

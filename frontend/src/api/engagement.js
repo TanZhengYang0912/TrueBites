@@ -82,16 +82,16 @@ export async function getReviews(vendorId) {
 export async function getMyReviews() {
   return requestJson("/api/engagement/reviews/mine", { headers: await authHeaders() });
 }
-export async function createReview(vendorId, { rating, body }) {
-  const payload = jsonBody({ rating, body });
+export async function createReview(vendorId, { rating, body, is_anonymous }) {
+  const payload = jsonBody({ rating, body, is_anonymous });
   return requestJson(`/api/engagement/vendors/${vendorId}/reviews`, {
     method: "POST",
     headers: await authHeaders({ "Content-Type": payload["Content-Type"] }),
     body: payload.body,
   });
 }
-export async function updateReview(id, { rating, body }) {
-  const payload = jsonBody({ rating, body });
+export async function updateReview(id, { rating, body, is_anonymous }) {
+  const payload = jsonBody({ rating, body, is_anonymous });
   return requestJson(`/api/engagement/reviews/${id}`, {
     method: "PATCH",
     headers: await authHeaders({ "Content-Type": payload["Content-Type"] }),

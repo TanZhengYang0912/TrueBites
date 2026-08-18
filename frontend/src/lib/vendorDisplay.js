@@ -1,5 +1,3 @@
-import { VENDOR_FOOD_IMAGES } from "../generated/vendorFoodImages.js";
-
 // Shared display helpers for vendor cards, the detail modal, and trip-panel
 // stops. Category keys are derived from cuisine_types first so discovery filters
 // use the database contract instead of a collection of visual guesses.
@@ -75,53 +73,106 @@ export function categoryMatches(vendor, key) {
 }
 
 // ─── Vendor imagery ─────────────────────────────────────────────────────────────
-// Curated category placeholders remain the final fallback. The static manifest
-// is checked first so the existing vendor UUIDs use the images shipped with this
-// branch without requiring a database or API change.
-const PLACEHOLDER_IMAGES = {
-  nyonya: [
-    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=480&h=360&fit=crop",
-  ],
-  cafe: [
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=480&h=360&fit=crop",
-  ],
-  local: [
-    "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1543353071-873f17a7a088?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1526318472351-c75fcf070305?w=480&h=360&fit=crop",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=480&h=360&fit=crop",
-  ],
-};
-
-function hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
+// Returns the real cover photo, or `null` when this vendor has none yet.
+// Deliberately does NOT fall back to a random stock/unrelated photo — showing
+// an unrelated restaurant's photo as if it belonged to this vendor is worse
+// than showing an honest "photo unavailable" state (see
+// PhotoUnavailablePlaceholder.jsx, which every caller of vendorGallery()
+// renders instead of an <img> whenever a slide is null). `storefront_image_url`
+// is the real DB/API column; `imageUrl` is how the admin console's API mapper
+// names it; `image_url` is kept as a last-resort legacy key in case anything
+// else still produces it.
+export function placeholderImage(vendor) {
+  return vendor.storefront_image_url || vendor.imageUrl || vendor.image_url || null;
 }
 
-// Deterministic (not random) so the same vendor always shows the same photo
-// across renders/reloads. A real uploaded image still takes precedence over the
-// bundled vendor image. `storefront_image_url` is the real DB/API column (set by
-// an admin upload or the AI pipeline's video thumbnail); `imageUrl` is how the
-// admin console's API mapper names it; `image_url` is kept as a last-resort
-// legacy key in case anything else still produces it.
-export function placeholderImage(vendor) {
-  const real = vendor.storefront_image_url || vendor.imageUrl || vendor.image_url;
-  if (real) return real;
-  const curatedImage = VENDOR_FOOD_IMAGES[String(vendor.id)];
-  if (curatedImage) return curatedImage;
-  const pool = PLACEHOLDER_IMAGES[categoryOf(vendor)] || PLACEHOLDER_IMAGES.local;
-  return pool[hashStr(String(vendor.id)) % pool.length];
+// Ordered image list for the card-hover / detail-modal carousels: the
+// storefront cover always leads (same photo `placeholderImage` returns, so
+// the first frame never "pops" when a carousel mounts), followed by any
+// admin-uploaded/fetched gallery photos in upload order. `gallery_image_urls`
+// is the raw DB/API field name; `galleryUrls` is how the admin console's list
+// mapper names it (see admin.js's item mapper) — both are accepted so this
+// works from either data source without a prop-mapping step at the call site.
+export function vendorGallery(vendor) {
+  const cover = placeholderImage(vendor);
+  const images = [cover];
+
+  const uploaded = Array.isArray(vendor.gallery_image_urls)
+    ? vendor.gallery_image_urls
+    : Array.isArray(vendor.galleryUrls)
+      ? vendor.galleryUrls
+      : [];
+  for (const url of uploaded) {
+    if (url && !images.includes(url)) images.push(url);
+  }
+
+  return images;
+}
+
+// Descriptive alt text per photo, e.g. "Storefront of Chacos Berlauk in
+// Melaka" — replaces the previous bare `vendor.name` on every slide, which
+// didn't distinguish the cover from later gallery photos and gave a screen
+// reader no more information than the visible heading already provides.
+// `index` is which slide within vendorGallery()'s ordering (0 = cover).
+export function photoAltText(vendor, index = 0) {
+  const place = vendor.city || vendor.address?.split(",")[0]?.trim() || "Melaka";
+  const role = index === 0 ? "Storefront" : "Photo";
+  return `${role} of ${vendor.vendor_name || vendor.name} in ${place}`;
 }
 
 // "RM8-15 per person" / "RM10" -> "RM8" (first number found); no match -> null.
 export function priceLabel(vendor) {
   const match = (vendor.price_range || "").match(/\d+/);
   return match ? `RM${match[0]}` : null;
+}
+
+// "RM 8 - RM 15 per person" -> "RM8 – RM15"; "RM10 per person" -> "RM10"
+// (single value when min/max are equal or only one number is present).
+// Same number-extraction shape as the admin form's parsePriceRange, just
+// rendered as an en-dash range instead of separate min/max form fields.
+export function priceRangeLabel(vendor) {
+  const str = vendor.price_range || "";
+  const match = str.match(/RM\s*(\d+(?:\.\d+)?)\s*(?:-\s*(?:RM\s*)?(\d+(?:\.\d+)?))?/i);
+  if (!match) return null;
+  const min = match[1];
+  const max = match[2];
+  if (!max || Number(max) === Number(min)) return `RM${min}`;
+  return `RM${min} – RM${max}`;
+}
+
+// Parses the "HH:MM AM/PM - HH:MM AM/PM" shape the admin form already
+// enforces (see HOURS_RE in AdminVendorManagementPage.jsx) into an open/closed
+// status plus a lowercase-formatted label ("6:00 am – 12:00 pm"). Older
+// AI-scraped strings that don't match this shape ("3 - 4", "4 pm, 5.5 pm, 6
+// pm") return null rather than guessing at a status — no badge is better than
+// a wrong one.
+const HOURS_RANGE_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+
+function hoursToMinutes(hh, mm, period) {
+  const h = Number.parseInt(hh, 10) % 12;
+  return (h + (/pm/i.test(period) ? 12 : 0)) * 60 + Number.parseInt(mm, 10);
+}
+
+function formatClock(hh, mm, period) {
+  return `${String(Number.parseInt(hh, 10)).padStart(2, "0")}:${mm} ${period.toLowerCase()}`;
+}
+
+export function hoursStatus(vendor) {
+  const raw = vendor.operating_hours_raw || vendor.operating_hours;
+  const match = HOURS_RANGE_RE.exec(raw || "");
+  if (!match) return null;
+  const [, oh, om, op, ch, cm, cp] = match;
+
+  const openMin = hoursToMinutes(oh, om, op);
+  const closeMin = hoursToMinutes(ch, cm, cp);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  // Closing time <= opening time means the window crosses midnight
+  // (e.g. "4:00 pm - 12:00 am") — treat closing as happening "the next day".
+  const isOpen = closeMin <= openMin
+    ? nowMin >= openMin || nowMin < closeMin
+    : nowMin >= openMin && nowMin < closeMin;
+
+  return { isOpen, label: `${formatClock(oh, om, op)} – ${formatClock(ch, cm, cp)}` };
 }
 
 // Backend already computes this via haversine (see /restaurants/nearby).

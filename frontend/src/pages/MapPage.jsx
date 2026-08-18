@@ -66,6 +66,7 @@ export default function MapPage() {
     setSearchParams(next, { replace: true });
   }
   const [vendors, setVendors] = useState([]);
+  const [vendorsLoading, setVendorsLoading] = useState(true);
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
@@ -104,7 +105,8 @@ export default function MapPage() {
   useEffect(() => {
     getRestaurants(MELAKA_CENTER.lat, MELAKA_CENTER.lng)
       .then(setVendors)
-      .catch((e) => { console.error("failed to load vendors:", e.message); notify("Couldn't load vendors. Check your connection and try again.", true); });
+      .catch((e) => { console.error("failed to load vendors:", e.message); notify("Couldn't load vendors. Check your connection and try again.", true); })
+      .finally(() => setVendorsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -350,6 +352,7 @@ export default function MapPage() {
       <>
         <Dashboard
           vendors={vendors}
+          loading={vendorsLoading}
           bookmarks={bookmarks}
           onToggleBookmark={toggleBookmark}
           onOpenMap={openMapNearby}
@@ -357,6 +360,9 @@ export default function MapPage() {
           onAddStop={addStop}
           focusVendorId={focusVendorId}
           onFocusVendorHandled={clearFocusVendor}
+          onVendorUpdated={(vendorId, patch) =>
+            setVendors((cur) => cur.map((v) => (v.id === vendorId ? { ...v, ...patch } : v)))
+          }
         />
         {pendingSaveVendor && (
           <FolderPickerModal

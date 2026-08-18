@@ -147,10 +147,9 @@ export async function recomputeVendorRating(vendorId) {
   const count = counted.length;
   const average = count ? counted.reduce((sum, r) => sum + r.rating, 0) / count : null;
 
-  await supabase
-    .from("vendors")
-    .update({ average_rating: average, review_count: count })
-    .eq("id", vendorId);
+  const patch = { average_rating: average, review_count: count };
+  await supabase.from("vendors").update(patch).eq("id", vendorId);
+  return patch;
 }
 
 function storagePathFromUrl(url) {
@@ -338,12 +337,19 @@ function displayName(user) {
   return user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Anonymous";
 }
 
+function maskName(name) {
+  if (!name) return "Anonymous";
+  const chars = Array.from(name);
+  if (chars.length <= 2) return chars[0] + "*".repeat(chars.length - 1);
+  return chars[0] + "*".repeat(chars.length - 2) + chars[chars.length - 1];
+}
+
 router.get("/engagement/vendors/:vendorId/reviews", async (req, res) => {
   const caller = await optionalUser(req);
 
   const { data: reviews, error } = await supabase
     .from("reviews")
-    .select("id, user_id, rating, body, author_name, is_hidden, hidden_reason, created_at, updated_at, review_photos(id, url)")
+    .select("id, user_id, rating, body, author_name, is_anonymous, is_hidden, hidden_reason, created_at, updated_at, review_photos(id, url)")
     .eq("vendor_id", req.params.vendorId)
     .order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: "database query failed", details: error.message });
@@ -359,6 +365,7 @@ router.get("/engagement/vendors/:vendorId/reviews", async (req, res) => {
     const reviewVotes = (votes || []).filter((v) => v.review_id === r.id);
     return {
       ...r,
+      author_name: r.is_anonymous ? maskName(r.author_name) : r.author_name,
       isOwn: r.user_id === caller?.id,
       likes: reviewVotes.filter((v) => v.is_like).length,
       dislikes: reviewVotes.filter((v) => !v.is_like).length,
@@ -403,6 +410,7 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
   }
   const body = String(req.body?.body || "").trim() || null;
   const profane = body ? isProfaneLoose(body) : false;
+  const isAnonymous = Boolean(req.body?.is_anonymous);
 
   const { data, error } = await supabase
     .from("reviews")
@@ -412,10 +420,11 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
       rating,
       body,
       author_name: displayName(user),
+      is_anonymous: isAnonymous,
       is_hidden: profane,
       hidden_reason: profane ? "profanity" : null,
     })
-    .select("id, rating, body, author_name, is_hidden, hidden_reason, created_at, updated_at")
+    .select("id, rating, body, author_name, is_anonymous, is_hidden, hidden_reason, created_at, updated_at")
     .single();
   if (error) {
     const status = error.code === "23505" ? 409 : 500;
@@ -425,9 +434,12 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
     });
   }
 
-  await recomputeVendorRating(req.params.vendorId);
+  const vendorStats = await recomputeVendorRating(req.params.vendorId);
   await logActivity({ actor: user, action: "review.create", entityType: "review", entityId: data.id, metadata: { vendor_id: req.params.vendorId, rating } });
-  res.status(201).json({ review: { ...data, isOwn: true, likes: 0, dislikes: 0, myVote: null } });
+  res.status(201).json({
+    review: { ...data, author_name: data.is_anonymous ? maskName(data.author_name) : data.author_name, isOwn: true, likes: 0, dislikes: 0, myVote: null },
+    vendor: vendorStats,
+  });
 });
 
 router.patch("/engagement/reviews/:id", async (req, res) => {
@@ -458,18 +470,24 @@ router.patch("/engagement/reviews/:id", async (req, res) => {
     patch.is_hidden = profane;
     patch.hidden_reason = profane ? "profanity" : null;
   }
+  if (req.body?.is_anonymous != null) {
+    patch.is_anonymous = Boolean(req.body.is_anonymous);
+  }
 
   const { data, error } = await supabase
     .from("reviews")
     .update(patch)
     .eq("id", req.params.id)
-    .select("id, rating, body, author_name, is_hidden, hidden_reason, created_at, updated_at")
+    .select("id, rating, body, author_name, is_anonymous, is_hidden, hidden_reason, created_at, updated_at")
     .single();
   if (error) return res.status(500).json({ error: "database update failed", details: error.message });
 
-  await recomputeVendorRating(existing.vendor_id);
+  const vendorStats = await recomputeVendorRating(existing.vendor_id);
   await logActivity({ actor: user, action: "review.update", entityType: "review", entityId: existing.id, metadata: { vendor_id: existing.vendor_id } });
-  res.json({ review: { ...data, isOwn: true } });
+  res.json({
+    review: { ...data, author_name: data.is_anonymous ? maskName(data.author_name) : data.author_name, isOwn: true },
+    vendor: vendorStats,
+  });
 });
 
 router.delete("/engagement/reviews/:id", async (req, res) => {
@@ -492,9 +510,9 @@ router.delete("/engagement/reviews/:id", async (req, res) => {
   const paths = (photos || []).map((p) => storagePathFromUrl(p.url)).filter(Boolean);
   if (paths.length) await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove(paths);
 
-  await recomputeVendorRating(existing.vendor_id);
+  const vendorStats = await recomputeVendorRating(existing.vendor_id);
   await logActivity({ actor: user, action: "review.delete", entityType: "review", entityId: existing.id, metadata: { vendor_id: existing.vendor_id } });
-  res.json({ deleted: true, id: existing.id });
+  res.json({ deleted: true, id: existing.id, vendor: vendorStats });
 });
 
 // ── Review photos ───────────────────────────────────────────────────────────
