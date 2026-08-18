@@ -1,5 +1,8 @@
 import { useRef } from "react";
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Users,
+  UtensilsCrossed, Soup, Coffee, CookingPot, Beef, Sandwich, Drumstick, Flame,
+} from "lucide-react";
 import {
   CATEGORY_FILTERS,
   MORE_CATEGORY_OPTIONS,
@@ -9,15 +12,17 @@ import {
 
 const MUTED = "#69717A";
 
+// lucide, not emoji — these sit beside the travel-mode rail's Car/Bike/Bus/
+// Footprints and have to read as the same family of marks.
 const ICONS = {
-  all: "🍽️",
-  local: "🍲",
-  cafe: "☕",
-  nyonya: "👘",
-  western: "🥩",
-  middle_eastern: "🌮",
-  chinese: "🍜",
-  korean: "🇰🇷",
+  all: UtensilsCrossed,
+  local: Soup,
+  cafe: Coffee,
+  nyonya: CookingPot,
+  western: Beef,
+  middle_eastern: Sandwich,
+  chinese: Drumstick,
+  korean: Flame,
 };
 
 const CHIP = "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition-colors active:scale-97 motion-reduce:transition-none";
@@ -30,7 +35,7 @@ function countFor(vendors, key) {
   return vendors.filter((vendor) => categoryMatches(vendor, key)).length;
 }
 
-export default function FilterChips({ active, onSelect, creator, onCreatorSelect, vendors = [] }) {
+export default function FilterChips({ active, onSelect, creator, onCreatorSelect, vendors = [], compact = false }) {
   const scrollerRef = useRef(null);
   const availableMore = MORE_CATEGORY_OPTIONS.filter((option) => countFor(vendors, option.key) > 0);
   const allCategories = [...CATEGORY_FILTERS, ...availableMore];
@@ -46,7 +51,9 @@ export default function FilterChips({ active, onSelect, creator, onCreatorSelect
   }
 
   return (
-    <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:gap-4">
+    <div className={compact
+      ? "flex flex-col items-stretch gap-2.5"
+      : "flex flex-col items-start gap-3 md:flex-row md:items-center md:gap-4"}>
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
@@ -59,11 +66,14 @@ export default function FilterChips({ active, onSelect, creator, onCreatorSelect
 
         <div
           ref={scrollerRef}
-          className="no-scrollbar flex min-w-0 max-w-[calc(100vw-9rem)] items-center gap-2 overflow-x-auto scroll-smooth sm:max-w-[420px] lg:max-w-[560px]"
+          className={compact
+            ? "no-scrollbar flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scroll-smooth"
+            : "no-scrollbar flex min-w-0 max-w-[calc(100vw-9rem)] items-center gap-2 overflow-x-auto scroll-smooth sm:max-w-[420px] lg:max-w-[560px]"}
           style={{ scrollbarWidth: "none" }}
         >
           {allCategories.map(({ key, label }) => {
             const isActive = active === key;
+            const Icon = ICONS[key];
             return (
               <button
                 key={key}
@@ -72,7 +82,7 @@ export default function FilterChips({ active, onSelect, creator, onCreatorSelect
                 className={isActive ? CHIP_ACTIVE : CHIP_IDLE}
                 aria-pressed={isActive}
               >
-                {ICONS[key] && <span aria-hidden="true">{ICONS[key]}</span>}
+                {Icon && <Icon size={15} strokeWidth={1.8} aria-hidden="true" />}
                 <span>{label}</span>
                 <small className={isActive ? "opacity-70" : "opacity-55"}>{countFor(vendors, key)}</small>
               </button>
@@ -91,10 +101,10 @@ export default function FilterChips({ active, onSelect, creator, onCreatorSelect
       </div>
 
       {/* Divider becomes a full-width rule once the bar stacks */}
-      <div className="h-px w-full bg-sand md:h-6 md:w-px" />
+      <div className={compact ? "h-px w-full bg-sand" : "h-px w-full bg-sand md:h-6 md:w-px"} />
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Users size={14} color={MUTED} />
+        <Users size={14} strokeWidth={1.8} color={MUTED} />
         <span className="text-[13px] text-muted">Recommended by</span>
         <select
           value={creator}

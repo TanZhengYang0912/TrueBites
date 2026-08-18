@@ -32,25 +32,10 @@ export default function TripPanel({
   onManualLocation, onLocateMe,
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
-<<<<<<< Updated upstream
-  nearbyToAdd, onAddStop, onAddCustomStop, onSelectNearby,
-  radiusKm, onRadiusChange, showAllVendors, onToggleAllVendors,
-  hasAnchor,
-=======
   onAddCustomStop,
->>>>>>> Stashed changes
   onSuggestBestOrder,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
-  // Lazy initialiser — reads storage once on mount, not on every render.
-  const [nearbyCollapsed, setNearbyCollapsed] = useState(loadNearbyCollapsed);
-
-  function toggleNearby() {
-    setNearbyCollapsed((collapsed) => {
-      saveNearbyCollapsed(!collapsed);
-      return !collapsed;
-    });
-  }
   const [editingId, setEditingId] = useState(null); // id of the stop whose address is being re-typed
   const [addingPlace, setAddingPlace] = useState(false);
 
@@ -217,84 +202,6 @@ export default function TripPanel({
         )
       )}
 
-<<<<<<< Updated upstream
-      {/* Nearby to add — tap a row to preview it on the map, tap + to add it.
-          Collapsible because on a phone this list pushes the route summary and
-          travel mode below the fold. */}
-      {onRadiusChange && (
-        <div className="mt-2.5 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={toggleNearby}
-            aria-expanded={!nearbyCollapsed}
-            aria-controls="nearby-to-add"
-            className="flex min-h-11 items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.8px] text-terracotta"
-          >
-            {nearbyCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-            Nearby to Add
-          </button>
-          <span className="flex-1" />
-          {!nearbyCollapsed && [1, 2, 5].map((km) => (
-            <button
-              key={km}
-              onClick={() => onRadiusChange(km)}
-              className={radiusKm === km
-                ? "min-h-11 min-w-11 rounded-full border border-forest bg-forest px-2 text-[11px] text-white"
-                : "min-h-11 min-w-11 rounded-full border border-sand px-2 text-[11px] text-muted"}
-            >
-              {km}km
-            </button>
-          ))}
-        </div>
-      )}
-      {!nearbyCollapsed && (
-      <div id="nearby-to-add">
-      {onToggleAllVendors && (
-        <button
-          onClick={onToggleAllVendors}
-          aria-pressed={showAllVendors}
-          className={showAllVendors
-            ? "mt-1.5 flex min-h-11 items-center gap-1.5 text-[11.5px] text-forest"
-            : "mt-1.5 flex min-h-11 items-center gap-1.5 text-[11.5px] text-muted"}
-        >
-          {showAllVendors ? <Eye size={13} /> : <EyeOff size={13} />}
-          {showAllVendors ? "Showing vendors on map" : "Vendors hidden on map"}
-        </button>
-      )}
-      {nearbyToAdd && nearbyToAdd.length > 0 && (
-        <div className="mt-1.5">
-          {nearbyToAdd.map((v) => (
-            <div
-              key={v.id}
-              onClick={() => onSelectNearby?.(v)}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5"
-            >
-              <img src={placeholderImage(v)} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
-              <span className="min-w-0 flex-1">
-                <div className="truncate text-[12.5px] text-ink">{v.name}</div>
-                <div className="text-[11px] text-muted">{[distanceLabel(v), priceLabel(v)].filter(Boolean).join(" · ")}</div>
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onAddStop(v); }}
-                aria-label={`Add ${v.name} to trip`}
-                className="grid size-11 shrink-0 place-items-center text-terracotta"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      {onRadiusChange && nearbyToAdd && nearbyToAdd.length === 0 && (
-        <div className="mt-1.5 text-[11.5px] text-muted">
-          {hasAnchor ? `Nothing within ${radiusKm}km — try a bigger radius.` : "Set your starting point to see nearby vendors."}
-        </div>
-      )}
-      </div>
-      )}
-
-=======
->>>>>>> Stashed changes
       {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
       {/* Route summary tiles */}

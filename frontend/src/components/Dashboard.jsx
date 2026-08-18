@@ -7,7 +7,7 @@ import FilterChips from "./discovery/FilterChips";
 import VendorCard from "./discovery/VendorCard";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
-import { categoryMatches, creatorHandle } from "../lib/vendorDisplay";
+import { matchesFilters } from "../lib/vendorFilters";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
@@ -50,21 +50,7 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
-  function matchesSearch(v) {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return v.name?.toLowerCase().includes(q)
-      || (v.cuisine_types || "").toLowerCase().includes(q)
-      || (v.signature_dishes || "").toLowerCase().includes(q);
-  }
-  function matchesCategory(v) {
-    return categoryMatches(v, category);
-  }
-  function matchesCreator(v) {
-    return creator === "all" || creatorHandle(v) === creator;
-  }
-
-  const displayed = vendors.filter((v) => matchesSearch(v) && matchesCategory(v) && matchesCreator(v));
+  const displayed = vendors.filter((v) => matchesFilters(v, { search, category, creator }));
   const pageData = paginate(displayed, page, PAGE_SIZE);
   useEffect(() => {
     if (page > pageData.totalPages) setPage(pageData.totalPages);

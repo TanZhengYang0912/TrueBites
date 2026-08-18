@@ -13,36 +13,6 @@ function withStorage(store, fn) {
   try { return fn(); } finally { globalThis.window = previous; }
 }
 
-<<<<<<< Updated upstream
-const { loadNearbyCollapsed, saveNearbyCollapsed } = await import("./panelPrefs.js");
-
-test("defaults to expanded when nothing is stored", () => {
-  withStorage({}, () => assert.equal(loadNearbyCollapsed(), false));
-});
-
-test("round-trips a collapsed preference", () => {
-  const store = {};
-  withStorage(store, () => {
-    saveNearbyCollapsed(true);
-    assert.equal(loadNearbyCollapsed(), true);
-    saveNearbyCollapsed(false);
-    assert.equal(loadNearbyCollapsed(), false);
-  });
-});
-
-test("treats unparseable stored values as expanded", () => {
-  withStorage({ "truebites:panel": "not json" }, () => {
-    assert.equal(loadNearbyCollapsed(), false);
-  });
-});
-
-test("never throws when storage is unavailable", () => {
-  const previous = globalThis.window;
-  globalThis.window = undefined;
-  try {
-    assert.equal(loadNearbyCollapsed(), false);
-    assert.doesNotThrow(() => saveNearbyCollapsed(true));
-=======
 const { loadPanelTab, savePanelTab } = await import("./panelPrefs.js");
 
 test("panel tab defaults to trip", () => {
@@ -77,7 +47,6 @@ test("panel tab never throws when storage is unavailable", () => {
   try {
     assert.equal(loadPanelTab(), "trip");
     assert.doesNotThrow(() => savePanelTab("vendors"));
->>>>>>> Stashed changes
   } finally {
     globalThis.window = previous;
   }
