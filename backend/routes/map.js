@@ -1,8 +1,7 @@
 import { Router } from "express";
-import pkg from "@googlemaps/polyline-codec";
-const { decode } = pkg;
 import { supabase } from "../supabase.js";
 import { haversine } from "../haversine.js";
+import { fetchDrivingRoute } from "../lib/drivingRoute.js";
 import { requireRole } from "../middleware/requireRole.js";
 
 const router = Router();
@@ -125,39 +124,30 @@ router.get("/route", async (req, res) => {
     return res.status(400).json({ error: "fromLat, fromLng, toLat, toLng are required" });
   }
 
-  const directionsUrl =
-    `https://maps.googleapis.com/maps/api/directions/json` +
-    `?origin=${fromLat},${fromLng}` +
-    `&destination=${toLat},${toLng}` +
-    `&mode=driving` +
-    `&key=${GOOGLE_API_KEY}`;
+  const coordinates = [fromLat, fromLng, toLat, toLng].map(Number);
+  if (coordinates.some((value) => !Number.isFinite(value))) {
+    return res.status(400).json({ error: "route coordinates must be valid numbers" });
+  }
 
-  let data;
   try {
-    data = await (await fetch(directionsUrl)).json();
-  } catch (err) {
-    return res.status(502).json({ error: "directions request failed", details: err.message });
+    const [numericFromLat, numericFromLng, numericToLat, numericToLng] = coordinates;
+    const route = await fetchDrivingRoute(
+      {
+        fromLat: numericFromLat,
+        fromLng: numericFromLng,
+        toLat: numericToLat,
+        toLng: numericToLng,
+      },
+      { googleApiKey: GOOGLE_API_KEY },
+    );
+    res.json(route);
+  } catch (error) {
+    res.status(502).json({
+      error: "directions failed",
+      status: error.googleStatus,
+      fallbackStatus: error.fallbackStatus,
+    });
   }
-
-  if (data.status !== "OK" || !data.routes.length) {
-    return res.status(502).json({ error: "directions failed", status: data.status });
-  }
-
-  const leg = data.routes[0].legs[0];
-
-  const path = [];
-  for (const step of leg.steps) {
-    const points = decode(step.polyline.points);
-    for (const [lat, lng] of points) {
-      path.push({ lat, lng });
-    }
-  }
-
-  res.json({
-    distance: leg.distance.text,
-    duration: leg.duration.text,
-    path,
-  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
