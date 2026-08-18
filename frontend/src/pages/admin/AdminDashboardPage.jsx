@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Database,
+  FileDown,
   MessageSquareWarning,
   Store,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getAdminDashboard } from "../../api/admin";
 import { normalizeDashboardPayload } from "../../lib/adminDashboard";
 import { BarChart, KpiCard, LineChart, PipelineChart } from "../../components/admin/AdminCharts";
+import { openOverviewPdf } from "../../lib/exportPdf";
 
 const KPI_ICONS = {
   totalVendors: Store,
@@ -128,6 +130,7 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [range, setRange] = useState(30);
+  const [exportingOverview, setExportingOverview] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -149,6 +152,21 @@ export default function AdminDashboardPage() {
   const trend = visibleTrend.length ? visibleTrend : [{ label: "No data", value: 0, active: 0, draft: 0 }];
   const sparkline = data.vendorTrend.slice(-12).map((item) => item.value);
 
+  async function handleExportOverview() {
+    setExportingOverview(true);
+    try {
+      await openOverviewPdf({
+        kpis,
+        statusBreakdown: data.statusBreakdown,
+        categoryBreakdown: data.categoryBreakdown,
+        sourceBreakdown: data.sourceBreakdown,
+        aiPipeline: data.aiPipeline,
+      });
+    } finally {
+      setExportingOverview(false);
+    }
+  }
+
   return (
     <div className="admin-dashboard">
       <div className="admin-dashboard-heading">
@@ -159,6 +177,9 @@ export default function AdminDashboardPage() {
         </div>
         <div className="admin-dashboard-actions">
           <span className="admin-last-updated">Updated {data.lastUpdated ? new Date(data.lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now"}</span>
+          <button type="button" className="admin-secondary-btn compact" onClick={handleExportOverview} disabled={exportingOverview}>
+            <FileDown size={14} /> {exportingOverview ? "Preparing PDF…" : "Export PDF"}
+          </button>
           <Link className="admin-secondary-btn compact" to="/admin/reviews"><MessageSquareWarning size={14} /> Review queue</Link>
           <Link className="admin-primary-btn compact" to="/admin/vendors2"><Store size={14} /> Add vendor</Link>
         </div>
