@@ -2,15 +2,7 @@ import React, { useState } from 'react';
 
 const API_BASE = 'http://localhost:8000/api';
 
-function getSentimentEmoji(sentimentScore) {
-  if (!sentimentScore) return '⭐';
-  const score = parseFloat(sentimentScore);
-  if (isNaN(score)) return '⭐';
-  if (score >= 4.5) return '🌟';
-  if (score >= 3.5) return '⭐';
-  if (score >= 2.5) return '🤔';
-  return '👎';
-}
+
 
 export default function BatchResultsStep({ batchData, onReset }) {
   const [expandedRow, setExpandedRow] = useState(null);
@@ -38,7 +30,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
     const headers = [
       'vendor_name', 'address', 'city', 'state', 'country',
       'latitude', 'longitude', 'cuisine_types', 'signature_dishes',
-      'price_range', 'sentiment_score', 'average_rating', 'review_count',
+      'price_range', 'average_rating', 'review_count',
       'ai_review_summary', 'operating_hours_raw', 'source_video_url',
       'source_platform', 'last_updated'
     ];
@@ -64,7 +56,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
         cuisines,
         dishes,
         priceRange,
-        ext.sentiment_score    || '',
+
         '', // average_rating
         '', // review_count
         job.summary            || '',
@@ -147,7 +139,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
               <th>Vendor</th>
               <th>Address</th>
               <th>Dishes / Cuisine</th>
-              <th>Score</th>
+
               <th style={{ textAlign: 'right' }}>Action</th>
             </tr>
           </thead>
@@ -258,7 +250,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                         ))}
                       </div>
                     </td>
-                    <td>{getSentimentEmoji(ext.sentiment_score)} {ext.sentiment_score || '-'}</td>
+
                     <td style={{ textAlign: 'right' }}>
                       <button className="expand-btn" onClick={() => setExpandedRow(isExpanded ? null : job.job_id)}>
                         {isExpanded ? 'Hide' : 'Details'}

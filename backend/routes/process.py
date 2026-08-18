@@ -682,10 +682,12 @@ async def api_create_draft(job_id: str, req: DraftRequest):
     vendor_row = (saved or [None])[0]
     _attach_ai_thumbnail(vendor_row, reviewed.get("thumbnail"))
 
-    update_job(job_id, review_status="draft_created", draft_created_at=datetime.now().isoformat())
+    vendor_id = vendor_row.get("id") if vendor_row else None
+    update_job(job_id, review_status="draft_created", draft_created_at=datetime.now().isoformat(), vendor_id=vendor_id)
     return {
         "job_id": job_id,
         "status": "draft_created",
+        "vendor_id": vendor_id,
         "candidates": candidates,
     }
 

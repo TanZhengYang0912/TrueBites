@@ -229,6 +229,7 @@ export default function EngagementPage() {
         onOpenDiscover={() => navigate("/map")}
         onOpenSaved={() => { setTab("bookmarks"); navigate("/engagement"); }}
         onOpenReviews={() => { setTab("reviews"); navigate("/engagement?tab=reviews"); }}
+        onOpenSuggestions={() => navigate("/suggestions")}
         onLogin={() => navigate("/login")}
         onSignUp={() => navigate("/login")}
         onOpenProfile={() => navigate("/profile")}
@@ -579,7 +580,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(1)}
         disabled={page === 1}
         aria-label="First page"
-        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
       >
         <ChevronsLeft size={16} />
       </button>
@@ -588,7 +589,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(page - 1)}
         disabled={page === 1}
         aria-label="Previous page"
-        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
       >
         <ChevronLeft size={16} />
       </button>
@@ -602,8 +603,8 @@ function Pagination({ page, totalPages, onChange }) {
             onClick={() => onChange(p)}
             aria-current={p === page ? "page" : undefined}
             className={p === page
-              ? "grid min-h-9 min-w-9 place-items-center rounded-full bg-forest text-[13px] font-semibold text-white"
-              : "grid min-h-9 min-w-9 place-items-center rounded-full text-[13px] text-ink hover:bg-sand/60"}
+              ? "grid min-h-11 min-w-11 place-items-center rounded-full bg-forest text-[13px] font-semibold text-white"
+              : "grid min-h-11 min-w-11 place-items-center rounded-full text-[13px] text-ink hover:bg-sand/60"}
           >
             {p}
           </button>
@@ -614,7 +615,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(page + 1)}
         disabled={page === totalPages}
         aria-label="Next page"
-        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
       >
         <ChevronRight size={16} />
       </button>
@@ -623,7 +624,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(totalPages)}
         disabled={page === totalPages}
         aria-label="Last page"
-        className="grid min-h-9 min-w-9 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
       >
         <ChevronsRight size={16} />
       </button>

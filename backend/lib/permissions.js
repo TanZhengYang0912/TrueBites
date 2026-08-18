@@ -1,7 +1,7 @@
 // Per-tab access a superadmin can grant/revoke for individual admin accounts.
 // Stored as app_metadata.permissions — service-key only, same trust model as
 // role (see middleware/requireRole.js). Mirrors frontend/src/lib/roles.js.
-export const PERMISSION_KEYS = ["vendors", "ai", "reviews", "settings"];
+export const PERMISSION_KEYS = ["vendors", "ai", "reviews", "settings", "suggestions"];
 
 export const ACCESS_DENIED_MESSAGE =
   "Your moderator has disabled access for this function. Please contact your moderator to gain access.";

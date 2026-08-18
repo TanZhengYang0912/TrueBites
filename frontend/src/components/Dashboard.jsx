@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lightbulb, Search } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import FilterChips from "./discovery/FilterChips";
@@ -82,6 +82,7 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
         onOpenDiscover={() => navigate("/map")}
         onOpenSaved={requireAuth(() => navigate("/engagement"))}
         onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
+        onOpenSuggestions={requireAuth(() => navigate("/suggestions"))}
         onSignUp={() => navigate("/login")}
       />
 
@@ -119,6 +120,21 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
                 />
               </label>
             </div>
+
+            <button
+              type="button"
+              onClick={requireAuth(() => navigate("/suggestions/new"))}
+              className="group mb-8 flex w-full items-center justify-between gap-5 border border-forest/20 bg-forest px-5 py-4 text-left text-white transition-transform hover:-translate-y-0.5 sm:px-6"
+            >
+              <span className="flex items-center gap-4">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={19} /></span>
+                <span>
+                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Community discoveries</span>
+                  <span className="mt-1 block font-display text-2xl leading-none">Know a hidden gem in Melaka?</span>
+                </span>
+              </span>
+              <span className="hidden text-sm font-bold sm:block">Share it →</span>
+            </button>
 
             <div className="mb-6">
               <FilterChips

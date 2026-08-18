@@ -18,6 +18,7 @@ import { PERMISSION_KEYS, resolvePermissions, deriveStatus } from "../lib/permis
 const router = Router();
 
 const OUTPUTS_DIR = path.resolve(process.cwd(), "outputs");
+const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN DASHBOARD / VENDORS / AI PROCESSING / SETTINGS / REVIEWS
@@ -405,6 +406,17 @@ router.patch("/vendors/:id", requirePermission("vendors"), async (req, res) => {
       if (error.code === "PGRST116") return res.status(404).json({ error: "Vendor not found" });
       throw error;
     }
+    if (clean.status === "active") {
+      try {
+        await supabase
+          .from("vendor_suggestions")
+          .update({ status: "published", published_at: new Date().toISOString() })
+          .eq("vendor_id", id)
+          .in("status", ["draft_created", "admin_review"]);
+      } catch (syncError) {
+        console.error("vendor suggestion publish sync failed:", syncError.message);
+      }
+    }
     await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
     res.json(data);
   } catch (error) {
@@ -471,7 +483,10 @@ router.post("/ai/submit", requirePermission("ai"), async (req, res) => {
     const target = `${process.env.AI_SERVICE_BASE || "http://localhost:8000"}/api/process`;
     const response = await fetch(target, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(AI_INTERNAL_KEY ? { "X-Internal-Key": AI_INTERNAL_KEY } : {}),
+      },
       body: JSON.stringify({ url }),
     });
 
@@ -496,7 +511,9 @@ router.get("/ai/service-status", requirePermission("ai"), async (_req, res) => {
   const base = process.env.AI_SERVICE_BASE || "http://localhost:8000";
 
   try {
-    const response = await fetch(`${base}/openapi.json`);
+    const response = await fetch(`${base}/openapi.json`, {
+      headers: AI_INTERNAL_KEY ? { "X-Internal-Key": AI_INTERNAL_KEY } : {},
+    });
     return res.json({
       available: response.ok,
       base,
