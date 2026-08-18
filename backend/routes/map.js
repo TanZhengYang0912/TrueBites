@@ -3,6 +3,7 @@ import pkg from "@googlemaps/polyline-codec";
 const { decode } = pkg;
 import { supabase } from "../supabase.js";
 import { haversine } from "../haversine.js";
+import { requireRole } from "../middleware/requireRole.js";
 
 const router = Router();
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -16,7 +17,7 @@ const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 // POST /api/restaurants
 // Body: { name: string, address: string }
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/restaurants", async (req, res) => {
+router.post("/restaurants", requireRole("admin", "superadmin"), async (req, res) => {
   const { name, address } = req.body;
   if (!name || !address) {
     return res.status(400).json({ error: "name and address are required" });
