@@ -18,25 +18,33 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 
-export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose }) {
+export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated }) {
   const navigate = useNavigate();
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [editingReview, setEditingReview] = useState(null); // "new" | review object | null
+  const [stats, setStats] = useState({ average_rating: vendor?.average_rating, review_count: vendor?.review_count });
   const [toast, notify] = useToast();
 
   useEffect(() => {
     if (!vendor) return;
     setReviewsLoading(true);
     setEditingReview(null);
+    setStats({ average_rating: vendor.average_rating, review_count: vendor.review_count });
     getReviews(vendor.id)
       .then((r) => setReviews(r.reviews))
       .catch((e) => { console.error("failed to load reviews:", e.message); notify("Couldn't load reviews for this vendor.", true); })
       .finally(() => setReviewsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor?.id]);
+
+  function applyVendorStats(newStats) {
+    if (!newStats) return;
+    setStats(newStats);
+    onVendorUpdated?.(vendor.id, newStats);
+  }
 
   const myReview = reviews.find((r) => r.isOwn);
 
@@ -51,19 +59,21 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
 
   async function handleDeleteReview(id) {
     try {
-      await deleteReview(id);
+      const res = await deleteReview(id);
       const r = await getReviews(vendor.id);
       setReviews(r.reviews);
+      applyVendorStats(res.vendor);
       notify("Review deleted successfully!");
     } catch (e) { notify(e.message, true); }
   }
 
-  function handleReviewSaved(review) {
+  function handleReviewSaved(review, vendorStats) {
     setReviews((prev) => {
       const exists = prev.some((r) => r.id === review.id);
       return exists ? prev.map((r) => (r.id === review.id ? review : r)) : [review, ...prev];
     });
     setEditingReview(null);
+    applyVendorStats(vendorStats);
   }
 
   useEffect(() => {
@@ -128,10 +138,10 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         <div className="flex flex-col gap-3.5 px-5 pb-5 pt-4.5">
           {/* Meta row */}
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-muted">
-            {vendor.review_count > 0 && (
+            {stats.review_count > 0 && (
               <MetaItem
                 icon={<Star size={14} color={TERRACOTTA} fill={TERRACOTTA} />}
-                text={`${Number(vendor.average_rating).toFixed(1)} (${vendor.review_count} review${vendor.review_count === 1 ? "" : "s"})`}
+                text={`${Number(stats.average_rating).toFixed(1)} (${stats.review_count} review${stats.review_count === 1 ? "" : "s"})`}
               />
             )}
             {price && <MetaItem icon={<Wallet size={14} color={TERRACOTTA} />} text={`${price}/person`} />}
