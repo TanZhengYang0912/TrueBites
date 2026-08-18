@@ -1,4 +1,4 @@
-import { Bookmark, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
+import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
 import NotificationBell from "./NotificationBell";
@@ -20,7 +20,7 @@ export default function DiscoveryHeader({
   onOpenMap,
   session, userEmail, initials, firstName, avatarUrl, onLogin, onOpenProfile, onSignUp,
   onOpenSaved, onOpenReviews, onOpenDiscover, activeSection = "discover",
-  savedCount = 0,
+  onOpenSuggestions, savedCount = 0,
   mapActive = false,
   onOpenVendor,
 }) {
@@ -66,6 +66,15 @@ export default function DiscoveryHeader({
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
           My reviews
+        </button>
+        <button
+          type="button"
+          className={activeSection === "suggestions" ? NAV_ACTIVE : NAV_IDLE}
+          onClick={() => onOpenSuggestions?.()}
+          aria-current={activeSection === "suggestions" ? "page" : undefined}
+        >
+          <Lightbulb size={14} strokeWidth={1.8} />
+          <span>Suggest</span>
         </button>
       </nav>
 

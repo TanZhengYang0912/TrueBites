@@ -110,6 +110,23 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle ?vendor=... in the URL to automatically select and focus a vendor
+  useEffect(() => {
+    const targetId = searchParams.get("vendor");
+    if (targetId && vendors.length > 0) {
+      const v = vendors.find(vv => vv.id === targetId);
+      if (v) {
+        setSelected(v);
+        setFocusVendor(v);
+        setOpenId(v.id);
+        // Clear the URL parameter so it doesn't get stuck open if the user refreshes
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("vendor");
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+  }, [vendors, searchParams, setSearchParams]);
+
   // Persist the trip on every change (id/name/lat/lng/isMe/source only — see
   // lib/tripStorage.js for why the embedded `vendor` snapshot isn't saved).
   useEffect(() => { saveTrip(trip, travelMode); }, [trip, travelMode]);
@@ -482,6 +499,7 @@ export default function MapPage() {
               onOpenSaved={() => navigate("/engagement")}
               onOpenReviews={() => navigate("/engagement?tab=reviews")}
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
+              onOpenSuggestions={() => navigate("/suggestions")}
             />
           </div>
         )}

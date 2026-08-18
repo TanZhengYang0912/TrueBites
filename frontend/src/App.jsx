@@ -12,14 +12,16 @@ import ProfilePage    from "./pages/ProfilePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DevPinPrecision from "./pages/DevPinPrecision";
-import AIPage         from "./pages/AIPage";
 import EngagementPage from "./pages/EngagementPage";
+import SuggestionsPage from "./pages/SuggestionsPage";
+import SuggestionFormPage from "./pages/SuggestionFormPage";
 import AdminLayout                     from "./components/admin/AdminLayout";
 import AdminDashboardPage              from "./pages/admin/AdminDashboardPage";
 import AdminVendorManagementPage       from "./pages/admin/AdminVendorManagementPage";
 import AdminAIProcessingConsolePage    from "./pages/admin/AdminAIProcessingConsolePage";
 import AdminReviewModerationPage       from "./pages/admin/AdminReviewModerationPage";
 import AdminSettingsPage               from "./pages/admin/AdminSettingsPage";
+import AdminSuggestionsPage            from "./pages/admin/AdminSuggestionsPage";
 import AdminStaffModerationPage        from "./pages/admin/AdminStaffModerationPage";
 import AdminStaffActivityPage          from "./pages/admin/AdminStaffActivityPage";
 import AdminNotificationsPage          from "./pages/admin/AdminNotificationsPage";
@@ -70,6 +72,13 @@ function AuthGate({ children }) {
       return;
     }
 
+    // AI processing is an admin-only surface. Customers can contribute a
+    // source video through /suggestions, but they never get the processor UI.
+    if (!admin && (location.pathname === "/ai" || location.pathname === "/vendors")) {
+      navigate("/map", { replace: true });
+      return;
+    }
+
     // Onboarding is optional — we never force it. But every account should
     // carry a display name for reviews, so lazily assign a random one to any
     // account that has none (existing accounts, Google sign-ins, etc.).
@@ -104,14 +113,17 @@ export default function App() {
 
           {/* Dev-only design preview, tree-shaken out of production builds. */}
           {import.meta.env.DEV && <Route path="/dev/map" element={<DevPinPrecision />} />}
-          <Route path="/ai"        element={<AIPage />} />
           <Route path="/engagement" element={<EngagementPage />} />
+          <Route path="/suggestions" element={<SuggestionsPage />} />
+          <Route path="/suggestions/new" element={<SuggestionFormPage />} />
+          <Route path="/ai" element={<Navigate to="/map" replace />} />
 
           {/* Admin console */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="vendors2" element={<RequireTabAccess permission="vendors"><AdminVendorManagementPage /></RequireTabAccess>} />
             <Route path="ai" element={<RequireTabAccess permission="ai"><AdminAIProcessingConsolePage /></RequireTabAccess>} />
+            <Route path="suggestions" element={<RequireTabAccess permission="suggestions"><AdminSuggestionsPage /></RequireTabAccess>} />
             <Route path="reviews" element={<RequireTabAccess permission="reviews"><AdminReviewModerationPage /></RequireTabAccess>} />
             <Route path="settings" element={<RequireTabAccess permission="settings"><AdminSettingsPage /></RequireTabAccess>} />
             <Route path="staff" element={<AdminStaffModerationPage />} />

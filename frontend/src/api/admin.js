@@ -84,6 +84,51 @@ export async function getAdminAiServiceStatus() {
   return requestJson("/api/admin/ai/service-status");
 }
 
+export async function getAdminSuggestions({ page = 1, pageSize = 10, status = "all", q = "" } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), status, q });
+  return requestJson(`/api/admin/suggestions?${params}`);
+}
+
+export async function getAdminSuggestion(id) {
+  return requestJson(`/api/admin/suggestions/${id}`);
+}
+
+export async function updateAdminSuggestionStatus(id, payload) {
+  return requestJson(`/api/admin/suggestions/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminSuggestionsBatch(ids, status) {
+  return requestJson(`/api/admin/suggestions/batch`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, status }),
+  });
+}
+
+export async function processAdminSuggestion(id) {
+  return requestJson(`/api/admin/suggestions/${id}/process`, { method: "POST" });
+}
+
+export async function getAdminSuggestionProcessing(id) {
+  return requestJson(`/api/admin/suggestions/${id}/processing`);
+}
+
+export async function createAdminSuggestionDraft(id, payload) {
+  return requestJson(`/api/admin/suggestions/${id}/create-draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function publishAdminSuggestion(id) {
+  return requestJson(`/api/admin/suggestions/${id}/publish`, { method: "POST" });
+}
+
 export async function createAdminVendor(payload) {
   return requestJson("/api/admin/vendors", {
     method: "POST",

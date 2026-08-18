@@ -1,6 +1,8 @@
 from pathlib import Path
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from routes.process import router as process_router
 
@@ -24,6 +26,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+AI_INTERNAL_KEY = os.getenv("AI_INTERNAL_KEY", "")
+
+
+@app.middleware("http")
+async def require_internal_api_key(request: Request, call_next):
+    # The Node admin API is the intended caller. Keep local setups without a
+    # configured key backwards-compatible, but enforce the boundary whenever
+    # AI_INTERNAL_KEY is configured in a real environment.
+    if AI_INTERNAL_KEY and request.url.path.startswith("/api"):
+        if request.headers.get("x-internal-key") != AI_INTERNAL_KEY:
+            return JSONResponse(status_code=401, content={"detail": "AI service is internal-only"})
+    return await call_next(request)
 
 app.include_router(process_router, prefix="/api")
 

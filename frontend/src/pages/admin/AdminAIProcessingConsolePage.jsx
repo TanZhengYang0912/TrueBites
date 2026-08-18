@@ -204,10 +204,6 @@ function DetailModal({ item, onClose }) {
             <span className={`admin-status-pill ${item.status.toLowerCase()}`}>{item.status}</span>
           </div>
           <div className="admin-detail-row">
-            <strong>Sentiment Score</strong>
-            <span>{item.score ?? "Not scored"}</span>
-          </div>
-          <div className="admin-detail-row">
             <strong>Recommendation</strong>
             <span className={`admin-recommendation ${item.recommendation === "Highly Recommended" ? "high" : ""}`}>
               {item.recommendation}
@@ -369,7 +365,7 @@ export default function AdminAIProcessingConsolePage() {
               <th>Vendor</th>
               <th>Location</th>
               <th>Dishes</th>
-              <th>Sentiment</th>
+              <th>Recommendation</th>
               <th />
             </tr>
           </thead>

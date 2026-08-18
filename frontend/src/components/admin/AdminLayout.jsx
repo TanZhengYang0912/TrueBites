@@ -6,6 +6,7 @@ import {
   Bell,
   BrainCircuit,
   KeyRound,
+  Lightbulb,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -23,6 +24,7 @@ const BASE_NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/admin/vendors2", label: "Vendors", icon: Store, perm: "vendors" },
   { to: "/admin/ai", label: "AI Content Queue", icon: BrainCircuit, perm: "ai" },
+  { to: "/admin/suggestions", label: "Community Suggestions", icon: Lightbulb, perm: "suggestions" },
   { to: "/admin/reviews", label: "Review Moderation", icon: MessageSquareWarning, perm: "reviews" },
   { to: "/admin/settings", label: "Platform Settings", icon: Settings, perm: "settings" },
 ];
@@ -77,6 +79,7 @@ export default function AdminLayout() {
     Overview: "Operational view of the TrueBites platform",
     Vendors: "Manage food vendor listings and approval",
     "AI Content Queue": "Review AI-extracted vendor content before it goes live",
+    "Community Suggestions": "Review hidden-gem submissions from TrueBites customers",
     "Review Moderation": "Moderate user reviews and keep vendor content trustworthy",
     "Platform Settings": "Platform configuration and preferences",
     "Staff Moderation": "View credentials of existing staff accounts (read-only)",

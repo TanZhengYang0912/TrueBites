@@ -8,6 +8,8 @@ const routes = [
   ["ai", "/ai"],
   ["login", "/login"],
   ["engagement", "/engagement"],
+  ["suggestions", "/suggestions"],
+  ["suggestions-new", "/suggestions/new"],
   ["admin-login", "/wsdasabi123&admin-login"],
   ["admin-overview", "/admin"],
   ["admin-set-password", "/admin-set-password"],
@@ -41,7 +43,7 @@ const EXTRA_VIEWPORTS = [
 // to /login and their screenshots prove nothing about those pages. Seeding a
 // non-expiring fake session in localStorage exercises the real render path.
 const SUPABASE_REF = "fpmopvxfohiosvjkfqtx";
-const SESSION_ROUTES = new Set(["profile", "onboarding"]);
+const SESSION_ROUTES = new Set(["profile", "onboarding", "suggestions", "suggestions-new"]);
 
 function fakeSession() {
   const farFuture = 4102444800; // 2100-01-01

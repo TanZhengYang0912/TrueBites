@@ -29,7 +29,7 @@ const CHIP = "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md bord
 const CHIP_IDLE = `${CHIP} border-sand bg-white text-muted hover:border-forest hover:text-forest`;
 const CHIP_ACTIVE = `${CHIP} border-forest bg-forest text-white`;
 const SELECT = "min-h-11 rounded-md border border-sand bg-white px-3 text-[13px] text-ink outline-none focus:border-forest";
-const SCROLL_BUTTON = "flex h-11 w-8 shrink-0 items-center justify-center rounded-md border border-sand bg-white text-muted transition-colors hover:border-forest hover:text-forest disabled:pointer-events-none disabled:opacity-30";
+const SCROLL_BUTTON = "flex size-11 shrink-0 items-center justify-center rounded-md border border-sand bg-white text-muted transition-colors hover:border-forest hover:text-forest disabled:pointer-events-none disabled:opacity-30";
 
 function countFor(vendors, key) {
   return vendors.filter((vendor) => categoryMatches(vendor, key)).length;

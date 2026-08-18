@@ -16,12 +16,13 @@ export const customerSession = (session) => (isAdmin(session) ? null : session);
 // Per-tab access a superadmin can grant/revoke for individual admin accounts
 // (see the Manage Account panel in Staff Moderation). Stored as
 // app_metadata.permissions — service-key only, same trust model as role.
-export const PERMISSION_KEYS = ["vendors", "ai", "reviews", "settings"];
+export const PERMISSION_KEYS = ["vendors", "ai", "reviews", "settings", "suggestions"];
 export const PERMISSION_LABELS = {
   vendors: "Manage Vendors",
   ai: "Manage AI Content Queue",
   reviews: "Manage Review Moderation",
   settings: "Manage Platform Settings",
+  suggestions: "Review Community Suggestions",
 };
 
 // Superadmin always has every permission. A missing/non-array permissions
