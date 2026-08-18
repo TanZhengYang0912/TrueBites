@@ -17,8 +17,7 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
-export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, focusVendorId, onFocusVendorHandled }) {
-export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated }) {
+export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, focusVendorId, onFocusVendorHandled, onVendorUpdated }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [search, setSearch] = useState("");
