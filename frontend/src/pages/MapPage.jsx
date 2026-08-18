@@ -342,6 +342,9 @@ export default function MapPage() {
           onOpenMap={openMapNearby}
           tripVendorIds={new Set(trip.filter((s) => !s.isMe).map((s) => s.id))}
           onAddStop={addStop}
+          onVendorUpdated={(vendorId, patch) =>
+            setVendors((cur) => cur.map((v) => (v.id === vendorId ? { ...v, ...patch } : v)))
+          }
         />
         {pendingSaveVendor && (
           <FolderPickerModal
