@@ -8,6 +8,8 @@ import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } f
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
+import MapPanel from "../components/MapPanel";
+import VendorPanel from "../components/VendorPanel";
 import TripPolyline from "../components/TripPolyline";
 import DirectionsRenderer from "../components/DirectionsRenderer";
 import TransitLayer from "../components/TransitLayer";
@@ -18,6 +20,7 @@ import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { loadTrip, saveTrip } from "../lib/tripStorage";
+import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
 import { shortPlaceName } from "../lib/placeName";
@@ -69,6 +72,8 @@ export default function MapPage() {
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
+  const [panelTab, setPanelTab] = useState(loadPanelTab);
+  function changeTab(tab) { setPanelTab(tab); savePanelTab(tab); }
   const [mapFullscreen, setMapFullscreen] = useState(false);
 
   // Trip planning is unauthenticated, browser-local state — restored from
@@ -481,6 +486,7 @@ export default function MapPage() {
         </button>
 
         {!mapFullscreen && (
+<<<<<<< Updated upstream
           <TripPanel
             trip={trip}
             hasAnchor={anchor != null}
@@ -506,10 +512,52 @@ export default function MapPage() {
             onRadiusChange={setRadiusKm}
             showAllVendors={showAllVendors}
             onToggleAllVendors={() => setShowAllVendors((v) => !v)}
+=======
+          <MapPanel
+            tab={panelTab}
+            onTab={changeTab}
+>>>>>>> Stashed changes
             collapsed={tripCollapsed}
             onToggleCollapsed={() => setTripCollapsed((v) => !v)}
-            onSuggestBestOrder={() => planTrip(trip, true)}
-          />
+            tripCount={trip.length}
+          >
+            {panelTab === "trip" ? (
+              <TripPanel
+                trip={trip}
+                summary={travelMode ? dirSummary : tripData}
+                loading={tripLoading}
+                onReorder={reorderTrip}
+                onClear={clearTrip}
+                onRemove={removeStop}
+                onEditStop={editStop}
+                travelMode={travelMode}
+                onTravelMode={setTravelMode}
+                onManualLocation={setManualLocation}
+                onLocateMe={() => locateMe()}
+                routeOptions={routeOptions}
+                routeIndex={routeIndex}
+                onSelectRoute={setRouteIndex}
+                transitLegs={transitLegs}
+                onAddCustomStop={addCustomStop}
+                onSuggestBestOrder={() => planTrip(trip, true)}
+              />
+            ) : (
+              <VendorPanel
+                vendors={vendors}
+                nearby={nearbyToAdd}
+                filters={filters}
+                onFilters={updateFilters}
+                radiusKm={radiusKm}
+                onRadiusChange={setRadiusKm}
+                showAllVendors={showAllVendors}
+                onToggleAllVendors={() => setShowAllVendors((v) => !v)}
+                onAddStop={addStop}
+                onSelectNearby={selectNearby}
+                hasAnchor={anchor != null}
+                tripIds={new Set(trip.map((s) => s.id))}
+              />
+            )}
+          </MapPanel>
         )}
 
         {pendingSaveVendor && (

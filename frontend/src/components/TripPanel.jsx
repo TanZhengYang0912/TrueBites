@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Navigation, GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, ChevronDown, ChevronUp, MapPin, LocateFixed, Eye, EyeOff, Bike, Bus, Car, Footprints } from "lucide-react";
-import { loadNearbyCollapsed, saveNearbyCollapsed } from "../lib/panelPrefs";
+import { GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, MapPin, LocateFixed, Bike, Bus, Car, Footprints } from "lucide-react";
 import LocationInput from "./LocationInput";
 import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
@@ -16,15 +15,6 @@ const NAV_MODES = [
   { mode: "TRANSIT",     label: "Transit",    Icon: Bus },
   { mode: "WALKING",     label: "Walking",    Icon: Footprints },
 ];
-
-// Bottom sheet on phones, the original floating side panel from md up.
-const PANEL =
-  "fixed inset-x-0 bottom-0 z-20 max-h-[60dvh] w-full overflow-y-auto rounded-t-2xl border border-sand bg-white p-4 shadow-2xl " +
-  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:max-h-[78vh] md:w-[340px] md:rounded-xl";
-
-const COLLAPSED =
-  "fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-sand bg-white px-3.5 text-[13px] font-semibold text-forest shadow-[0_4px_20px_rgba(64,84,74,0.18)] " +
-  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:w-[300px]";
 
 const OUTLINE_BTN =
   "mb-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-sand bg-white px-3 text-[13px] font-medium text-forest no-underline";
@@ -42,11 +32,14 @@ export default function TripPanel({
   onManualLocation, onLocateMe,
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
+<<<<<<< Updated upstream
   nearbyToAdd, onAddStop, onAddCustomStop, onSelectNearby,
   radiusKm, onRadiusChange, showAllVendors, onToggleAllVendors,
   hasAnchor,
+=======
+  onAddCustomStop,
+>>>>>>> Stashed changes
   onSuggestBestOrder,
-  collapsed, onToggleCollapsed,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
   // Lazy initialiser — reads storage once on mount, not on every render.
@@ -71,38 +64,10 @@ export default function TripPanel({
   }
 
   const vendorStops = trip.filter((s) => !s.isMe);
-
-  if (collapsed) {
-    return (
-      <button onClick={onToggleCollapsed} className={COLLAPSED}>
-        <Navigation size={15} color={MAP_COLORS.terracotta} />
-        {trip.length > 0 ? `${trip.length} ${trip.length === 1 ? "stop" : "stops"}` : "Your Trip"}
-      </button>
-    );
-  }
   const gmaps = buildGoogleMapsUrl(trip, travelMode);
 
   return (
-    <div className={PANEL}>
-      {/* Panel header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 font-display text-base font-bold text-forest">
-          <Navigation size={16} color={MAP_COLORS.terracotta} /> Your Trip
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {trip.length > 0 && (
-            <span className="rounded-full bg-forest px-2.5 py-0.5 text-[11.5px] text-white">
-              {trip.length} {trip.length === 1 ? "stop" : "stops"}
-            </span>
-          )}
-          {onToggleCollapsed && (
-            <button onClick={onToggleCollapsed} aria-label="Collapse trip panel" className={ICON_BTN}>
-              <ChevronDown size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-
+    <>
       {trip.length > 0 && (
         <div className="mb-2.5 mt-1 text-[11px] text-muted">Drag stops to reorder</div>
       )}
@@ -252,6 +217,7 @@ export default function TripPanel({
         )
       )}
 
+<<<<<<< Updated upstream
       {/* Nearby to add — tap a row to preview it on the map, tap + to add it.
           Collapsible because on a phone this list pushes the route summary and
           travel mode below the fold. */}
@@ -327,6 +293,8 @@ export default function TripPanel({
       </div>
       )}
 
+=======
+>>>>>>> Stashed changes
       {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
       {/* Route summary tiles */}
@@ -406,7 +374,7 @@ export default function TripPanel({
           Clear stops
         </button>
       )}
-    </div>
+    </>
   );
 }
 
