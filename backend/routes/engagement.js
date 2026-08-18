@@ -592,4 +592,103 @@ router.delete("/engagement/reviews/:id/vote", async (req, res) => {
   res.json({ deleted: true });
 });
 
+// ── Notifications ───────────────────────────────────────────────────────────
+// Newly published vendors. Capped server-side so a large backfill can never
+// return hundreds of rows to a dropdown that shows fifteen.
+
+const NOTIFICATION_LIMIT = 15;
+
+router.get("/notifications", async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+
+  const { data: vendors, error } = await supabase
+    .from("vendors")
+    .select("id, vendor_name, cuisine_types, published_at")
+    .eq("status", "active")
+    .not("published_at", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(NOTIFICATION_LIMIT);
+  if (error) return res.status(500).json({ error: "database query failed", details: error.message });
+
+  const { data: readRow, error: readErr } = await supabase
+    .from("notification_reads")
+    .select("last_seen_at, read_ids")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (readErr) return res.status(500).json({ error: "database query failed", details: readErr.message });
+
+  // The column is vendor_name; the customer UI reads `name` everywhere else
+  // (see /restaurants/nearby in map.js). Match that rather than leaking the
+  // database's column name into a third shape.
+  res.json({
+    notifications: vendors.map((v) => ({
+      id: v.id,
+      name: v.vendor_name,
+      cuisine_types: v.cuisine_types,
+      published_at: v.published_at,
+    })),
+    lastSeenAt: readRow?.last_seen_at || null,
+    readIds: readRow?.read_ids || [],
+  });
+});
+
+router.post("/notifications/seen", async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+
+  // The watermark now covers everything, so the per-item exceptions it
+  // subsumes are dropped rather than left to grow.
+  const lastSeenAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("notification_reads")
+    .upsert({ user_id: user.id, last_seen_at: lastSeenAt, read_ids: [] }, { onConflict: "user_id" });
+  if (error) return res.status(500).json({ error: "database update failed", details: error.message });
+
+  res.json({ lastSeenAt, readIds: [] });
+});
+
+// One notification opened. Read-modify-write rather than an atomic array
+// append: this fires on a single user's click, so the lost-update window is a
+// double-click on two different rows.
+// ponytail: read-modify-write, move to an rpc with array_append if it ever races
+router.post("/notifications/:id/read", async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+
+  const { data: row, error: readErr } = await supabase
+    .from("notification_reads")
+    .select("last_seen_at, read_ids")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (readErr) return res.status(500).json({ error: "database query failed", details: readErr.message });
+
+  const readIds = [...new Set([...(row?.read_ids || []), req.params.id])];
+  const { error } = await supabase
+    .from("notification_reads")
+    .upsert(
+      { user_id: user.id, last_seen_at: row?.last_seen_at || new Date(0).toISOString(), read_ids: readIds },
+      { onConflict: "user_id" }
+    );
+  if (error) return res.status(500).json({ error: "database update failed", details: error.message });
+
+  res.json({ readIds });
+});
+
+// Demo control: drop the user's last-seen row so everything reads as unread
+// again. No last-seen at all is exactly the state of a user who has never
+// opened the bell, so the badge comes back without any special-casing.
+router.delete("/notifications/seen", async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+
+  const { error } = await supabase
+    .from("notification_reads")
+    .delete()
+    .eq("user_id", user.id);
+  if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
+
+  res.json({ lastSeenAt: null, readIds: [] });
+});
+
 export default router;

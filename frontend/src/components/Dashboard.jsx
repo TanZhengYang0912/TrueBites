@@ -16,7 +16,7 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
-export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop }) {
+export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, focusVendorId, onFocusVendorHandled }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [search, setSearch] = useState("");
@@ -41,6 +41,15 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
   useEffect(() => {
     setPage(1);
   }, [search, category, creator]);
+
+  // Arrived from a notification: open that vendor's detail once the list has
+  // loaded, then clear the param so it doesn't reopen on refresh.
+  useEffect(() => {
+    if (!focusVendorId || vendors.length === 0) return;
+    const match = vendors.find((v) => v.id === focusVendorId);
+    if (match) setDetailVendor(match);
+    onFocusVendorHandled?.();
+  }, [focusVendorId, vendors, onFocusVendorHandled]);
 
   const meta = session?.user?.user_metadata || {};
   const userEmail = session?.user?.email || "";
@@ -68,6 +77,7 @@ export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpen
         onOpenSaved={requireAuth(() => navigate("/engagement"))}
         onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
         onSignUp={() => navigate("/login")}
+        onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
 
       <main className="mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12 xl:px-10">

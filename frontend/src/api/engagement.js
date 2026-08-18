@@ -121,3 +121,29 @@ export async function voteReview(id, isLike) {
 export async function removeVote(id) {
   return requestJson(`/api/engagement/reviews/${id}/vote`, { method: "DELETE", headers: await authHeaders() });
 }
+
+// ── Notifications ──
+export async function getNotifications() {
+  return requestJson("/api/notifications", { headers: await authHeaders() });
+}
+
+export async function markNotificationsSeen() {
+  return requestJson("/api/notifications/seen", {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+}
+
+export async function markNotificationRead(id) {
+  return requestJson(`/api/notifications/${id}/read`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+}
+
+export async function resetNotificationsSeen() {
+  return requestJson("/api/notifications/seen", {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+}

@@ -155,11 +155,24 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
     return res.status(400).json({ error: `status must be one of: ${VENDOR_STATUSES.join(", ")}` });
   }
 
+  // Stamp the first activation only. Re-activating a suspended vendor keeps its
+  // original publish date, so it does not resurface as "new" in the bell.
+  const { data: current } = await supabase
+    .from("vendors")
+    .select("published_at")
+    .eq("id", req.params.id)
+    .maybeSingle();
+
+  const patch = { status };
+  if (status === "active" && !current?.published_at) {
+    patch.published_at = new Date().toISOString();
+  }
+
   const { data, error } = await supabase
     .from("vendors")
-    .update({ status })
+    .update(patch)
     .eq("id", req.params.id)
-    .select("id, vendor_name, status")
+    .select("id, vendor_name, status, published_at")
     .single();
 
   if (error) {

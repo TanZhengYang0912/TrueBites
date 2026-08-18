@@ -213,6 +213,7 @@ export default function EngagementPage() {
         onLogin={() => navigate("/login")}
         onSignUp={() => navigate("/login")}
         onOpenProfile={() => navigate("/profile")}
+        onOpenVendor={(id) => navigate(`/map?vendor=${id}`)}
       />
 
       <main className="mx-auto w-full max-w-[1200px] px-4 py-8 md:px-6">

@@ -57,6 +57,14 @@ export default function MapPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = searchParams.get("view") === "map" ? "map" : "dashboard";     // "dashboard" | "map"
+  const focusVendorId = searchParams.get("vendor");
+  // Consumed once by the Dashboard's detail modal, then dropped so a refresh
+  // or a back-navigation doesn't reopen it.
+  function clearFocusVendor() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("vendor");
+    setSearchParams(next, { replace: true });
+  }
   const [vendors, setVendors] = useState([]);
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
@@ -347,6 +355,8 @@ export default function MapPage() {
           onOpenMap={openMapNearby}
           tripVendorIds={new Set(trip.filter((s) => !s.isMe).map((s) => s.id))}
           onAddStop={addStop}
+          focusVendorId={focusVendorId}
+          onFocusVendorHandled={clearFocusVendor}
         />
         {pendingSaveVendor && (
           <FolderPickerModal
@@ -465,6 +475,7 @@ export default function MapPage() {
               onOpenDiscover={backToDashboard}
               onOpenSaved={() => navigate("/engagement")}
               onOpenReviews={() => navigate("/engagement?tab=reviews")}
+              onOpenVendor={(id) => setSearchParams({ vendor: id })}
             />
           </div>
         )}

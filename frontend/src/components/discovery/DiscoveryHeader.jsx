@@ -1,6 +1,7 @@
 import { Bookmark, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
+import NotificationBell from "./NotificationBell";
 
 // Shared customer header for discovery and map surfaces. Search lives in the
 // discovery hero so the top bar stays quiet and consistent across screens.
@@ -21,6 +22,7 @@ export default function DiscoveryHeader({
   onOpenSaved, onOpenReviews, onOpenDiscover, activeSection = "discover",
   savedCount = 0,
   mapActive = false,
+  onOpenVendor,
 }) {
   return (
     <header className="sticky top-0 z-30 flex min-h-[72px] flex-wrap items-center gap-2 border-b border-sand bg-chalk/95 px-4 py-2 font-body backdrop-blur lg:flex-nowrap lg:gap-6 md:px-10">
@@ -87,15 +89,18 @@ export default function DiscoveryHeader({
         </div>
 
         {session ? (
-          <button
-            type="button"
-            className={AVATAR}
-            onClick={onOpenProfile}
-            title={userEmail}
-            aria-label={`Open profile${firstName ? ` for ${firstName}` : ""}`}
-          >
-            {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : initials}
-          </button>
+          <>
+            <NotificationBell onOpenVendor={onOpenVendor} />
+            <button
+              type="button"
+              className={AVATAR}
+              onClick={onOpenProfile}
+              title={userEmail}
+              aria-label={`Open profile${firstName ? ` for ${firstName}` : ""}`}
+            >
+              {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : initials}
+            </button>
+          </>
         ) : (
           <div className="flex items-center gap-2">
             <button
