@@ -1,76 +1,83 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
-import { getAdminStaffActivity } from "../../api/admin";
-import { useSession } from "../../lib/SessionContext";
-import { isSuperAdmin } from "../../lib/roles";
+import { ArrowLeft, FileDown } from "lucide-react";
+import { getAdminUserActivity } from "../../api/admin";
+import { fetchAllPages, openActivityLogPdf } from "../../lib/exportPdf";
 
 function formatAction(action) {
   return String(action || "").replace(/[._]/g, " ");
 }
 
-// Superadmin-only, read-only — full activity log for one staff member.
-// Reached by clicking a row on the Staff Moderation panel; "Back" returns
-// there instead of popping a modal, so the URL/history reflects where you are.
-export default function AdminStaffActivityPage() {
-  const { session } = useSession();
+// Read-only — full activity log for one customer account (what they did,
+// and when). Reached by clicking a row on the User Moderation panel.
+export default function AdminUserActivityPage() {
   const { id } = useParams();
   const { state } = useLocation();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (!isSuperAdmin(session)) return;
     let active = true;
     setLoading(true);
     setError("");
-    getAdminStaffActivity(id)
+    getAdminUserActivity(id)
       .then((payload) => { if (active) setData(payload); })
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [session, id]);
+  }, [id]);
 
-  if (!isSuperAdmin(session)) {
-    return (
-      <div className="admin-feedback error">
-        <ShieldAlert size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} />
-        Only the superadmin account can view staff moderation.
-      </div>
-    );
-  }
-
-  const email = data?.staff?.email || state?.email || "—";
+  const email = data?.user?.email || state?.email || "—";
+  const displayName = data?.user?.displayName || state?.displayName || null;
   const items = data?.items || [];
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const entries = await fetchAllPages((pageOpts) => getAdminUserActivity(id, pageOpts));
+      await openActivityLogPdf({
+        title: `Activity Log — ${displayName || email}`,
+        subtitle: displayName ? email : undefined,
+        entries,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <section className="admin-vendors-page">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+      <div style={{ marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
         <button
           type="button"
           className="admin-secondary-btn compact"
-          onClick={() => navigate("/admin/staff")}
+          onClick={() => navigate("/admin/users")}
           style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
         >
           <ArrowLeft size={13} />
           Back
         </button>
-
         <button
           type="button"
           className="admin-secondary-btn compact"
-          onClick={() => navigate(`/admin/staff/${id}/manage`, { state: { email } })}
+          onClick={handleExport}
+          disabled={exporting || loading}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
         >
-          Manage Account
+          <FileDown size={13} />
+          {exporting ? "Preparing PDF…" : "Export PDF"}
         </button>
       </div>
 
       <div className="admin-panel-header" style={{ marginBottom: 0 }}>
         <div>
-          <h2>{email}</h2>
-          <p>{data?.staff?.role ? `Role: ${data.staff.role}` : "Full activity log"}</p>
+          <h2>{displayName || email}</h2>
+          <p>{displayName ? email : "Full activity log"}</p>
         </div>
       </div>
 
@@ -101,7 +108,7 @@ export default function AdminStaffActivityPage() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="3"><div className="admin-empty-state">No recorded activity for this account yet.</div></td></tr>
+                <tr><td colSpan="3"><div className="admin-empty-state">No recorded activity for this user yet.</div></td></tr>
               )}
             </tbody>
           </table>

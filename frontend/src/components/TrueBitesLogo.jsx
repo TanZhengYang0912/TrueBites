@@ -7,8 +7,10 @@ const SIZE = {
 };
 
 const TONE = {
-  default: { mark: "border-forest text-forest", title: "text-forest" },
-  light:   { mark: "border-white/80 text-white", title: "text-white" },
+  // `sub` (the "MELAKA · MALAYSIA" line) uses the lighter terracotta on dark
+  // backgrounds — plain terracotta reads too low-contrast against bg-forest.
+  default: { mark: "border-forest text-forest", title: "text-forest", sub: "text-terracotta" },
+  light:   { mark: "border-white/80 text-white", title: "text-white", sub: "text-terracotta-light" },
 };
 
 export default function TrueBitesLogo({ size = "auth", tone = "default" }) {
@@ -23,7 +25,7 @@ export default function TrueBitesLogo({ size = "auth", tone = "default" }) {
       </span>
       <span className="grid gap-[3px] text-left leading-none">
         <span className={`font-display font-bold ${s.title} ${t.title}`}>TRUEBITES</span>
-        <span className={`font-body font-bold uppercase tracking-[0.18em] text-terracotta ${s.sub}`}>
+        <span className={`font-body font-bold uppercase tracking-[0.18em] ${t.sub} ${s.sub}`}>
           MELAKA · MALAYSIA
         </span>
       </span>

@@ -12,8 +12,7 @@ import {
 } from "../lib/vendorValidation.js";
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
 import { logActivity } from "../lib/auditLog.js";
-import { requirePermission } from "../middleware/requirePermission.js";
-import { PERMISSION_KEYS, resolvePermissions, deriveStatus } from "../lib/permissions.js";
+import { isSuspended } from "../lib/suspension.js";
 
 const router = Router();
 
@@ -22,20 +21,9 @@ const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN DASHBOARD / VENDORS / AI PROCESSING / SETTINGS / REVIEWS
-// The whole /api/admin router is gated by requireRole("admin", "superadmin")
-// in server.js, so every handler below can assume the caller is a verified
-// admin. A few routes (e.g. /staff) additionally require requireSuperAdmin
-// below, since regular admins should not see other staff accounts.
+// The whole /api/admin router is gated by requireRole("admin") in server.js,
+// so every handler below can assume the caller is a verified admin.
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Stricter than the router-level gate: only the superadmin role may pass.
-// requireRole already verified the token and attached req.callerUser.
-function requireSuperAdmin(req, res, next) {
-  if (req.callerUser?.app_metadata?.role !== "superadmin") {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  next();
-}
 
 function normalizeStatusFilter(status) {
   if (!status || status === "all") return null;
@@ -195,12 +183,13 @@ function buildDashboardAnalytics(vendors, reviews) {
 
 router.get("/dashboard", async (_req, res) => {
   try {
-    const [totalVendors, activeVendors, pendingReview, aiVideosProcessed, recentVendorsRes, recentLogRes, analyticsVendorsRes, analyticsReviewsRes] =
+    const [totalVendors, activeVendors, pendingReview, aiVideosProcessed, pendingAppeals, recentVendorsRes, recentLogRes, analyticsVendorsRes, analyticsReviewsRes] =
       await Promise.all([
         countQuery(supabase.from("vendors").select("id", { count: "exact", head: true })),
         countQuery(supabase.from("vendors").select("id", { count: "exact", head: true }).eq("status", "active")),
         countQuery(supabase.from("vendors").select("id", { count: "exact", head: true }).eq("status", "draft")),
         countQuery(supabase.from("vendors").select("id", { count: "exact", head: true }).not("source_video_url", "is", null)),
+        countQuery(supabase.from("suspension_appeals").select("id", { count: "exact", head: true }).eq("status", "pending")),
         supabase
           .from("vendors")
           .select("id,vendor_name,cuisine_types,address,state,status,created_at,last_updated")
@@ -229,6 +218,15 @@ router.get("/dashboard", async (_req, res) => {
       analyticsVendorsRes.error ? [] : (analyticsVendorsRes.data || []),
       analyticsReviewsRes.error ? [] : (analyticsReviewsRes.data || []),
     );
+    if (pendingAppeals > 0) {
+      analytics.attentionItems.unshift({
+        id: "pending-appeals",
+        label: "Suspension appeals waiting for review",
+        value: pendingAppeals,
+        href: "/admin/users",
+        tone: "danger",
+      });
+    }
 
     const stats = [
       { label: "Total Vendors", value: totalVendors, note: "Records in Supabase", tone: "neutral" },
@@ -268,7 +266,7 @@ router.get("/dashboard", async (_req, res) => {
 
 const ADMIN_CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 
-router.get("/vendors", requirePermission("vendors"), async (req, res) => {
+router.get("/vendors", async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 10));
   const status = String(req.query.status || "all").toLowerCase();
@@ -363,7 +361,7 @@ router.get("/vendors", requirePermission("vendors"), async (req, res) => {
 
 // Read-only fuzzy scan for the "possible duplicates" review panel — never
 // deletes or merges anything; the admin reviews each pair and decides.
-router.get("/vendors/duplicates", requirePermission("vendors"), async (req, res) => {
+router.get("/vendors/duplicates", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("vendors")
@@ -379,7 +377,7 @@ router.get("/vendors/duplicates", requirePermission("vendors"), async (req, res)
   }
 });
 
-router.patch("/vendors/:id", requirePermission("vendors"), async (req, res) => {
+router.patch("/vendors/:id", async (req, res) => {
   const { id } = req.params;
 
   const { errors, clean } = validateVendorPatch(req.body || {});
@@ -425,7 +423,7 @@ router.patch("/vendors/:id", requirePermission("vendors"), async (req, res) => {
   }
 });
 
-router.get("/ai-records", requirePermission("ai"), async (req, res) => {
+router.get("/ai-records", async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 5));
 
@@ -472,7 +470,7 @@ router.get("/ai-records", requirePermission("ai"), async (req, res) => {
   }
 });
 
-router.post("/ai/submit", requirePermission("ai"), async (req, res) => {
+router.post("/ai/submit", async (req, res) => {
   const url = String(req.body?.url || "").trim();
 
   if (!url) {
@@ -507,7 +505,7 @@ router.post("/ai/submit", requirePermission("ai"), async (req, res) => {
   }
 });
 
-router.get("/ai/service-status", requirePermission("ai"), async (_req, res) => {
+router.get("/ai/service-status", async (_req, res) => {
   const base = process.env.AI_SERVICE_BASE || "http://localhost:8000";
 
   try {
@@ -528,7 +526,7 @@ router.get("/ai/service-status", requirePermission("ai"), async (_req, res) => {
   }
 });
 
-router.get("/settings", requirePermission("settings"), async (_req, res) => {
+router.get("/settings", async (_req, res) => {
   try {
     const platformSettings = [
       { label: "Platform Name", value: "TrueBites" },
@@ -570,7 +568,7 @@ router.get("/settings", requirePermission("settings"), async (_req, res) => {
   }
 });
 
-router.post("/vendors", requirePermission("vendors"), async (req, res) => {
+router.post("/vendors", async (req, res) => {
   const { errors, clean } = validateVendor(req.body || {});
   if (Object.keys(errors).length) {
     return res.status(400).json({ error: "Validation failed", fields: errors });
@@ -635,7 +633,7 @@ function pathFromUrl(bucket, url) {
   return idx === -1 ? null : decodeURIComponent(url.slice(idx + marker.length));
 }
 
-router.delete("/vendors/:id", requirePermission("vendors"), async (req, res) => {
+router.delete("/vendors/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -689,7 +687,7 @@ router.delete("/vendors/:id", requirePermission("vendors"), async (req, res) => 
   }
 });
 
-router.get("/reviews", requirePermission("reviews"), async (req, res) => {
+router.get("/reviews", async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 10));
   const visibility = String(req.query.visibility || "all").toLowerCase();
@@ -728,7 +726,7 @@ router.get("/reviews", requirePermission("reviews"), async (req, res) => {
   }
 });
 
-router.patch("/reviews/:id/visibility", requirePermission("reviews"), async (req, res) => {
+router.patch("/reviews/:id/visibility", async (req, res) => {
   const { id } = req.params;
   const isHidden = Boolean(req.body?.is_hidden);
 
@@ -755,190 +753,157 @@ router.patch("/reviews/:id/visibility", requirePermission("reviews"), async (req
   }
 });
 
-// Superadmin-only: read-only view of staff (admin/superadmin) accounts.
-// Supabase Auth never returns passwords (hashed or plain) via the SDK, so
-// there is nothing secret in this response — only account metadata.
-router.get("/staff", requireSuperAdmin, async (_req, res) => {
+// Customer accounts exist only as Supabase Auth users (no app-side `users`
+// table), and listUsers() paginates server-side — so to search/paginate on
+// our own terms we page through every user once per request and filter/sort
+// in memory. Fine at this app's scale; would need a real query if the user
+// base got large.
+async function fetchAllAuthUsers() {
+  const perPage = 1000;
+  let page = 1;
+  let all = [];
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = data?.users || [];
+    all = all.concat(users);
+    if (users.length < perPage) break;
+    page += 1;
+  }
+  return all;
+}
+
+function customerDisplayName(user) {
+  const meta = user.user_metadata || {};
+  const name = [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim();
+  return name || null;
+}
+
+// Read-only: the signed-in admin's own audit trail — every action they've
+// personally taken (vendor edits, review moderation, user suspensions,
+// appeal decisions, ...). Same audit_log table and shape as the per-customer
+// activity log below, just scoped to req.callerUser instead of a :id param.
+router.get("/me/activity", async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 25));
+
+  // The DISABLE_AUTH dev bypass's synthetic caller has id "dev" — not a real
+  // uuid, and logActivity stores a null actor_id for it (see lib/auditLog.js),
+  // so there's nothing to query and the eq() below would just error on the
+  // malformed uuid.
+  if (req.callerUser.id === "dev") {
+    return res.json({ items: [], pagination: { page: 1, pageSize, total: 0, totalPages: 1 } });
+  }
+
   try {
-    const { data, error } = await supabase.auth.admin.listUsers();
+    const { data, error, count } = await supabase
+      .from("audit_log")
+      .select("id, action, entity_type, entity_id, metadata, created_at", { count: "exact" })
+      .eq("actor_id", req.callerUser.id)
+      .order("created_at", { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
     if (error) throw error;
 
-    const items = (data.users || [])
-      .filter((user) => ["admin", "superadmin"].includes(user.app_metadata?.role))
-      .map((user) => ({
-        id: user.id,
-        email: user.email,
-        role: user.app_metadata?.role || "unknown",
-        status: deriveStatus(user),
-        permissions: resolvePermissions(user),
-        createdAt: user.created_at,
-        lastSignInAt: user.last_sign_in_at,
-        emailConfirmedAt: user.email_confirmed_at,
-        mustChangePassword: Boolean(user.user_metadata?.must_change_password),
-      }))
-      .sort((a, b) => (a.email || "").localeCompare(b.email || ""));
+    const items = (data || []).map((row) => ({
+      id: row.id,
+      action: row.action,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+    }));
 
-    res.json({ items });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to load staff accounts", details: error.message });
-  }
-});
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Superadmin-only: creates a new staff (admin) account. Deliberately skips
-// email confirmation and any 2FA step — internal staff accounts, including
-// fake/organizational addresses, need to be usable immediately. The initial
-// password is set to the email itself (a known, temporary value) and
-// must_change_password forces a real password on first login before the
-// account can do anything else — see requireRole's app_metadata check and
-// AdminLoginPage/SetAdminPasswordPage on the frontend.
-router.post("/staff", requireSuperAdmin, async (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return res.status(400).json({ error: "Enter a valid email address" });
-  }
-
-  const requested = req.body?.permissions;
-  const permissions = Array.isArray(requested)
-    ? requested.filter((p) => PERMISSION_KEYS.includes(p))
-    : [...PERMISSION_KEYS];
-
-  try {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email,
-      password: email,
-      email_confirm: true,
-      app_metadata: { role: "admin", permissions },
-      user_metadata: { must_change_password: true },
-    });
-    if (error) {
-      const status = /already registered|already exists/i.test(error.message) ? 409 : 500;
-      return res.status(status).json({ error: status === 409 ? "An account with this email already exists" : "Failed to create staff account", details: error.message });
-    }
-
-    await logActivity({ actor: req.callerUser, action: "staff.create", entityType: "staff", entityId: data.user.id, metadata: { email, permissions } });
-
-    res.status(201).json({
-      id: data.user.id,
-      email: data.user.email,
-      role: data.user.app_metadata?.role || "admin",
-      status: "active",
-      permissions,
-      createdAt: data.user.created_at,
-      lastSignInAt: data.user.last_sign_in_at,
-      emailConfirmedAt: data.user.email_confirmed_at,
-      mustChangePassword: true,
+    res.json({
+      items,
+      pagination: {
+        page,
+        pageSize,
+        total: count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / pageSize)),
+      },
     });
   } catch (error) {
-    res.status(500).json({ error: "Failed to create staff account", details: error.message });
+    res.status(500).json({ error: "Failed to load your activity log", details: error.message });
   }
 });
 
-// Superadmin-only: full detail for one staff member — backs the Manage
-// Account panel (status, current access, actions).
-router.get("/staff/:id", requireSuperAdmin, async (req, res) => {
-  const { data, error } = await supabase.auth.admin.getUserById(req.params.id);
-  if (error || !data?.user) return res.status(404).json({ error: "Staff account not found" });
-
-  const user = data.user;
-  res.json({
-    id: user.id,
-    email: user.email,
-    role: user.app_metadata?.role || "unknown",
-    status: deriveStatus(user),
-    permissions: resolvePermissions(user),
-    createdAt: user.created_at,
-    lastSignInAt: user.last_sign_in_at,
-    emailConfirmedAt: user.email_confirmed_at,
-    mustChangePassword: Boolean(user.user_metadata?.must_change_password),
-    isSelf: user.id === req.callerUser.id,
-  });
-});
-
-// Suspending uses Supabase Auth's own ban mechanism, so it actually blocks
-// sign-in — not just a cosmetic flag. ~100 years stands in for "indefinite"
-// since the GoTrue API wants a duration, not a boolean.
-const SUSPEND_DURATION = "876000h";
-
-router.patch("/staff/:id/status", requireSuperAdmin, async (req, res) => {
-  if (req.params.id === req.callerUser.id) {
-    return res.status(400).json({ error: "You cannot suspend your own account" });
-  }
-  const status = String(req.body?.status || "").toLowerCase();
-  if (!["active", "suspended"].includes(status)) {
-    return res.status(400).json({ error: "status must be 'active' or 'suspended'" });
-  }
+// Read-only: every non-admin (customer) account, for the User Moderation
+// panel. Admin accounts are hardcoded via Supabase directly and don't show
+// up here — this list is customers only.
+router.get("/users", async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 10));
+  const query = String(req.query.q || "").trim().toLowerCase();
 
   try {
-    const { data, error } = await supabase.auth.admin.updateUserById(req.params.id, {
-      ban_duration: status === "suspended" ? SUSPEND_DURATION : "none",
+    const allUsers = await fetchAllAuthUsers();
+    // Excludes "superadmin" too, in case any pre-refactor accounts still
+    // carry that role value in Supabase — see roles.js, which now only
+    // recognizes "admin".
+    const customers = allUsers.filter((user) => !["admin", "superadmin"].includes(user.app_metadata?.role));
+
+    const filtered = query
+      ? customers.filter((user) =>
+          (user.email || "").toLowerCase().includes(query) ||
+          (customerDisplayName(user) || "").toLowerCase().includes(query)
+        )
+      : customers;
+
+    filtered.sort((a, b) => (a.email || "").localeCompare(b.email || ""));
+
+    const total = filtered.length;
+    const start = (page - 1) * pageSize;
+    const pageOfUsers = filtered.slice(start, start + pageSize);
+
+    // One query for the whole page's pending appeals rather than N —
+    // powers the ticket icon next to a suspended user's name.
+    const pageUserIds = pageOfUsers.map((user) => user.id);
+    const { data: appealRows } = pageUserIds.length
+      ? await supabase
+          .from("suspension_appeals")
+          .select("id, user_id")
+          .eq("status", "pending")
+          .in("user_id", pageUserIds)
+      : { data: [] };
+    const pendingAppealByUser = new Map((appealRows || []).map((row) => [row.user_id, row.id]));
+
+    const items = pageOfUsers.map((user) => ({
+      id: user.id,
+      email: user.email,
+      displayName: customerDisplayName(user),
+      avatarUrl: user.user_metadata?.avatar_url || null,
+      provider: (user.app_metadata?.providers || [])[0] || "email",
+      createdAt: user.created_at,
+      lastSignInAt: user.last_sign_in_at,
+      suspended: isSuspended(user.app_metadata),
+      pendingAppealId: pendingAppealByUser.get(user.id) || null,
+    }));
+
+    res.json({
+      items,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
     });
-    if (error) throw error;
-
-    await logActivity({ actor: req.callerUser, action: status === "suspended" ? "staff.suspend" : "staff.reactivate", entityType: "staff", entityId: req.params.id });
-    res.json({ id: data.user.id, status: deriveStatus(data.user) });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update account status", details: error.message });
+    res.status(500).json({ error: "Failed to load users", details: error.message });
   }
 });
 
-router.patch("/staff/:id/permissions", requireSuperAdmin, async (req, res) => {
-  if (req.params.id === req.callerUser.id) {
-    return res.status(400).json({ error: "You cannot change your own access" });
-  }
-  const requested = req.body?.permissions;
-  if (!Array.isArray(requested) || requested.some((p) => !PERMISSION_KEYS.includes(p))) {
-    return res.status(400).json({ error: `permissions must be a subset of: ${PERMISSION_KEYS.join(", ")}` });
-  }
-
-  try {
-    const { data: existing, error: findErr } = await supabase.auth.admin.getUserById(req.params.id);
-    if (findErr || !existing?.user) return res.status(404).json({ error: "Staff account not found" });
-
-    const { data, error } = await supabase.auth.admin.updateUserById(req.params.id, {
-      app_metadata: { ...existing.user.app_metadata, permissions: requested },
-    });
-    if (error) throw error;
-
-    await logActivity({ actor: req.callerUser, action: "staff.permissions_update", entityType: "staff", entityId: req.params.id, metadata: { permissions: requested } });
-    res.json({ id: data.user.id, permissions: resolvePermissions(data.user) });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update access", details: error.message });
-  }
-});
-
-router.delete("/staff/:id", requireSuperAdmin, async (req, res) => {
-  if (req.params.id === req.callerUser.id) {
-    return res.status(400).json({ error: "You cannot remove your own account" });
-  }
-
-  try {
-    const { data: existing, error: findErr } = await supabase.auth.admin.getUserById(req.params.id);
-    if (findErr || !existing?.user) return res.status(404).json({ error: "Staff account not found" });
-
-    // Logged before the delete — the actor row is gone once deleteUser() succeeds.
-    await logActivity({ actor: req.callerUser, action: "staff.remove", entityType: "staff", entityId: req.params.id, metadata: { email: existing.user.email } });
-
-    const { error } = await supabase.auth.admin.deleteUser(req.params.id);
-    if (error) throw error;
-
-    res.json({ deleted: true, id: req.params.id });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to remove account", details: error.message });
-  }
-});
-
-// Superadmin-only: full activity log for one staff member (admin/superadmin
-// account). Read-only — surfaced in the Staff Moderation panel when a
-// superadmin clicks a row.
-router.get("/staff/:id/activity", requireSuperAdmin, async (req, res) => {
+// Read-only: full activity log for one customer account — what they did and
+// when. Reuses the same audit_log table admin actions are written to
+// (see lib/auditLog.js); customer actions are logged there already
+// (reviews, bookmarks, profile/account changes).
+router.get("/users/:id/activity", async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 50));
 
   try {
-    const { data: user, error: userError } = await supabase.auth.admin.getUserById(req.params.id);
-    if (userError || !user?.user) return res.status(404).json({ error: "Staff account not found" });
+    const { data: userRes, error: userErr } = await supabase.auth.admin.getUserById(req.params.id);
+    if (userErr || !userRes?.user) return res.status(404).json({ error: "User not found" });
 
     const { data, error, count } = await supabase
       .from("audit_log")
@@ -958,7 +923,11 @@ router.get("/staff/:id/activity", requireSuperAdmin, async (req, res) => {
     }));
 
     res.json({
-      staff: { id: user.user.id, email: user.user.email, role: user.user.app_metadata?.role || "unknown" },
+      user: {
+        id: userRes.user.id,
+        email: userRes.user.email,
+        displayName: customerDisplayName(userRes.user),
+      },
       items,
       pagination: {
         page,
@@ -969,6 +938,181 @@ router.get("/staff/:id/activity", requireSuperAdmin, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: "Failed to load activity log", details: error.message });
+  }
+});
+
+// Deliberately NOT Supabase Auth's ban_duration/banned_until — that blocks
+// sign-in outright at the GoTrue level. A suspended customer should still be
+// able to log in and browse the discovery grid; they just can't save
+// bookmarks, post reviews, or use the map (enforced in engagement.js and
+// gated client-side in MapPage.jsx). So suspension state is tracked entirely
+// in app_metadata instead, and expiry is computed here rather than relying
+// on GoTrue's own duration handling.
+const SUSPEND_DURATIONS_MS = {
+  "1d": 24 * 60 * 60 * 1000,
+  "1w": 7 * 24 * 60 * 60 * 1000,
+  "1m": 30 * 24 * 60 * 60 * 1000,
+  "1y": 365 * 24 * 60 * 60 * 1000,
+};
+
+router.patch("/users/:id/suspend", async (req, res) => {
+  const duration = String(req.body?.duration || "");
+  const isReactivate = duration === "none";
+  const isIndefinite = duration === "indefinite";
+  if (!isReactivate && !isIndefinite && !SUSPEND_DURATIONS_MS[duration]) {
+    return res.status(400).json({ error: `duration must be one of: ${[...Object.keys(SUSPEND_DURATIONS_MS), "indefinite", "none"].join(", ")}` });
+  }
+  const reason = String(req.body?.reason || "").trim().slice(0, 2000);
+  if (!isReactivate && !reason) {
+    return res.status(400).json({ error: "A reason is required to suspend an account" });
+  }
+
+  try {
+    // updateUserById replaces app_metadata wholesale, so the existing role
+    // (and anything else on it) has to be fetched and spread back in rather
+    // than overwritten. Suspension fields are cleared on reactivation so a
+    // future suspension never accidentally shows stale data.
+    const { data: existing, error: findErr } = await supabase.auth.admin.getUserById(req.params.id);
+    if (findErr || !existing?.user) return res.status(404).json({ error: "User not found" });
+
+    const suspensionUntil = !isReactivate && !isIndefinite
+      ? new Date(Date.now() + SUSPEND_DURATIONS_MS[duration]).toISOString()
+      : null;
+
+    const { data, error } = await supabase.auth.admin.updateUserById(req.params.id, {
+      // Belt and braces: accounts suspended before this feature stopped
+      // using Supabase's own ban_duration may still carry a real
+      // banned_until from that older code path. Clearing it unconditionally
+      // here guarantees suspension is only ever enforced by app_metadata
+      // (see lib/suspension.js), never by GoTrue rejecting sign-in outright.
+      ban_duration: "none",
+      app_metadata: {
+        ...existing.user.app_metadata,
+        suspended: !isReactivate,
+        suspension_reason: isReactivate ? null : reason,
+        suspension_until: suspensionUntil,
+        suspension_indefinite: !isReactivate && isIndefinite,
+      },
+    });
+    if (error) throw error;
+
+    await logActivity({
+      actor: req.callerUser,
+      action: isReactivate ? "user.reactivate" : "user.suspend",
+      entityType: "user",
+      entityId: req.params.id,
+      metadata: isReactivate ? null : { duration, reason },
+    });
+
+    res.json({ id: data.user.id, suspended: isSuspended(data.user.app_metadata) });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update suspension", details: error.message });
+  }
+});
+
+// Powers the numbered badge next to the "User Moderation" nav item — a
+// cheap count-only query, separate from the full /appeals list below.
+router.get("/appeals/pending-count", async (_req, res) => {
+  try {
+    const { count, error } = await supabase
+      .from("suspension_appeals")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    if (error) throw error;
+    res.json({ count: count || 0 });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load appeal count", details: error.message });
+  }
+});
+
+// Full detail for one appeal — backs the review modal opened from the
+// ticket icon next to a suspended user's name.
+router.get("/appeals/:id", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("suspension_appeals")
+      .select("id, user_id, user_email, message, status, reviewed_at, created_at")
+      .eq("id", req.params.id)
+      .single();
+    if (error?.code === "PGRST116" || !data) return res.status(404).json({ error: "Appeal not found" });
+    if (error) throw error;
+
+    res.json({
+      id: data.id,
+      userId: data.user_id,
+      userEmail: data.user_email,
+      message: data.message,
+      status: data.status,
+      reviewedAt: data.reviewed_at,
+      createdAt: data.created_at,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load appeal", details: error.message });
+  }
+});
+
+// Approving reactivates the account (same effect as PATCH /users/:id/suspend
+// with duration "none"); rejecting just closes the ticket and leaves the
+// suspension in place. Either way the appeal moves out of "pending" so it
+// stops counting toward the badge and disappears from the ticket icon.
+router.patch("/appeals/:id", async (req, res) => {
+  const decision = String(req.body?.decision || "");
+  if (!["approve", "reject"].includes(decision)) {
+    return res.status(400).json({ error: "decision must be 'approve' or 'reject'" });
+  }
+
+  try {
+    const { data: appeal, error: findErr } = await supabase
+      .from("suspension_appeals")
+      .select("id, user_id, status")
+      .eq("id", req.params.id)
+      .single();
+    if (findErr?.code === "PGRST116" || !appeal) return res.status(404).json({ error: "Appeal not found" });
+    if (findErr) throw findErr;
+    if (appeal.status !== "pending") {
+      return res.status(409).json({ error: "This appeal has already been reviewed" });
+    }
+
+    if (decision === "approve") {
+      const { data: existing, error: userErr } = await supabase.auth.admin.getUserById(appeal.user_id);
+      if (userErr || !existing?.user) return res.status(404).json({ error: "User not found" });
+
+      const { error: reactivateErr } = await supabase.auth.admin.updateUserById(appeal.user_id, {
+        ban_duration: "none",
+        app_metadata: {
+          ...existing.user.app_metadata,
+          suspended: false,
+          suspension_reason: null,
+          suspension_until: null,
+          suspension_indefinite: false,
+        },
+      });
+      if (reactivateErr) throw reactivateErr;
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("suspension_appeals")
+      .update({
+        status: decision === "approve" ? "approved" : "rejected",
+        reviewed_by: req.callerUser?.id !== "dev" ? req.callerUser?.id : null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", req.params.id)
+      .select("id, status")
+      .single();
+    if (updateErr) throw updateErr;
+
+    await logActivity({
+      actor: req.callerUser,
+      action: decision === "approve" ? "appeal.approve" : "appeal.reject",
+      entityType: "suspension_appeal",
+      entityId: req.params.id,
+      metadata: { userId: appeal.user_id },
+    });
+
+    res.json({ id: updated.id, status: updated.status });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update appeal", details: error.message });
   }
 });
 

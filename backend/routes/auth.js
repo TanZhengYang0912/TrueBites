@@ -2,6 +2,7 @@ import { Router } from "express";
 import express from "express";
 import { supabase } from "../supabase.js";
 import { logActivity } from "../lib/auditLog.js";
+import { isSuspended } from "../lib/suspension.js";
 
 const router = Router();
 
@@ -113,6 +114,84 @@ router.post("/login-hint", async (req, res) => {
     res.json({ googleOnly });
   } catch {
     res.json({ googleOnly: false });
+  }
+});
+
+// Suspension doesn't ban the account (see admin.js's suspend endpoint) — a
+// suspended customer keeps a working session and can still browse. This is
+// how the frontend finds out to show the banner/notification and gate
+// writes: called on page load, not just at sign-in.
+router.get("/account/status", async (req, res) => {
+  const user = await userFromToken(req, res);
+  if (!user) return;
+
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(user.id);
+    if (error || !data?.user) return res.status(404).json({ error: "Account not found" });
+
+    const meta = data.user.app_metadata || {};
+    const suspended = isSuspended(meta);
+
+    res.json({
+      suspended,
+      indefinite: suspended && Boolean(meta.suspension_indefinite),
+      until: suspended && !meta.suspension_indefinite ? meta.suspension_until : null,
+      reason: suspended ? (meta.suspension_reason || null) : null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load account status", details: error.message });
+  }
+});
+
+const APPEAL_MIN_LENGTH = 100;
+
+// A suspended customer's one shot at getting an admin to reconsider — surfaced
+// on AccountSuspendedPage. One pending appeal at a time per account; a
+// rejected or approved appeal doesn't block filing a new one later.
+router.post("/account/appeal", async (req, res) => {
+  const user = await userFromToken(req, res);
+  if (!user) return;
+
+  const message = String(req.body?.message || "").trim();
+  if (message.length < APPEAL_MIN_LENGTH) {
+    return res.status(400).json({ error: `Your appeal must be at least ${APPEAL_MIN_LENGTH} characters.` });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(user.id);
+    if (error || !data?.user) return res.status(404).json({ error: "Account not found" });
+    if (!isSuspended(data.user.app_metadata)) {
+      return res.status(400).json({ error: "Your account isn't suspended — there's nothing to appeal." });
+    }
+
+    const { data: existing, error: existingErr } = await supabase
+      .from("suspension_appeals")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (existingErr) throw existingErr;
+    if (existing) {
+      return res.status(409).json({ error: "You already have a pending appeal. We'll review it soon." });
+    }
+
+    const { data: appeal, error: insertErr } = await supabase
+      .from("suspension_appeals")
+      .insert({ user_id: user.id, user_email: user.email, message })
+      .select("id, created_at")
+      .single();
+    if (insertErr) throw insertErr;
+
+    await logActivity({
+      actor: user,
+      action: "appeal.submit",
+      entityType: "suspension_appeal",
+      entityId: appeal.id,
+    });
+
+    res.status(201).json({ id: appeal.id, status: "pending", createdAt: appeal.created_at });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to submit appeal", details: error.message });
   }
 });
 

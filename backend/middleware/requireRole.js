@@ -9,7 +9,7 @@ const AUTH_DISABLED = process.env.DISABLE_AUTH === "true";
 export function requireRole(...allowedRoles) {
   return async (req, res, next) => {
     if (AUTH_DISABLED) {
-      req.callerUser = { id: "dev", app_metadata: { role: "superadmin" } };
+      req.callerUser = { id: "dev", app_metadata: { role: "admin" } };
       return next();
     }
 

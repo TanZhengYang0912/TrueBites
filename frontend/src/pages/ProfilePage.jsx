@@ -8,6 +8,8 @@ import DobScrollPicker from "../components/DobScrollPicker";
 import { customerSession } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
 import { AUTH_INPUT, AUTH_ERROR } from "./LoginPage";
+import Footer from "../components/Footer";
+import { COUNTRY_CODES, DEFAULT_COUNTRY, splitStoredPhone } from "../lib/countryCodes";
 
 // Profile action buttons — full width on every screen, 44px minimum height.
 const ACTION_OUTLINE = "min-h-11 w-full rounded-md border-[1.5px] border-forest bg-white px-4 text-sm font-medium text-forest";
@@ -27,6 +29,9 @@ function formatDob({ day, month, year }) {
 }
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
+const NAME_MAX_LENGTH = 30;
+const PHONE_DIGITS_MAX = 10;
+const PHONE_DIGITS_MIN = 7;
 
 export default function ProfilePage() {
   const { session: authSession, loading } = useSession();
@@ -39,6 +44,8 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState("");
   const [dob, setDob] = useState(null);
   const [gender, setGender] = useState("");
+  const [phoneDial, setPhoneDial] = useState(DEFAULT_COUNTRY.dial);
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -86,8 +93,29 @@ export default function ProfilePage() {
     setLastName(meta.last_name || "");
     setDob(savedDob || { day: 1, month: 1, year: new Date().getFullYear() - 18 });
     setGender(meta.gender || "");
+    const { dial, digits } = splitStoredPhone(meta.phone);
+    setPhoneDial(dial);
+    setPhoneDigits(digits);
     setErrorMsg("");
     setEditing(true);
+  }
+
+  // Local numbers are usually typed with a leading trunk "0" ("0123456789")
+  // that isn't part of the number once a country code is prefixed — stripped
+  // as they type rather than left for them to notice and delete themselves.
+  // Capped at PHONE_DIGITS_MAX so typing simply stops accepting more digits.
+  function handlePhoneDigitsChange(raw) {
+    let digits = raw.replace(/\D/g, "");
+    if (digits.startsWith("0")) digits = digits.slice(1);
+    setPhoneDigits(digits.slice(0, PHONE_DIGITS_MAX));
+  }
+
+  // phoneDigits itself stays plain digits (that's what gets saved/validated/
+  // counted) — this only affects what's shown in the input. The space is
+  // reconstructed from the raw digits on every render, so it survives
+  // whatever position the user is typing/deleting from.
+  function formatPhoneDisplay(digits) {
+    return digits.length > 2 ? `${digits.slice(0, 2)} ${digits.slice(2)}` : digits;
   }
 
   async function handleAvatarChange(e) {
@@ -141,12 +169,12 @@ export default function ProfilePage() {
       setErrorMsg("First and last name are required.");
       return;
     }
-    if (first.length > 50) {
-      setErrorMsg("First name must be 50 characters or fewer.");
+    if (first.length > NAME_MAX_LENGTH) {
+      setErrorMsg(`First name must be ${NAME_MAX_LENGTH} characters or fewer.`);
       return;
     }
-    if (last.length > 50) {
-      setErrorMsg("Last name must be 50 characters or fewer.");
+    if (last.length > NAME_MAX_LENGTH) {
+      setErrorMsg(`Last name must be ${NAME_MAX_LENGTH} characters or fewer.`);
       return;
     }
 
@@ -160,6 +188,14 @@ export default function ProfilePage() {
       setErrorMsg("Last name must contain only letters.");
       return;
     }
+
+    // The max length is already enforced live as they type (handlePhoneDigitsChange
+    // caps it at PHONE_DIGITS_MAX) — this just catches an implausibly short number.
+    if (phoneDigits && phoneDigits.length < PHONE_DIGITS_MIN) {
+      setErrorMsg(`Phone number must be at least ${PHONE_DIGITS_MIN} digits.`);
+      return;
+    }
+    const phoneCombined = phoneDigits ? `${phoneDial}${phoneDigits}` : "";
 
     // Semantic: validate DOB is a real calendar date
     const dobDate = new Date(dob.year, dob.month - 1, dob.day);
@@ -204,7 +240,8 @@ export default function ProfilePage() {
       first === (meta.first_name || "") &&
       last === (meta.last_name || "") &&
       dobIso === (meta.date_of_birth || "") &&
-      gender === (meta.gender || "")
+      gender === (meta.gender || "") &&
+      phoneCombined === (meta.phone || "")
     ) {
       setEditing(false);
       return;
@@ -213,7 +250,7 @@ export default function ProfilePage() {
     setSaving(true);
     setErrorMsg("");
     const { error } = await supabase.auth.updateUser({
-      data: { first_name: first, last_name: last, date_of_birth: dobIso, gender },
+      data: { first_name: first, last_name: last, date_of_birth: dobIso, gender, phone: phoneCombined },
     });
     setSaving(false);
     if (error) { setErrorMsg(error.message); return; }
@@ -241,7 +278,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-chalk px-4 py-8 font-body text-ink sm:py-10">
+    <>
+      <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-chalk px-4 py-8 font-body text-ink sm:py-10">
       <div className="relative mx-auto w-full max-w-[560px] rounded-2xl border border-sand bg-white p-5 text-left shadow-[0_18px_48px_rgba(32,42,53,0.09)] sm:p-8">
         <div className="mb-7 flex items-center justify-between">
           <button onClick={() => navigate("/map")} className="grid size-11 place-items-center text-xl text-forest">
@@ -300,9 +338,19 @@ export default function ProfilePage() {
               <div className="text-base font-medium text-ink">{savedDob ? formatDob(savedDob) : "Not set"}</div>
             </div>
 
-            <div className="mb-7">
+            <div className="mb-4">
               <div className="mb-2 text-sm text-muted">Gender</div>
               <div className="text-base font-medium text-ink">{meta.gender || "Not set"}</div>
+            </div>
+
+            <div className="mb-7">
+              <div className="mb-2 text-sm text-muted">Phone Number</div>
+              <div className="text-base font-medium text-ink">
+                {meta.phone ? (() => {
+                  const { dial, digits } = splitStoredPhone(meta.phone);
+                  return `${dial} ${formatPhoneDisplay(digits)}`;
+                })() : "Not set"}
+              </div>
             </div>
 
             <button onClick={startEditing} className={`mb-2.5 ${ACTION_OUTLINE}`}>
@@ -390,18 +438,53 @@ export default function ProfilePage() {
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  maxLength={50}
+                  maxLength={NAME_MAX_LENGTH}
                   className={`mt-1 ${AUTH_INPUT}`}
                 />
+                <div className={`mt-1 text-right text-[11px] ${firstName.length >= NAME_MAX_LENGTH ? "text-[#D64545]" : "text-muted"}`}>
+                  {firstName.length}/{NAME_MAX_LENGTH} characters
+                </div>
               </label>
               <label className="text-[13px] text-muted">
                 Last name
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  maxLength={50}
+                  maxLength={NAME_MAX_LENGTH}
                   className={`mt-1 ${AUTH_INPUT}`}
                 />
+                <div className={`mt-1 text-right text-[11px] ${lastName.length >= NAME_MAX_LENGTH ? "text-[#D64545]" : "text-muted"}`}>
+                  {lastName.length}/{NAME_MAX_LENGTH} characters
+                </div>
+              </label>
+
+              <label className="mt-1.5 text-[13px] text-muted">
+                Phone number
+                <div className="mt-1 flex items-stretch gap-1.5">
+                  <select
+                    value={phoneDial}
+                    onChange={(e) => setPhoneDial(e.target.value)}
+                    aria-label="Country code"
+                    style={{ width: 96, flex: "0 0 auto" }}
+                    className={`${AUTH_INPUT} !w-auto`}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.dial}>{c.flag} {c.dial}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={formatPhoneDisplay(phoneDigits)}
+                    onChange={(e) => handlePhoneDigitsChange(e.target.value)}
+                    placeholder="12 3456789"
+                    style={{ flex: "1 1 auto", minWidth: 0 }}
+                    className={AUTH_INPUT}
+                  />
+                </div>
+                <div className="mt-1 text-right text-[11px] text-muted">
+                  {phoneDigits.length}/{PHONE_DIGITS_MAX} digits
+                </div>
               </label>
 
               <div className="mt-1.5 text-[13px] text-muted">Date of birth</div>
@@ -440,6 +523,8 @@ export default function ProfilePage() {
           </>
         )}
       </div>
-    </div>
+      </div>
+      <Footer />
+    </>
   );
 }

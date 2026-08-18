@@ -1,11 +1,9 @@
 import { Router } from "express";
 import { supabase } from "../supabase.js";
-import { requirePermission } from "../middleware/requirePermission.js";
 import { logActivity } from "../lib/auditLog.js";
 import { assertTransition, SUGGESTION_STATUSES } from "../lib/suggestionValidation.js";
 
 const router = Router();
-const suggestionPermission = requirePermission("suggestions");
 const AI_SERVICE_BASE = String(process.env.AI_SERVICE_BASE || "http://localhost:8000").replace(/\/$/, "");
 const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY || "";
 
@@ -70,7 +68,7 @@ async function withSubmitter(row) {
   }
 }
 
-router.get("/suggestions", suggestionPermission, async (req, res) => {
+router.get("/suggestions", async (req, res) => {
   const page = cleanPage(req.query.page, 1, 100000);
   const pageSize = cleanPage(req.query.pageSize, 10, 50);
   const status = String(req.query.status || "all");
@@ -93,7 +91,7 @@ router.get("/suggestions", suggestionPermission, async (req, res) => {
   });
 });
 
-router.get("/suggestions/:id", suggestionPermission, async (req, res) => {
+router.get("/suggestions/:id", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
@@ -103,7 +101,7 @@ router.get("/suggestions/:id", suggestionPermission, async (req, res) => {
   }
 });
 
-router.patch("/suggestions/:id/status", suggestionPermission, async (req, res) => {
+router.patch("/suggestions/:id/status", async (req, res) => {
   const nextStatus = String(req.body?.status || "");
   if (!SUGGESTION_STATUSES.includes(nextStatus)) return res.status(400).json({ error: "Invalid suggestion status" });
 
@@ -130,7 +128,7 @@ router.patch("/suggestions/:id/status", suggestionPermission, async (req, res) =
   }
 });
 
-router.post("/suggestions/:id/process", suggestionPermission, async (req, res) => {
+router.post("/suggestions/:id/process", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
@@ -168,7 +166,7 @@ router.post("/suggestions/:id/process", suggestionPermission, async (req, res) =
   }
 });
 
-router.get("/suggestions/:id/processing", suggestionPermission, async (req, res) => {
+router.get("/suggestions/:id/processing", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
@@ -189,7 +187,7 @@ router.get("/suggestions/:id/processing", suggestionPermission, async (req, res)
   }
 });
 
-router.post("/suggestions/:id/create-draft", suggestionPermission, async (req, res) => {
+router.post("/suggestions/:id/create-draft", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
@@ -216,7 +214,7 @@ router.post("/suggestions/:id/create-draft", suggestionPermission, async (req, r
   }
 });
 
-router.post("/suggestions/:id/publish", suggestionPermission, async (req, res) => {
+router.post("/suggestions/:id/publish", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
@@ -233,7 +231,7 @@ router.post("/suggestions/:id/publish", suggestionPermission, async (req, res) =
   }
 });
 
-router.patch("/suggestions/batch", suggestionPermission, async (req, res) => {
+router.patch("/suggestions/batch", async (req, res) => {
   const { ids, status: nextStatus } = req.body;
   
   if (!Array.isArray(ids) || !ids.length) {

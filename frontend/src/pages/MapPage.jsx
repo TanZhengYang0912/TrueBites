@@ -4,7 +4,7 @@ import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { getRestaurants, getTrip } from "../api";
 import { useSession } from "../lib/SessionContext";
-import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
+import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder, getAccountStatus } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
@@ -100,6 +100,28 @@ export default function MapPage() {
   const [transitLegs, setTransitLegs] = useState([]);    // itinerary legs (TRANSIT)
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
+  const [accountStatus, setAccountStatus] = useState(null);
+
+  // Suspended customers can still sign in and browse (see backend/lib/suspension.js)
+  // but shouldn't be able to use the interactive map/trip planner — checked
+  // on every visit, not just at sign-in, since a suspension applied mid-session
+  // doesn't invalidate the token that's already loaded.
+  useEffect(() => {
+    if (!session) { setAccountStatus(null); return; }
+    let active = true;
+    getAccountStatus().then((status) => { if (active) setAccountStatus(status); }).catch(() => {});
+    return () => { active = false; };
+  }, [session]);
+
+  // Defense in depth against openMapNearby's guard — covers a direct URL
+  // edit, a stale bookmark, or browser back/forward landing on ?view=map.
+  useEffect(() => {
+    if (view === "map" && accountStatus?.suspended) {
+      notify("Your account is suspended — the map isn't available right now.", true);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, accountStatus]);
 
   // Load vendors (Supabase, sorted from Melaka centre as a default reference).
   useEffect(() => {
@@ -329,6 +351,10 @@ export default function MapPage() {
   // Entry point for the Dashboard's "Map" tab — jump to the map centred on the
   // user. Which pins render is the radius toggle's job, not this function's.
   function openMapNearby() {
+    if (accountStatus?.suspended) {
+      notify("Your account is suspended — the map isn't available right now.", true);
+      return;
+    }
     const focusOn = (pos) => {
       setUserPos(pos);
       setLocateTarget(pos);

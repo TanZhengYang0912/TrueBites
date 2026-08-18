@@ -201,52 +201,53 @@ export async function getAdminReviews({ page = 1, pageSize = 10, visibility = "a
   return requestJson(`/api/admin/reviews?${params}`);
 }
 
-// Superadmin-only — see requireSuperAdmin in backend/routes/admin.js.
-export async function getAdminStaff() {
-  return requestJson("/api/admin/staff");
-}
-
-export async function getAdminStaffActivity(id, { page = 1, pageSize = 50 } = {}) {
-  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-  return requestJson(`/api/admin/staff/${id}/activity?${params}`);
-}
-
-export async function createAdminStaff(email, permissions) {
-  return requestJson("/api/admin/staff", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, permissions }),
-  });
-}
-
-export async function getAdminStaffDetail(id) {
-  return requestJson(`/api/admin/staff/${id}`);
-}
-
-export async function setStaffStatus(id, status) {
-  return requestJson(`/api/admin/staff/${id}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-}
-
-export async function setStaffPermissions(id, permissions) {
-  return requestJson(`/api/admin/staff/${id}/permissions`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ permissions }),
-  });
-}
-
-export async function deleteAdminStaff(id) {
-  return requestJson(`/api/admin/staff/${id}`, { method: "DELETE" });
-}
-
 export async function setReviewVisibility(id, isHidden) {
   return requestJson(`/api/admin/reviews/${id}/visibility`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ is_hidden: isHidden }),
+  });
+}
+
+export async function getMyActivity({ page = 1, pageSize = 25 } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return requestJson(`/api/admin/me/activity?${params}`);
+}
+
+export async function getAdminUsers({ page = 1, pageSize = 10, q = "" }) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), q });
+  return requestJson(`/api/admin/users?${params}`);
+}
+
+export async function getAdminUserActivity(id, { page = 1, pageSize = 50 } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return requestJson(`/api/admin/users/${id}/activity?${params}`);
+}
+
+// `duration` is one of "1d" | "1w" | "1m" | "1y" | "indefinite" | "none"
+// (the last reactivates a previously suspended account). `reason` is
+// required whenever duration isn't "none" — the backend rejects an empty one.
+export async function suspendAdminUser(id, duration, reason = "") {
+  return requestJson(`/api/admin/users/${id}/suspend`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ duration, reason }),
+  });
+}
+
+export async function getAppealsPendingCount() {
+  return requestJson("/api/admin/appeals/pending-count");
+}
+
+export async function getAppealDetail(id) {
+  return requestJson(`/api/admin/appeals/${id}`);
+}
+
+// `decision` is "approve" (reactivates the account) or "reject" (leaves it suspended).
+export async function decideAppeal(id, decision) {
+  return requestJson(`/api/admin/appeals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
   });
 }
