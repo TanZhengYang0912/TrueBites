@@ -14,13 +14,17 @@ function read() {
   }
 }
 
-export function loadNearbyCollapsed() {
-  return read().nearbyCollapsed === true;
+const TABS = ["trip", "vendors"];
+
+export function loadPanelTab() {
+  const tab = read().tab;
+  return TABS.includes(tab) ? tab : "trip";
 }
 
-export function saveNearbyCollapsed(collapsed) {
+export function savePanelTab(tab) {
+  if (!TABS.includes(tab)) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...read(), nearbyCollapsed: collapsed }));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...read(), tab }));
   } catch {
     // storage full/unavailable — the preference just won't survive this reload
   }

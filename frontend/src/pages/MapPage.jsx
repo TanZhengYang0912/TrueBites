@@ -8,6 +8,8 @@ import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } f
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
+import MapPanel from "../components/MapPanel";
+import VendorPanel from "../components/VendorPanel";
 import TripPolyline from "../components/TripPolyline";
 import DirectionsRenderer from "../components/DirectionsRenderer";
 import TransitLayer from "../components/TransitLayer";
@@ -18,8 +20,10 @@ import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { loadTrip, saveTrip } from "../lib/tripStorage";
+import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
+import { matchesFilters } from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
 import { customerSession } from "../lib/roles";
 
@@ -53,6 +57,14 @@ export default function MapPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = searchParams.get("view") === "map" ? "map" : "dashboard";     // "dashboard" | "map"
+  const focusVendorId = searchParams.get("vendor");
+  // Consumed once by the Dashboard's detail modal, then dropped so a refresh
+  // or a back-navigation doesn't reopen it.
+  function clearFocusVendor() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("vendor");
+    setSearchParams(next, { replace: true });
+  }
   const [vendors, setVendors] = useState([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
   const { session: authSession } = useSession();
@@ -67,9 +79,13 @@ export default function MapPage() {
   const [userPos, setUserPos] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives both the "Nearby to add" list and map pin visibility
+  const [filters, setFilters] = useState({ search: "", category: "all", creator: "all" });
+  const updateFilters = (partial) => setFilters((f) => ({ ...f, ...partial }));
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
+  const [panelTab, setPanelTab] = useState(loadPanelTab);
+  function changeTab(tab) { setPanelTab(tab); savePanelTab(tab); }
   const [mapFullscreen, setMapFullscreen] = useState(false);
 
   // Trip planning is unauthenticated, browser-local state — restored from
@@ -342,6 +358,8 @@ export default function MapPage() {
           onOpenMap={openMapNearby}
           tripVendorIds={new Set(trip.filter((s) => !s.isMe).map((s) => s.id))}
           onAddStop={addStop}
+          focusVendorId={focusVendorId}
+          onFocusVendorHandled={clearFocusVendor}
           onVendorUpdated={(vendorId, patch) =>
             setVendors((cur) => cur.map((v) => (v.id === vendorId ? { ...v, ...patch } : v)))
           }
@@ -371,25 +389,36 @@ export default function MapPage() {
   // location set there is no anchor, and the panel says so.
   const anchor = userPos || null;
 
+  // "all" means no distance limit. Kept as Infinity at the call sites so
+  // mapVisibility.js keeps its simple numeric comparison.
+  const effectiveRadiusKm = radiusKm === "all" ? Infinity : radiusKm;
+  const stopIds = new Set(vendorStopOrder.keys());
+
+  // A stop's own pin must survive every filter — otherwise filtering to "Cafe"
+  // erases the nyonya stops you are currently routing through.
+  const pinVendors = vendors.filter((v) => stopIds.has(v.id) || matchesFilters(v, filters));
+
   const visibleVendors = selectVisibleVendors({
-    vendors,
+    vendors: pinVendors,
     anchor,
-    radiusKm,
+    radiusKm: effectiveRadiusKm,
     showAll: showAllVendors,
-    stopIds: new Set(vendorStopOrder.keys()),
+    stopIds,
     focusVendor,
   });
 
-  // "Nearby to add" — vendors not already in the trip, within the chosen radius
-  // of the anchor, closest first. Filters on the raw distance so the list and
-  // the map pins agree at the radius boundary; rounds only for display.
+  // "Nearby to add" — vendors matching the filters, not already in the trip,
+  // within the chosen radius of the anchor, closest first. Filters on the raw
+  // distance so the list and the map pins agree at the boundary; rounds only
+  // for display.
   const nearbyToAdd = anchor
     ? vendors
         .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
+        .filter((v) => matchesFilters(v, filters))
         .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
-        .filter((v) => v.distKm <= radiusKm)
+        .filter((v) => v.distKm <= effectiveRadiusKm)
         .sort((a, b) => a.distKm - b.distKm)
-        .slice(0, 8)
+        .slice(0, 12)
         .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
     : [];
 
@@ -452,6 +481,7 @@ export default function MapPage() {
               onOpenDiscover={backToDashboard}
               onOpenSaved={() => navigate("/engagement")}
               onOpenReviews={() => navigate("/engagement?tab=reviews")}
+              onOpenVendor={(id) => setSearchParams({ vendor: id })}
             />
           </div>
         )}
@@ -487,35 +517,50 @@ export default function MapPage() {
         </button>
 
         {!mapFullscreen && (
-          <TripPanel
-            trip={trip}
-            hasAnchor={anchor != null}
-            summary={travelMode ? dirSummary : tripData}
-            loading={tripLoading}
-            onReorder={reorderTrip}
-            onClear={clearTrip}
-            onRemove={removeStop}
-            onEditStop={editStop}
-            travelMode={travelMode}
-            onTravelMode={setTravelMode}
-            onManualLocation={setManualLocation}
-            onLocateMe={() => locateMe()}
-            routeOptions={routeOptions}
-            routeIndex={routeIndex}
-            onSelectRoute={setRouteIndex}
-            transitLegs={transitLegs}
-            nearbyToAdd={nearbyToAdd}
-            onAddStop={addStop}
-            onAddCustomStop={addCustomStop}
-            onSelectNearby={selectNearby}
-            radiusKm={radiusKm}
-            onRadiusChange={setRadiusKm}
-            showAllVendors={showAllVendors}
-            onToggleAllVendors={() => setShowAllVendors((v) => !v)}
+          <MapPanel
+            tab={panelTab}
+            onTab={changeTab}
             collapsed={tripCollapsed}
             onToggleCollapsed={() => setTripCollapsed((v) => !v)}
-            onSuggestBestOrder={() => planTrip(trip, true)}
-          />
+            tripCount={trip.length}
+          >
+            {panelTab === "trip" ? (
+              <TripPanel
+                trip={trip}
+                summary={travelMode ? dirSummary : tripData}
+                loading={tripLoading}
+                onReorder={reorderTrip}
+                onClear={clearTrip}
+                onRemove={removeStop}
+                onEditStop={editStop}
+                travelMode={travelMode}
+                onTravelMode={setTravelMode}
+                onManualLocation={setManualLocation}
+                onLocateMe={() => locateMe()}
+                routeOptions={routeOptions}
+                routeIndex={routeIndex}
+                onSelectRoute={setRouteIndex}
+                transitLegs={transitLegs}
+                onAddCustomStop={addCustomStop}
+                onSuggestBestOrder={() => planTrip(trip, true)}
+              />
+            ) : (
+              <VendorPanel
+                vendors={vendors}
+                nearby={nearbyToAdd}
+                filters={filters}
+                onFilters={updateFilters}
+                radiusKm={radiusKm}
+                onRadiusChange={setRadiusKm}
+                showAllVendors={showAllVendors}
+                onToggleAllVendors={() => setShowAllVendors((v) => !v)}
+                onAddStop={addStop}
+                onSelectNearby={selectNearby}
+                hasAnchor={anchor != null}
+                tripIds={new Set(trip.map((s) => s.id))}
+              />
+            )}
+          </MapPanel>
         )}
 
         {pendingSaveVendor && (

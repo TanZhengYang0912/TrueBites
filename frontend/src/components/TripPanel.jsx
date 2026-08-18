@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Navigation, GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, ChevronDown, ChevronUp, MapPin, LocateFixed, Eye, EyeOff, Bike, Bus, Car, Footprints } from "lucide-react";
-import { loadNearbyCollapsed, saveNearbyCollapsed } from "../lib/panelPrefs";
+import { GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, MapPin, LocateFixed, Bike, Bus, Car, Footprints } from "lucide-react";
 import LocationInput from "./LocationInput";
 import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
@@ -16,15 +15,6 @@ const NAV_MODES = [
   { mode: "TRANSIT",     label: "Transit",    Icon: Bus },
   { mode: "WALKING",     label: "Walking",    Icon: Footprints },
 ];
-
-// Bottom sheet on phones, the original floating side panel from md up.
-const PANEL =
-  "fixed inset-x-0 bottom-0 z-20 max-h-[60dvh] w-full overflow-y-auto rounded-t-2xl border border-sand bg-white p-4 shadow-2xl " +
-  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:max-h-[78vh] md:w-[340px] md:rounded-xl";
-
-const COLLAPSED =
-  "fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-sand bg-white px-3.5 text-[13px] font-semibold text-forest shadow-[0_4px_20px_rgba(64,84,74,0.18)] " +
-  "md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-[132px] md:w-[300px]";
 
 const OUTLINE_BTN =
   "mb-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-sand bg-white px-3 text-[13px] font-medium text-forest no-underline";
@@ -42,22 +32,10 @@ export default function TripPanel({
   onManualLocation, onLocateMe,
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
-  nearbyToAdd, onAddStop, onAddCustomStop, onSelectNearby,
-  radiusKm, onRadiusChange, showAllVendors, onToggleAllVendors,
-  hasAnchor,
+  onAddCustomStop,
   onSuggestBestOrder,
-  collapsed, onToggleCollapsed,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
-  // Lazy initialiser — reads storage once on mount, not on every render.
-  const [nearbyCollapsed, setNearbyCollapsed] = useState(loadNearbyCollapsed);
-
-  function toggleNearby() {
-    setNearbyCollapsed((collapsed) => {
-      saveNearbyCollapsed(!collapsed);
-      return !collapsed;
-    });
-  }
   const [editingId, setEditingId] = useState(null); // id of the stop whose address is being re-typed
   const [addingPlace, setAddingPlace] = useState(false);
 
@@ -71,38 +49,10 @@ export default function TripPanel({
   }
 
   const vendorStops = trip.filter((s) => !s.isMe);
-
-  if (collapsed) {
-    return (
-      <button onClick={onToggleCollapsed} className={COLLAPSED}>
-        <Navigation size={15} color={MAP_COLORS.terracotta} />
-        {trip.length > 0 ? `${trip.length} ${trip.length === 1 ? "stop" : "stops"}` : "Your Trip"}
-      </button>
-    );
-  }
   const gmaps = buildGoogleMapsUrl(trip, travelMode);
 
   return (
-    <div className={PANEL}>
-      {/* Panel header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 font-display text-base font-bold text-forest">
-          <Navigation size={16} color={MAP_COLORS.terracotta} /> Your Trip
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {trip.length > 0 && (
-            <span className="rounded-full bg-forest px-2.5 py-0.5 text-[11.5px] text-white">
-              {trip.length} {trip.length === 1 ? "stop" : "stops"}
-            </span>
-          )}
-          {onToggleCollapsed && (
-            <button onClick={onToggleCollapsed} aria-label="Collapse trip panel" className={ICON_BTN}>
-              <ChevronDown size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-
+    <>
       {trip.length > 0 && (
         <div className="mb-2.5 mt-1 text-[11px] text-muted">Drag stops to reorder</div>
       )}
@@ -252,81 +202,6 @@ export default function TripPanel({
         )
       )}
 
-      {/* Nearby to add — tap a row to preview it on the map, tap + to add it.
-          Collapsible because on a phone this list pushes the route summary and
-          travel mode below the fold. */}
-      {onRadiusChange && (
-        <div className="mt-2.5 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={toggleNearby}
-            aria-expanded={!nearbyCollapsed}
-            aria-controls="nearby-to-add"
-            className="flex min-h-11 items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.8px] text-terracotta"
-          >
-            {nearbyCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-            Nearby to Add
-          </button>
-          <span className="flex-1" />
-          {!nearbyCollapsed && [1, 2, 5].map((km) => (
-            <button
-              key={km}
-              onClick={() => onRadiusChange(km)}
-              className={radiusKm === km
-                ? "min-h-11 min-w-11 rounded-full border border-forest bg-forest px-2 text-[11px] text-white"
-                : "min-h-11 min-w-11 rounded-full border border-sand px-2 text-[11px] text-muted"}
-            >
-              {km}km
-            </button>
-          ))}
-        </div>
-      )}
-      {!nearbyCollapsed && (
-      <div id="nearby-to-add">
-      {onToggleAllVendors && (
-        <button
-          onClick={onToggleAllVendors}
-          aria-pressed={showAllVendors}
-          className={showAllVendors
-            ? "mt-1.5 flex min-h-11 items-center gap-1.5 text-[11.5px] text-forest"
-            : "mt-1.5 flex min-h-11 items-center gap-1.5 text-[11.5px] text-muted"}
-        >
-          {showAllVendors ? <Eye size={13} /> : <EyeOff size={13} />}
-          {showAllVendors ? "Showing vendors on map" : "Vendors hidden on map"}
-        </button>
-      )}
-      {nearbyToAdd && nearbyToAdd.length > 0 && (
-        <div className="mt-1.5">
-          {nearbyToAdd.map((v) => (
-            <div
-              key={v.id}
-              onClick={() => onSelectNearby?.(v)}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5"
-            >
-              <img src={placeholderImage(v)} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
-              <span className="min-w-0 flex-1">
-                <div className="truncate text-[12.5px] text-ink">{v.name}</div>
-                <div className="text-[11px] text-muted">{[distanceLabel(v), priceLabel(v)].filter(Boolean).join(" · ")}</div>
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onAddStop(v); }}
-                aria-label={`Add ${v.name} to trip`}
-                className="grid size-11 shrink-0 place-items-center text-terracotta"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      {onRadiusChange && nearbyToAdd && nearbyToAdd.length === 0 && (
-        <div className="mt-1.5 text-[11.5px] text-muted">
-          {hasAnchor ? `Nothing within ${radiusKm}km — try a bigger radius.` : "Set your starting point to see nearby vendors."}
-        </div>
-      )}
-      </div>
-      )}
-
       {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
       {/* Route summary tiles */}
@@ -406,7 +281,7 @@ export default function TripPanel({
           Clear stops
         </button>
       )}
-    </div>
+    </>
   );
 }
 

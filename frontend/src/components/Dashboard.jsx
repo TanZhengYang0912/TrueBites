@@ -8,7 +8,7 @@ import VendorCard from "./discovery/VendorCard";
 import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
-import { categoryMatches, creatorHandle } from "../lib/vendorDisplay";
+import { matchesFilters } from "../lib/vendorFilters";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
@@ -17,6 +17,7 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
+export default function Dashboard({ vendors, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, focusVendorId, onFocusVendorHandled }) {
 export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
@@ -43,6 +44,15 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
     setPage(1);
   }, [search, category, creator]);
 
+  // Arrived from a notification: open that vendor's detail once the list has
+  // loaded, then clear the param so it doesn't reopen on refresh.
+  useEffect(() => {
+    if (!focusVendorId || vendors.length === 0) return;
+    const match = vendors.find((v) => v.id === focusVendorId);
+    if (match) setDetailVendor(match);
+    onFocusVendorHandled?.();
+  }, [focusVendorId, vendors, onFocusVendorHandled]);
+
   const meta = session?.user?.user_metadata || {};
   const userEmail = session?.user?.email || "";
   const avatarUrl = meta.avatar_url || "";
@@ -51,21 +61,7 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
-  function matchesSearch(v) {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return v.name?.toLowerCase().includes(q)
-      || (v.cuisine_types || "").toLowerCase().includes(q)
-      || (v.signature_dishes || "").toLowerCase().includes(q);
-  }
-  function matchesCategory(v) {
-    return categoryMatches(v, category);
-  }
-  function matchesCreator(v) {
-    return creator === "all" || creatorHandle(v) === creator;
-  }
-
-  const displayed = vendors.filter((v) => matchesSearch(v) && matchesCategory(v) && matchesCreator(v));
+  const displayed = vendors.filter((v) => matchesFilters(v, { search, category, creator }));
   const pageData = paginate(displayed, page, PAGE_SIZE);
   useEffect(() => {
     if (page > pageData.totalPages) setPage(pageData.totalPages);
@@ -83,6 +79,7 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
         onOpenSaved={requireAuth(() => navigate("/engagement"))}
         onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
         onSignUp={() => navigate("/login")}
+        onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
 
       <main className="mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12 xl:px-10">
