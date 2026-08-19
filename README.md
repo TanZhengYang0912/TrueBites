@@ -168,6 +168,31 @@ The AI service requires Python 3.12 with the packages in `backend/requirements.t
 is only a bare Python 3.13 environment and is not sufficient for this service. Virtual
 environments are local-only and must not be committed.
 
+### Deploy the Node API to Render
+
+The repository root contains `render.yaml`, which deploys only the Node/Express API.
+Create a Render Blueprint from this repository and provide these secret values when
+Render prompts for them:
+
+| Variable | Purpose |
+|---|---|
+| `GOOGLE_API_KEY` | Server-side Geocoding and Directions key |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Supabase service-role key; never expose this to Vite |
+
+The Blueprint uses `backend` as its root directory, runs `npm ci`, and starts the API
+with `npm start`. Render supplies `PORT`; do not hard-code it. Once deployment succeeds,
+set the Vercel frontend variable below and redeploy the frontend:
+
+```dotenv
+VITE_API_BASE=https://your-render-service.onrender.com
+```
+
+Do not append `/api`; the frontend API modules add that path themselves. The separate
+FastAPI/AI service is not deployed by this Blueprint. Deploy it independently and set
+`AI_SERVICE_BASE` on the Node service plus `VITE_AI_API_BASE` on the frontend when it is
+ready for production.
+
 ### 5. When your feature is ready, push and open a PR
 
 ```bash
@@ -190,6 +215,7 @@ Then open a Pull Request on GitHub to merge into `main`.
 | `SUPABASE_URL` | Supabase project URL | Ask Tan Zheng Yang |
 | `SUPABASE_SERVICE_KEY` | Supabase secret key (never committed) | Ask Tan Zheng Yang |
 | `WHISPER_LANGUAGE` | Whisper language hint for AI transcription | Leave as `ms` for Malay/English food content |
+| `AI_SERVICE_BASE` | Separately deployed FastAPI service URL | Leave unset when deploying only the Node API |
 | `AI_INTERNAL_KEY` | Optional shared secret between Node API and FastAPI AI service | Set the same long random value in both services for production |
 | `PORT` | Server port (default 4000) | Leave as `4000` |
 
@@ -200,10 +226,14 @@ Then open a Pull Request on GitHub to merge into `main`.
 | Variable | Description | How to get |
 |---|---|---|
 | `VITE_MAPS_BROWSER_KEY` | Google Maps browser key | Ask Tan Zheng Yang |
-| `VITE_API_BASE` | Backend URL | Leave as `http://localhost:4000` |
+| `VITE_MAP_ID` | Google Maps map ID | Google Maps Platform console |
+| `VITE_API_BASE` | Node backend URL | Local: `http://localhost:4000`; production: Render service URL |
 | `VITE_AI_API_BASE` | FastAPI AI processing URL | Leave as `http://localhost:8000/api` |
+| `VITE_SUPABASE_URL` | Supabase project URL used by browser auth | Supabase project settings |
+| `VITE_SUPABASE_ANON_KEY` | Supabase public/anon key used by browser auth | Supabase project settings |
 
-> The frontend does **not** need Supabase keys — all database access goes through the backend.
+> Never place `SUPABASE_SERVICE_KEY`, `GOOGLE_API_KEY`, or `AI_INTERNAL_KEY` in a
+> `VITE_*` variable. Vite variables are embedded in the public browser bundle.
 
 ---
 
