@@ -12,20 +12,27 @@ import ProfilePage    from "./pages/ProfilePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DevPinPrecision from "./pages/DevPinPrecision";
-import AIPage         from "./pages/AIPage";
 import EngagementPage from "./pages/EngagementPage";
+import SuggestionsPage from "./pages/SuggestionsPage";
+import SuggestionFormPage from "./pages/SuggestionFormPage";
+import AccountSuspendedPage from "./pages/AccountSuspendedPage";
+import AboutPage      from "./pages/AboutPage";
+import TermsPage      from "./pages/TermsPage";
+import GuidelinesPage from "./pages/GuidelinesPage";
+import ContactPage    from "./pages/ContactPage";
+import CareersPage    from "./pages/CareersPage";
 import AdminLayout                     from "./components/admin/AdminLayout";
 import AdminDashboardPage              from "./pages/admin/AdminDashboardPage";
 import AdminVendorManagementPage       from "./pages/admin/AdminVendorManagementPage";
 import AdminAIProcessingConsolePage    from "./pages/admin/AdminAIProcessingConsolePage";
 import AdminReviewModerationPage       from "./pages/admin/AdminReviewModerationPage";
 import AdminSettingsPage               from "./pages/admin/AdminSettingsPage";
-import AdminStaffModerationPage        from "./pages/admin/AdminStaffModerationPage";
-import AdminStaffActivityPage          from "./pages/admin/AdminStaffActivityPage";
+import AdminSuggestionsPage            from "./pages/admin/AdminSuggestionsPage";
+import AdminUserModerationPage         from "./pages/admin/AdminUserModerationPage";
+import AdminUserActivityPage           from "./pages/admin/AdminUserActivityPage";
+import AdminMyAuditLogPage             from "./pages/admin/AdminMyAuditLogPage";
 import AdminNotificationsPage          from "./pages/admin/AdminNotificationsPage";
-import AdminStaffManagePage            from "./pages/admin/AdminStaffManagePage";
 import AdminAccountPage                from "./pages/admin/AdminAccountPage";
-import RequireTabAccess                from "./components/admin/RequireTabAccess";
 import AdminViewingBar                 from "./components/AdminViewingBar";
 import { DISABLE_AUTH } from "./lib/testMode";
 import { randomDisplayName } from "./lib/randomName";
@@ -33,7 +40,10 @@ import { randomDisplayName } from "./lib/randomName";
 // Pages that can be visited without any session. Guests can freely browse the
 // discovery map; login-only features (engagement hub, profile) stay gated and
 // redirect guests to /login. Admins may browse everything a guest can.
-const AUTH_PUBLIC_PATHS = ["/", "/map", "/login", "/onboarding", "/wsdasabi123&admin-login", "/admin-set-password", "/reset-password"];
+const AUTH_PUBLIC_PATHS = [
+  "/", "/map", "/login", "/onboarding", "/wsdasabi123&admin-login", "/admin-set-password", "/reset-password",
+  "/about", "/terms", "/guidelines", "/contact", "/careers",
+];
 
 function AuthGate({ children }) {
   const location = useLocation();
@@ -63,9 +73,16 @@ function AuthGate({ children }) {
 
     const admin = isAdmin(session);
 
-    // Customers (non-admins) can never enter the admin console. Admins (and
-    // superadmins) can go anywhere — including browsing the public site like a guest.
+    // Customers (non-admins) can never enter the admin console. Admins can go
+    // anywhere — including browsing the public site like a guest.
     if (!admin && (location.pathname === "/admin" || location.pathname.startsWith("/admin/"))) {
+      navigate("/map", { replace: true });
+      return;
+    }
+
+    // AI processing is an admin-only surface. Customers can contribute a
+    // source video through /suggestions, but they never get the processor UI.
+    if (!admin && (location.pathname === "/ai" || location.pathname === "/vendors")) {
       navigate("/map", { replace: true });
       return;
     }
@@ -104,19 +121,30 @@ export default function App() {
 
           {/* Dev-only design preview, tree-shaken out of production builds. */}
           {import.meta.env.DEV && <Route path="/dev/map" element={<DevPinPrecision />} />}
-          <Route path="/ai"        element={<AIPage />} />
           <Route path="/engagement" element={<EngagementPage />} />
+          <Route path="/suggestions" element={<SuggestionsPage />} />
+          <Route path="/suggestions/new" element={<SuggestionFormPage />} />
+          <Route path="/ai" element={<Navigate to="/map" replace />} />
+          <Route path="/account-suspended" element={<AccountSuspendedPage />} />
+
+          {/* Static info pages, linked from the footer */}
+          <Route path="/about"     element={<AboutPage />} />
+          <Route path="/terms"     element={<TermsPage />} />
+          <Route path="/guidelines" element={<GuidelinesPage />} />
+          <Route path="/contact"   element={<ContactPage />} />
+          <Route path="/careers"   element={<CareersPage />} />
 
           {/* Admin console */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
-            <Route path="vendors2" element={<RequireTabAccess permission="vendors"><AdminVendorManagementPage /></RequireTabAccess>} />
-            <Route path="ai" element={<RequireTabAccess permission="ai"><AdminAIProcessingConsolePage /></RequireTabAccess>} />
-            <Route path="reviews" element={<RequireTabAccess permission="reviews"><AdminReviewModerationPage /></RequireTabAccess>} />
-            <Route path="settings" element={<RequireTabAccess permission="settings"><AdminSettingsPage /></RequireTabAccess>} />
-            <Route path="staff" element={<AdminStaffModerationPage />} />
-            <Route path="staff/:id" element={<AdminStaffActivityPage />} />
-            <Route path="staff/:id/manage" element={<AdminStaffManagePage />} />
+            <Route path="vendors2" element={<AdminVendorManagementPage />} />
+            <Route path="ai" element={<AdminAIProcessingConsolePage />} />
+            <Route path="suggestions" element={<AdminSuggestionsPage />} />
+            <Route path="reviews" element={<AdminReviewModerationPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="users" element={<AdminUserModerationPage />} />
+            <Route path="users/:id" element={<AdminUserActivityPage />} />
+            <Route path="audit-log" element={<AdminMyAuditLogPage />} />
             <Route path="notifications" element={<AdminNotificationsPage />} />
             <Route path="account" element={<AdminAccountPage />} />
           </Route>

@@ -105,25 +105,18 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
         Structured eatery data extracted from the transcript by Groq llama-3.1-8b.
       </div>
 
-      {extracted.sentiment_score && (
+      {draft.is_in_malacca !== undefined && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 8 }}>
-            AI Sentiment Score
-          </div>
-          <span className="sentiment-badge recommended">⭐ {extracted.sentiment_score} / 5.0</span>
-          {draft.is_in_malacca !== undefined && (
-            <span style={{
-              marginLeft: 12,
-              padding: '6px 12px',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
+          <span style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
               backgroundColor: draft.is_in_malacca ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
               color: draft.is_in_malacca ? 'var(--success)' : 'var(--text-muted)',
             }}>
               {draft.is_in_malacca ? '📍 Verified Malacca Location' : '⚠️ Not in Malacca'}
             </span>
-          )}
         </div>
       )}
 

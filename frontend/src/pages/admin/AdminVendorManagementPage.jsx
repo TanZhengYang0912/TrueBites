@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
@@ -9,6 +9,7 @@ import Toast from "../../components/engagement/Toast";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
+import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
@@ -214,7 +215,7 @@ function FieldError({ message }) {
 // manifest, else a category stock photo. Resets its error flag whenever
 // imageUrl changes so a freshly-uploaded photo always gets a fresh load
 // attempt instead of getting stuck on a stale failure.
-function VendorThumb({ vendor }) {
+function VendorThumb({ vendor, className }) {
   const [errored, setErrored] = useState(false);
   useEffect(() => setErrored(false), [vendor.imageUrl]);
 
@@ -230,7 +231,7 @@ function VendorThumb({ vendor }) {
     <img
       src={src}
       alt=""
-      className="admin-table-thumb"
+      className={className || "admin-table-thumb"}
       loading="lazy"
       onError={() => setErrored(true)}
     />
@@ -927,6 +928,7 @@ export default function AdminVendorManagementPage() {
   const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
   const [dupDeleteId, setDupDeleteId] = useState(null);
   const [dupDeleting, setDupDeleting] = useState(false);
+  const [exportingVendors, setExportingVendors] = useState(false);
 
   const loadDuplicates = () =>
     getAdminVendorDuplicates()
@@ -957,6 +959,32 @@ export default function AdminVendorManagementPage() {
     );
     return () => setTopbarAction(null);
   }, [setTopbarAction]);
+
+  // Exports every vendor matching the current filters — not just the page
+  // on screen — so the PDF reflects the same search/category/status/sort
+  // the admin is looking at.
+  const handleExportVendors = async () => {
+    setExportingVendors(true);
+    try {
+      const vendors = await fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
+        params: { status, category, sort, q: query },
+      });
+      const filterBits = [
+        status !== "all" ? `Status: ${status}` : null,
+        category !== "all" ? `Category: ${category}` : null,
+        query ? `Search: "${query}"` : null,
+      ].filter(Boolean);
+      await openVendorsPdf({
+        title: "Vendor Directory",
+        subtitle: filterBits.length ? filterBits.join(" · ") : "All vendors",
+        vendors,
+      });
+    } catch (err) {
+      notify(err.message, true);
+    } finally {
+      setExportingVendors(false);
+    }
+  };
 
   const loadVendors = (overrides = {}) => {
     const page = overrides.page ?? data.pagination.page ?? 1;
@@ -1181,38 +1209,64 @@ export default function AdminVendorManagementPage() {
   };
 
   const content = (
-    <section className="admin-vendors-page">
-      <div className="admin-toolbar">
-        <div className="admin-search">
-          <Search size={15} />
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 xl:max-w-2xl">
+          <Search size={16} className="text-gray-400" />
           <input
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
             value={draftQuery}
             onChange={(e) => { setDraftQuery(e.target.value); resetToFirstPage(); }}
             placeholder="Search Vendors, Categories, Dishes…"
           />
         </div>
 
-        <div className="admin-filter-cluster">
-          <select value={category} onChange={(e) => { setCategory(e.target.value); resetToFirstPage(); }}>
-            <option value="all">All Categories</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={status} onChange={(e) => { setStatus(e.target.value); resetToFirstPage(); }}>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s === "all" ? "All Statuses" : s[0].toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
-          <select value={sort} onChange={(e) => { setSort(e.target.value); resetToFirstPage(); }}>
-            {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={category} onChange={(e) => { setCategory(e.target.value); resetToFirstPage(); }}>
+              <option value="all">All Categories</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
+          <div className="relative">
+            <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={status} onChange={(e) => { setStatus(e.target.value); resetToFirstPage(); }}>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s === "all" ? "All Statuses" : s[0].toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
+          <div className="relative">
+            <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={sort} onChange={(e) => { setSort(e.target.value); resetToFirstPage(); }}>
+              {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
 
-        {duplicateGroups.length > 0 && (
-          <button type="button" className="admin-duplicates-badge" onClick={() => setShowDuplicatesPanel(true)}>
-            <AlertTriangle size={13} />
-            {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
+          {duplicateGroups.length > 0 && (
+            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 shadow-sm transition-colors hover:bg-amber-100" onClick={() => setShowDuplicatesPanel(true)}>
+              <AlertTriangle size={16} />
+              {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60"
+            onClick={handleExportVendors}
+            disabled={exportingVendors}
+          >
+            <FileDown size={16} />
+            {exportingVendors ? "Preparing PDF…" : "Export PDF"}
           </button>
-        )}
+        </div>
       </div>
 
       {error ? (
@@ -1243,45 +1297,40 @@ export default function AdminVendorManagementPage() {
         </div>
       )}
 
-      <section className="admin-panel admin-table-panel">
-        <div className="admin-table-scroll">
-        <table className="admin-table">
-          <thead>
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full whitespace-nowrap text-left text-sm">
+          <thead className="border-b border-gray-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-gray-500">
             <tr>
-              <th className="admin-th-check">
+              <th className="w-12 px-6 py-4 text-center">
                 <input
                   type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                   checked={allOnPageSelected}
                   onChange={toggleSelectAll}
                   aria-label="Select all vendors on this page"
                 />
               </th>
-              <th>Image</th>
-              <th aria-sort={ariaSortFor("vendor")}>
-                <button type="button" className="admin-th-sort" onClick={() => handleHeaderSort("vendor")}>
-                  Vendor <span className="admin-sort-caret">{sortIndicator("vendor")}</span>
-                </button>
+              <th className="px-4 py-4">Image</th>
+              <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("vendor")} onClick={() => handleHeaderSort("vendor")}>
+                Vendor <span className="text-gray-400">{sortIndicator("vendor")}</span>
               </th>
-              <th aria-sort={ariaSortFor("category")}>
-                <button type="button" className="admin-th-sort" onClick={() => handleHeaderSort("category")}>
-                  Category <span className="admin-sort-caret">{sortIndicator("category")}</span>
-                </button>
+              <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("category")} onClick={() => handleHeaderSort("category")}>
+                Category <span className="text-gray-400">{sortIndicator("category")}</span>
               </th>
-              <th>Hours</th>
-              <th aria-sort={ariaSortFor("status")}>
-                <button type="button" className="admin-th-sort" onClick={() => handleHeaderSort("status")}>
-                  Status <span className="admin-sort-caret">{sortIndicator("status")}</span>
-                </button>
+              <th className="px-4 py-4">Hours</th>
+              <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("status")} onClick={() => handleHeaderSort("status")}>
+                Status <span className="text-gray-400">{sortIndicator("status")}</span>
               </th>
-              <th>Actions</th>
+              <th className="px-4 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {loading ? (
               Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                 <tr key={`sk-${i}`} className="admin-skeleton-row">
                   {Array.from({ length: 7 }).map((__, j) => (
-                    <td key={j}><div className="admin-skeleton-bar" /></td>
+                    <td key={j} className="px-4 py-4"><div className="h-4 w-full animate-pulse rounded bg-gray-100" /></td>
                   ))}
                 </tr>
               ))
@@ -1291,57 +1340,73 @@ export default function AdminVendorManagementPage() {
                 return (
                 <tr
                   key={vendor.id}
-                  className={selectedIds.has(vendor.id) ? "is-selected" : ""}
+                  className={`group cursor-pointer transition-colors hover:bg-gray-50 ${selectedIds.has(vendor.id) ? "bg-blue-50/40" : ""}`}
                   onClick={() => openVendor(vendor)}
                 >
-                  <td className="admin-td-check" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={selectedIds.has(vendor.id)}
                       onChange={() => toggleSelect(vendor.id)}
                       aria-label={`Select ${vendor.name}`}
                     />
                   </td>
-                  <td>
-                    <VendorThumb vendor={vendor} />
+                  <td className="px-4 py-4">
+                    <div className="size-10 overflow-hidden rounded-[10px] border border-gray-200 bg-gray-50">
+                      <VendorThumb vendor={vendor} className="h-full w-full object-cover" />
+                    </div>
                   </td>
-                  <td><strong>{vendor.name}</strong></td>
-                  <td>{vendor.category}</td>
-                  <td>{vendor.operatingHours || <span className="admin-dash">—</span>}</td>
-                  <td>
-                    <span className={`admin-status-pill ${st}`}>
-                      {vendor.status}
-                    </span>
+                  <td className="px-4 py-4 font-bold text-gray-900">{vendor.name}</td>
+                  <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
+                  <td className="px-4 py-4 text-gray-500">{vendor.operatingHours || "—"}</td>
+                  <td className="px-4 py-4">
+                    {st === "active" ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+                        {vendor.status}
+                      </span>
+                    ) : st === "draft" ? (
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700">
+                        {vendor.status}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
+                        {vendor.status}
+                      </span>
+                    )}
                   </td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="admin-table-actions">
+                  <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3 text-gray-400">
                       {st !== "active" && (
-                        <button type="button" className="approve" onClick={() => handleQuickStatus(vendor.id, "active")} aria-label={`Approve ${vendor.name}`} title="Approve">
-                          <Check size={15} />
+                        <button type="button" className="transition-colors hover:text-emerald-600" onClick={() => handleQuickStatus(vendor.id, "active")} aria-label={`Approve ${vendor.name}`} title="Approve">
+                          <Check size={16} />
                         </button>
                       )}
                       {st === "active" && (
-                        <button type="button" onClick={() => handleQuickStatus(vendor.id, "suspended")} aria-label={`Suspend ${vendor.name}`} title="Suspend">
-                          <Ban size={15} />
+                        <button type="button" className="transition-colors hover:text-gray-600" onClick={() => handleQuickStatus(vendor.id, "suspended")} aria-label={`Suspend ${vendor.name}`} title="Suspend">
+                          <Ban size={16} />
                         </button>
                       )}
-                      <button type="button" onClick={() => openVendor(vendor)} aria-label={`View ${vendor.name}`}>
-                        <Eye size={15} />
+                      <button type="button" className="transition-colors hover:text-gray-600" onClick={() => openVendor(vendor)} aria-label={`View ${vendor.name}`} title="View">
+                        <Eye size={16} />
                       </button>
                       <button
                         type="button"
+                        className="transition-colors hover:text-gray-600"
                         onClick={() => { openVendor(vendor); setEditing(true); }}
                         aria-label={`Edit ${vendor.name}`}
+                        title="Edit"
                       >
-                        <Pencil size={15} />
+                        <Pencil size={16} />
                       </button>
                       <button
                         type="button"
-                        className="danger"
+                        className="transition-colors hover:text-red-500"
                         onClick={() => setConfirmDeleteId(vendor.id)}
                         aria-label={`Delete ${vendor.name}`}
+                        title="Delete"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
@@ -1350,10 +1415,10 @@ export default function AdminVendorManagementPage() {
               })
             ) : (
               <tr>
-                <td colSpan="8">
-                  <div className="admin-empty-state">
-                    <p>No vendors matched this filter.</p>
-                    <div className="admin-empty-actions">
+                <td colSpan="7">
+                  <div className="py-12 text-center">
+                    <p className="text-gray-500">No vendors matched this filter.</p>
+                    <div className="mt-4 flex justify-center gap-3">
                       <button type="button" className="admin-secondary-btn compact" onClick={clearFilters}>Clear filters</button>
                       <button type="button" className="admin-primary-btn compact" onClick={() => setShowAddModal(true)}>
                         <Plus size={14} /> Add Vendor

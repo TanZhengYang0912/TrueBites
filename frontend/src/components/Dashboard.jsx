@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import FilterChips from "./discovery/FilterChips";
@@ -8,10 +8,13 @@ import VendorCard from "./discovery/VendorCard";
 import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
+import Footer from "./Footer";
 import { matchesFilters } from "../lib/vendorFilters";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
+import { getAccountStatus } from "../api/engagement";
+import { humanizeDuration } from "../lib/suspension";
 
 const PAGE_SIZE = 12;
 
@@ -26,8 +29,19 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
   const [page, setPage] = useState(1);
   const [detailVendor, setDetailVendor] = useState(null);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [accountStatus, setAccountStatus] = useState(null);
   const navigate = useNavigate();
   const bookmarked = vendors.filter((v) => bookmarks.has(v.id));
+
+  // Checked on every visit rather than only at sign-in — a ban blocks future
+  // sign-ins but doesn't revoke an already-issued session token, so a
+  // suspended customer can still be sitting on a live session.
+  useEffect(() => {
+    if (!session) { setAccountStatus(null); return; }
+    let active = true;
+    getAccountStatus().then((status) => { if (active) setAccountStatus(status); }).catch(() => {});
+    return () => { active = false; };
+  }, [session]);
 
   // Guests can browse freely but can't bookmark, add personal trip stops
   // tied to an account, or view "My reviews" — nudge them to log in instead.
@@ -77,9 +91,29 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
         onOpenDiscover={() => navigate("/map")}
         onOpenSaved={requireAuth(() => navigate("/engagement"))}
         onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
+        onOpenSuggestions={requireAuth(() => navigate("/suggestions"))}
         onSignUp={() => navigate("/login")}
         onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
+
+      {accountStatus?.suspended && (
+        <div className="mx-auto mt-4 w-full max-w-[1360px] px-4 md:px-6 xl:px-10">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-terracotta/40 bg-terracotta/10 px-4 py-3 text-sm font-semibold text-terracotta">
+            <ShieldAlert size={16} className="shrink-0" />
+            <span>
+              This account has been suspended{" "}
+              {accountStatus.indefinite ? "until further notice" : `for ${humanizeDuration(accountStatus.until)}`}.
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate("/account-suspended")}
+              className="ml-auto shrink-0 text-[13px] font-bold underline underline-offset-2 hover:text-terracotta-light"
+            >
+              Learn more
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12 xl:px-10">
         <>
@@ -115,6 +149,21 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
                 />
               </label>
             </div>
+
+            <button
+              type="button"
+              onClick={requireAuth(() => navigate("/suggestions/new"))}
+              className="group mb-8 flex w-full items-center justify-between gap-5 border border-forest/20 bg-forest px-5 py-4 text-left text-white transition-transform hover:-translate-y-0.5 sm:px-6"
+            >
+              <span className="flex items-center gap-4">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={19} /></span>
+                <span>
+                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Community discoveries</span>
+                  <span className="mt-1 block font-display text-2xl leading-none">Know a hidden gem in Melaka?</span>
+                </span>
+              </span>
+              <span className="hidden text-sm font-bold sm:block">Share it →</span>
+            </button>
 
             <div className="mb-6">
               <FilterChips
@@ -154,6 +203,8 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
             )}
         </>
       </main>
+
+      <Footer />
 
       {detailVendor && (
         <VendorDetailModal

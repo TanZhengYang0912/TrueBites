@@ -7,6 +7,8 @@ import vendorRoutes     from "./routes/vendors.js";
 import aiRoutes         from "./routes/ai.js";
 import engagementRoutes from "./routes/engagement.js";
 import adminRoutes      from "./routes/admin.js";
+import adminSuggestionRoutes from "./routes/adminSuggestions.js";
+import suggestionRoutes from "./routes/suggestions.js";
 import { requireRole }  from "./middleware/requireRole.js";
 
 const app = express();
@@ -20,9 +22,11 @@ app.use("/api", authRoutes);
 app.use("/api", vendorRoutes);
 app.use("/api", aiRoutes);
 app.use("/api", engagementRoutes);
+app.use("/api", suggestionRoutes);
 // Every admin route requires a verified admin session (skipped only when
 // DISABLE_AUTH=true for local testing — see middleware/requireRole.js).
-app.use("/api/admin", requireRole("admin", "superadmin"), adminRoutes);
+app.use("/api/admin", requireRole("admin"), adminRoutes);
+app.use("/api/admin", requireRole("admin"), adminSuggestionRoutes);
 
 app.listen(PORT, () => {
   console.log(`✅  TrueBites backend running on http://localhost:${PORT}`);

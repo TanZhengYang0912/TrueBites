@@ -12,7 +12,7 @@ export default function LandingFooter() {
           {/* Wordmark */}
           <div>
             <TrueBitesLogo size="footer" tone="light" />
-            <div className="mt-3.5 font-body text-xs uppercase tracking-[1.1px] text-terracotta">
+            <div className="mt-3.5 font-body text-xs uppercase tracking-[1.1px] text-terracotta-light">
               Official Food Discovery Platform · Melaka Tourism
             </div>
           </div>

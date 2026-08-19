@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { useSession } from "../../lib/SessionContext";
-import { isSuperAdmin, PERMISSION_KEYS, PERMISSION_LABELS, hasPermission } from "../../lib/roles";
 import { logActivity } from "../../lib/activityLog";
 
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -18,7 +16,7 @@ const FIELD_STYLE = {
   outline: "none",
 };
 
-// Self-service — any signed-in admin/superadmin manages their own account
+// Self-service — any signed-in admin manages their own account
 // here. Password change re-authenticates with the current password first
 // (Supabase's client SDK has no separate "verify current password" call),
 // then updates immediately — no 2FA step, matching every other password
@@ -35,9 +33,6 @@ export default function AdminAccountPage() {
   const [success, setSuccess] = useState("");
 
   if (!user) return null;
-
-  const role = user.app_metadata?.role || "admin";
-  const superadmin = isSuperAdmin(session);
 
   async function handleChangePassword(e) {
     e.preventDefault();
@@ -97,7 +92,7 @@ export default function AdminAccountPage() {
             <div><strong>Email:</strong> {user.email}</div>
             <div>
               <strong>Role:</strong>{" "}
-              <span className={`admin-status-pill ${superadmin ? "active" : "draft"}`}>{role}</span>
+              <span className="admin-status-pill active">Admin</span>
             </div>
             <div>
               <strong>Status:</strong>{" "}
@@ -110,18 +105,7 @@ export default function AdminAccountPage() {
 
         <div>
           <h3 style={{ margin: "0 0 10px" }}>Access</h3>
-          {superadmin ? (
-            <p style={{ margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>Full access (superadmin).</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {PERMISSION_KEYS.map((key) => (
-                <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, opacity: hasPermission(session, key) ? 1 : 0.4 }}>
-                  {hasPermission(session, key) ? <Check size={15} /> : <span style={{ width: 15 }} />}
-                  {PERMISSION_LABELS[key]}
-                </div>
-              ))}
-            </div>
-          )}
+          <p style={{ margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>Full access to all moderation activities.</p>
         </div>
 
         <div>

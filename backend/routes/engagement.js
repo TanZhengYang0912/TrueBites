@@ -2,8 +2,8 @@ import { Router } from "express";
 import express from "express";
 import { Filter } from "bad-words";
 import { supabase } from "../supabase.js";
-import { isAdminUser } from "../lib/customerAccess.js";
 import { logActivity } from "../lib/auditLog.js";
+import { isSuspended } from "../lib/suspension.js";
 
 const router = Router();
 
@@ -92,15 +92,25 @@ async function requireUser(req, res) {
     res.status(401).json({ error: "Invalid or expired session" });
     return null;
   }
-  // An admin account is not a customer account. Hiding the controls in the UI is
-  // not enough — this endpoint would still accept an admin's token from curl,
-  // and displayName() would fall through to their email address, publishing it
-  // as the review's author_name.
-  if (isAdminUser(data.user)) {
-    res.status(403).json({ error: "Admin accounts cannot use customer features" });
+  return data.user;
+}
+
+// Same identity check as requireUser, plus a suspension gate — used only by
+// mutating routes (save, review, vote). A suspended customer can still sign
+// in and read everything (browse the discovery grid, view reviews); this is
+// what stops them from writing anything while suspended. app_metadata isn't
+// on the token's user object, so it takes a second lookup via the admin API.
+async function requireActiveUser(req, res) {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  if (TEST_MODE) return user;
+
+  const { data, error } = await supabase.auth.admin.getUserById(user.id);
+  if (!error && isSuspended(data?.user?.app_metadata)) {
+    res.status(403).json({ error: "Your account is suspended and can't make changes right now." });
     return null;
   }
-  return data.user;
+  return user;
 }
 
 // Optional auth — public review reads stay open, but a signed-in caller
@@ -177,7 +187,7 @@ router.get("/engagement/folders", async (req, res) => {
 });
 
 router.post("/engagement/folders", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const name = String(req.body?.name || "").trim();
@@ -200,7 +210,7 @@ router.post("/engagement/folders", async (req, res) => {
 });
 
 router.delete("/engagement/folders/:id", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const { data: folder, error: findErr } = await supabase
@@ -257,7 +267,7 @@ router.get("/engagement/bookmarks", async (req, res) => {
 });
 
 router.post("/engagement/bookmarks", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const vendorId = req.body?.vendor_id;
@@ -288,7 +298,7 @@ router.post("/engagement/bookmarks", async (req, res) => {
 });
 
 router.patch("/engagement/bookmarks/:vendorId", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   let folderId = req.body?.folder_id || null;
@@ -317,7 +327,7 @@ router.patch("/engagement/bookmarks/:vendorId", async (req, res) => {
 });
 
 router.delete("/engagement/bookmarks/:vendorId", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const { error } = await supabase
@@ -401,7 +411,7 @@ router.get("/engagement/reviews/mine", async (req, res) => {
 });
 
 router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const rating = Number.parseInt(req.body?.rating, 10);
@@ -443,7 +453,7 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
 });
 
 router.patch("/engagement/reviews/:id", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const { data: existing, error: findErr } = await supabase
@@ -491,7 +501,7 @@ router.patch("/engagement/reviews/:id", async (req, res) => {
 });
 
 router.delete("/engagement/reviews/:id", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const { data: existing, error: findErr } = await supabase
@@ -524,7 +534,7 @@ router.post(
   // raw-body with a bare HTML 413 the frontend can't read as JSON.
   express.raw({ type: "image/*", limit: `${MAX_PHOTO_BYTES + 1}b` }),
   async (req, res) => {
-    const user = await requireUser(req, res);
+    const user = await requireActiveUser(req, res);
     if (!user) return;
 
     const ext = ALLOWED_IMAGE_TYPES[req.headers["content-type"]];
@@ -576,7 +586,7 @@ router.post(
 // ── Votes ───────────────────────────────────────────────────────────────────
 
 router.post("/engagement/reviews/:id/vote", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const isLike = req.body?.is_like;
@@ -596,7 +606,7 @@ router.post("/engagement/reviews/:id/vote", async (req, res) => {
 });
 
 router.delete("/engagement/reviews/:id/vote", async (req, res) => {
-  const user = await requireUser(req, res);
+  const user = await requireActiveUser(req, res);
   if (!user) return;
 
   const { error } = await supabase

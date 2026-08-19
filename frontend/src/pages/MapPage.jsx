@@ -4,7 +4,7 @@ import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { getRestaurants, getTrip } from "../api";
 import { useSession } from "../lib/SessionContext";
-import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
+import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder, getAccountStatus } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
@@ -100,6 +100,28 @@ export default function MapPage() {
   const [transitLegs, setTransitLegs] = useState([]);    // itinerary legs (TRANSIT)
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
+  const [accountStatus, setAccountStatus] = useState(null);
+
+  // Suspended customers can still sign in and browse (see backend/lib/suspension.js)
+  // but shouldn't be able to use the interactive map/trip planner — checked
+  // on every visit, not just at sign-in, since a suspension applied mid-session
+  // doesn't invalidate the token that's already loaded.
+  useEffect(() => {
+    if (!session) { setAccountStatus(null); return; }
+    let active = true;
+    getAccountStatus().then((status) => { if (active) setAccountStatus(status); }).catch(() => {});
+    return () => { active = false; };
+  }, [session]);
+
+  // Defense in depth against openMapNearby's guard — covers a direct URL
+  // edit, a stale bookmark, or browser back/forward landing on ?view=map.
+  useEffect(() => {
+    if (view === "map" && accountStatus?.suspended) {
+      notify("Your account is suspended — the map isn't available right now.", true);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, accountStatus]);
 
   // Load vendors (Supabase, sorted from Melaka centre as a default reference).
   useEffect(() => {
@@ -109,6 +131,23 @@ export default function MapPage() {
       .finally(() => setVendorsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle ?vendor=... in the URL to automatically select and focus a vendor
+  useEffect(() => {
+    const targetId = searchParams.get("vendor");
+    if (targetId && vendors.length > 0) {
+      const v = vendors.find(vv => vv.id === targetId);
+      if (v) {
+        setSelected(v);
+        setFocusVendor(v);
+        setOpenId(v.id);
+        // Clear the URL parameter so it doesn't get stuck open if the user refreshes
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("vendor");
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+  }, [vendors, searchParams, setSearchParams]);
 
   // Persist the trip on every change (id/name/lat/lng/isMe/source only — see
   // lib/tripStorage.js for why the embedded `vendor` snapshot isn't saved).
@@ -312,6 +351,10 @@ export default function MapPage() {
   // Entry point for the Dashboard's "Map" tab — jump to the map centred on the
   // user. Which pins render is the radius toggle's job, not this function's.
   function openMapNearby() {
+    if (accountStatus?.suspended) {
+      notify("Your account is suspended — the map isn't available right now.", true);
+      return;
+    }
     const focusOn = (pos) => {
       setUserPos(pos);
       setLocateTarget(pos);
@@ -413,13 +456,13 @@ export default function MapPage() {
   // for display.
   const nearbyToAdd = anchor
     ? vendors
-        .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
-        .filter((v) => matchesFilters(v, filters))
-        .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
-        .filter((v) => v.distKm <= effectiveRadiusKm)
-        .sort((a, b) => a.distKm - b.distKm)
-        .slice(0, 12)
-        .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
+      .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
+      .filter((v) => matchesFilters(v, filters))
+      .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
+      .filter((v) => v.distKm <= effectiveRadiusKm)
+      .sort((a, b) => a.distKm - b.distKm)
+      .slice(0, 12)
+      .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
     : [];
 
   return (
@@ -482,6 +525,7 @@ export default function MapPage() {
               onOpenSaved={() => navigate("/engagement")}
               onOpenReviews={() => navigate("/engagement?tab=reviews")}
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
+              onOpenSuggestions={() => navigate("/suggestions")}
             />
           </div>
         )}

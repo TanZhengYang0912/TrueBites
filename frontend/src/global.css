@@ -481,6 +481,22 @@
     box-shadow: inset 4px 0 0 var(--admin-navy);
   }
 
+  .admin-nav-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--admin-danger-text);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
   /* Reset native <button> chrome — disabled nav tabs render as a button
      (not an <a>) so a click can show the "access disabled" toast instead
      of navigating. */

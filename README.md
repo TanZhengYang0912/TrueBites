@@ -36,6 +36,20 @@ JOSHUA - I have added a frontend for login page. I just need Tan Zheng Yang's Su
 - Day/Night map mode — auto-detects OS preference, manual toggle available
 - Night style is hardcoded in `MapPage.jsx` — no configuration needed
 
+### Community vendor suggestions
+
+Customers can submit a hidden-gem vendor from the customer home flow at `/suggestions/new`.
+The submission is limited to a Malacca/Melaka location and a TikTok or YouTube source URL.
+Customers can only see their own submission status; they never access the AI processing console.
+
+Admins review the queue at `/admin/suggestions`, then can accept a submission for the existing
+AI transcript/summary/extraction workflow, inspect the result, create a vendor draft, and publish
+it as an active vendor. This keeps AI as an admin assistant while human review controls publication.
+
+The database migration is `supabase/migrations/202608180001_vendor_suggestions.sql`. Apply it to
+the Supabase project used by `backend/.env` before using the feature. The Node API owns the
+customer/admin authorization boundaries and the table also has RLS policies as defense in depth.
+
 ---
 
 ## Authentication & Roles
@@ -176,6 +190,7 @@ Then open a Pull Request on GitHub to merge into `main`.
 | `SUPABASE_URL` | Supabase project URL | Ask Tan Zheng Yang |
 | `SUPABASE_SERVICE_KEY` | Supabase secret key (never committed) | Ask Tan Zheng Yang |
 | `WHISPER_LANGUAGE` | Whisper language hint for AI transcription | Leave as `ms` for Malay/English food content |
+| `AI_INTERNAL_KEY` | Optional shared secret between Node API and FastAPI AI service | Set the same long random value in both services for production |
 | `PORT` | Server port (default 4000) | Leave as `4000` |
 
 ---
@@ -244,6 +259,15 @@ CREATE POLICY "Allow backend insert" ON restaurants FOR INSERT WITH CHECK (true)
 | `GET` | `/api/restaurants/nearby?lat=&lng=` | Return nearest restaurants sorted by Haversine |
 | `GET` | `/api/route?fromLat=&fromLng=&toLat=&toLng=` | Return road distance, ETA, and route polyline |
 | `DELETE` | `/api/account` | Delete the calling user's own Supabase auth account (token-derived id only) |
+| `POST` | `/api/suggestions` | *(customer)* Submit a Malacca vendor suggestion |
+| `GET` | `/api/suggestions/mine` | *(customer)* List the calling user's own suggestions |
+| `GET` | `/api/suggestions/:id` | *(customer)* Read one owned suggestion |
+| `GET` | `/api/admin/suggestions` | *(admin)* Review the suggestion queue |
+| `PATCH` | `/api/admin/suggestions/:id/status` | *(admin)* Move a suggestion through review states |
+| `POST` | `/api/admin/suggestions/:id/process` | *(admin)* Start/retry AI processing through the Node proxy |
+| `GET` | `/api/admin/suggestions/:id/processing` | *(admin)* Read processing status and update the queue state |
+| `POST` | `/api/admin/suggestions/:id/create-draft` | *(admin)* Create a vendor draft after human review |
+| `POST` | `/api/admin/suggestions/:id/publish` | *(admin)* Activate the linked vendor and publish the suggestion |
 | `GET` | `/api/admin/admins` | *(superadmin)* List all admin accounts |
 | `POST` | `/api/admin/admins` | *(superadmin)* Invite a new admin by email |
 | `DELETE` | `/api/admin/admins/:id` | *(superadmin)* Remove an admin account |
