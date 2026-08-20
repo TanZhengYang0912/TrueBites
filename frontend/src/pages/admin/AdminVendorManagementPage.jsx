@@ -6,6 +6,7 @@ import {
   getAdminVendors, updateAdminVendor, uploadVendorGalleryImage, uploadVendorImage,
 } from "../../api/admin";
 import Toast from "../../components/engagement/Toast";
+import ImageLightbox from "../../components/engagement/ImageLightbox";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
@@ -177,6 +178,20 @@ function validateForm(form) {
   return errors;
 }
 
+// Fields that actually get sent to PATCH /api/admin/vendors/:id — used to
+// detect whether an edit session has any real change to save. imageFile /
+// imagePreview are deliberately excluded: those are compared separately
+// (imageFile != null means a new cover was picked).
+const FORM_COMPARE_KEYS = [
+  "vendor_name", "address", "latitude", "longitude", "cuisine_types",
+  "priceMin", "priceMax", "openSlot", "closeSlot", "signature_dishes",
+  "phone", "status", "source_video_url",
+];
+
+function formFieldsEqual(a, b) {
+  return FORM_COMPARE_KEYS.every((key) => (a[key] ?? "") === (b[key] ?? ""));
+}
+
 function Pagination({ pagination, pageSize, onPageChange, onPageSizeChange }) {
   const { page, totalPages, total } = pagination;
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -311,13 +326,25 @@ function ImageDropzone({ form, onFileChange, disabled }) {
 // facing card-hover and detail-modal carousels. Only usable once the vendor
 // already has an id — a brand-new vendor gets its cover through the dropzone
 // above and picks up a gallery afterwards, from this same edit view.
-// Each add/remove hits the server immediately (no "Save" step, matching how
-// the cover-image dropzone itself uploads on file pick) and reports the
-// server's authoritative gallery_image_urls back up through `onChange`.
-function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
+//
+// Adding a photo still hits the server immediately (matching how the cover
+// dropzone itself uploads on file pick). Removing one does NOT — when the
+// caller supplies `onRequestRemove` (the Edit-vendor modal), a click just
+// asks the parent to confirm, and actual deletion is deferred until the
+// parent applies it (on Save) or drops it (on Cancel); the photo meanwhile
+// renders in a "pending removal" state via `pendingDeletes`. Callers that
+// don't pass `onRequestRemove` (the post-create AddVendorModal gallery step,
+// which has no separate Save/Cancel step) keep the original immediate-delete
+// behavior unchanged.
+function GalleryManager({ vendorId, images, disabled, pendingDeletes, onChange, onRequestRemove, onUndoRemove, onManualAdd, notify }) {
   const fileInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [galleryError, setGalleryError] = useState("");
+  // Click-to-enlarge preview — reuses the same lightbox review photos use.
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const canAdd = !disabled && !busy && images.length < MAX_GALLERY_IMAGES;
 
   const pickFile = async (file) => {
     if (!file) return;
@@ -333,7 +360,9 @@ function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
     setBusy(true);
     try {
       const { gallery_image_urls } = await uploadVendorGalleryImage(vendorId, file);
+      const added = gallery_image_urls.find((u) => !images.includes(u));
       onChange(gallery_image_urls);
+      if (added) onManualAdd?.(added);
     } catch (err) {
       notify?.(err.message, true);
     } finally {
@@ -341,7 +370,7 @@ function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
     }
   };
 
-  const removeImage = async (url) => {
+  const removeImageNow = async (url) => {
     setBusy(true);
     try {
       const { gallery_image_urls } = await deleteVendorGalleryImage(vendorId, url);
@@ -353,35 +382,79 @@ function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
     }
   };
 
+  const handleRemoveClick = (url) => {
+    if (onRequestRemove) onRequestRemove(url);
+    else removeImageNow(url);
+  };
+
   return (
+    <>
     <label>
       <span>Gallery Photos ({images.length}/{MAX_GALLERY_IMAGES})</span>
-      <div className="admin-gallery-grid">
-        {images.map((url) => (
-          <div className="admin-gallery-thumb" key={url}>
-            <img src={url} alt="" loading="lazy" />
-            {!disabled && (
-              <button
-                type="button"
-                className="admin-gallery-thumb-remove"
-                onClick={() => removeImage(url)}
-                disabled={busy}
-                aria-label="Remove photo"
-              >
-                <Trash2 size={12} />
-              </button>
-            )}
-          </div>
-        ))}
+      <div
+        className="admin-gallery-grid"
+        onDragOver={(e) => { e.preventDefault(); if (canAdd) setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (!canAdd) return;
+          pickFile(e.dataTransfer.files?.[0]);
+        }}
+      >
+        {images.map((url) => {
+          const pending = pendingDeletes?.has(url);
+          return (
+            <div className={`admin-gallery-thumb${pending ? " pending-removal" : ""}`} key={url}>
+              <img
+                src={url}
+                alt=""
+                loading="lazy"
+                onClick={(e) => {
+                  // This whole block sits inside a <label> (for the hidden
+                  // upload <input> below) — without preventDefault, clicking
+                  // a plain, non-form-control child like this <img> also
+                  // forwards the click to that input and pops the OS file
+                  // picker. Always prevent that; only actually open the
+                  // preview in View mode (`disabled`) — Edit mode has no
+                  // click-to-preview.
+                  e.preventDefault();
+                  if (disabled) setPreviewUrl(url);
+                }}
+                style={{ cursor: disabled ? "zoom-in" : "default" }}
+              />
+              {!disabled && (
+                pending ? (
+                  <div className="admin-gallery-thumb-pending">
+                    <span>Pending removal</span>
+                    <button type="button" className="admin-link-btn" onClick={() => onUndoRemove?.(url)}>
+                      Undo
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="admin-gallery-thumb-remove"
+                    onClick={() => handleRemoveClick(url)}
+                    disabled={busy}
+                    aria-label="Remove photo"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })}
         {!disabled && images.length < MAX_GALLERY_IMAGES && (
           <button
             type="button"
-            className="admin-gallery-add"
+            className={`admin-gallery-add${dragOver ? " drag-over" : ""}`}
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
           >
             <ImagePlus size={16} />
-            <span>{busy ? "Uploading…" : "Add"}</span>
+            <span>{busy ? "Uploading…" : dragOver ? "Drop to add" : "Add"}</span>
           </button>
         )}
       </div>
@@ -394,6 +467,8 @@ function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
       />
       <FieldError message={galleryError} />
     </label>
+    <ImageLightbox src={previewUrl} onClose={() => setPreviewUrl(null)} />
+    </>
   );
 }
 
@@ -406,12 +481,32 @@ function GalleryManager({ vendorId, images, disabled, onChange, notify }) {
 // latitude, longitude), so lat/lng auto-fill through the exact same plumbing
 // every other field uses — no extra prop wiring. Degrades gracefully to a
 // plain text input if Photon is unreachable (offline, etc).
-function AddressAutocomplete({ form, error, onChange, disabled }) {
+// If the admin is mid-typing the start of the vendor's own name (e.g. vendor
+// "Jonker 88", typed "Jonker"), search on the fuller vendor name instead —
+// Photon indexes business names as POIs, so the complete name is a much
+// stronger query than a truncated prefix of it. Leaves the query alone for
+// anything else (a street name, an unrelated landmark, etc).
+function locationSearchQuery(typed, vendorName) {
+  const name = (vendorName || "").trim();
+  const query = typed.trim();
+  if (name && name.length > query.length && name.toLowerCase().startsWith(query.toLowerCase())) {
+    return name;
+  }
+  return query;
+}
+
+function AddressAutocomplete({ form, error, onChange, disabled, notify }) {
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
   const boxRef = useRef(null);
   const debounceRef = useRef(null);
   const requestSeq = useRef(0);
+  // Always holds the latest `form`, for the delayed blur check below — a
+  // plain closure over `form` would still see the pre-blur value even after
+  // a suggestion click has since updated it.
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
 
   useEffect(() => {
     function onClickOutside(e) {
@@ -420,6 +515,52 @@ function AddressAutocomplete({ form, error, onChange, disabled }) {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  // Photon has patchy coverage of small Melaka streets — when it has no
+  // matching suggestion, an admin can type/paste a full address and never
+  // get the chance to click one, leaving latitude/longitude blank (the
+  // actual cause behind "why didn't this fill in the coordinates"). Falls
+  // back to a plain, unbounded Photon search once the field is left — same
+  // query shape as handleInput below, just without requiring the dropdown
+  // to have shown a match, and taking its top result outright instead of
+  // waiting for a click. (This used to call Google Geocoding instead, but
+  // that account's billing is disabled — confirmed live, every call came
+  // back REQUEST_DENIED — so it silently failed every single time. Photon
+  // is free and already proven working for the live-suggestions dropdown
+  // right below, so there's nothing Google was doing that this can't.)
+  // Only runs if a suggestion pick (or a manual edit) hasn't already filled
+  // coordinates in the meantime — the short delay gives a suggestion
+  // click's mousedown -> blur -> click sequence time to land first, so this
+  // never races pick().
+  function handleBlur() {
+    setTimeout(async () => {
+      const current = formRef.current;
+      const address = current.address.trim();
+      if (disabled || address.length < 5) return;
+      if (current.latitude !== "" || current.longitude !== "") return;
+      setGeocoding(true);
+      try {
+        const params = new URLSearchParams({
+          q: locationSearchQuery(address, current.vendor_name),
+          limit: "1",
+          lat: "2.1896",
+          lon: "102.2501",
+          bbox: `${MELAKA_BOUNDS.lngMin},${MELAKA_BOUNDS.latMin},${MELAKA_BOUNDS.lngMax},${MELAKA_BOUNDS.latMax}`,
+        });
+        const res = await fetch(`https://photon.komoot.io/api/?${params}`);
+        const data = await res.json();
+        const top = data.features?.[0];
+        if (!top) throw new Error("no match");
+        const [lng, lat] = top.geometry.coordinates;
+        onChange({ target: { name: "latitude", value: String(lat) } });
+        onChange({ target: { name: "longitude", value: String(lng) } });
+      } catch {
+        notify?.("Couldn't auto-fill coordinates for that address — enter them manually.", true);
+      } finally {
+        setGeocoding(false);
+      }
+    }, 200);
+  }
 
   function handleInput(e) {
     onChange(e);
@@ -431,7 +572,7 @@ function AddressAutocomplete({ form, error, onChange, disabled }) {
       const seq = ++requestSeq.current;
       try {
         const params = new URLSearchParams({
-          q: value,
+          q: locationSearchQuery(value, formRef.current.vendor_name),
           limit: "5",
           lat: "2.1896",
           lon: "102.2501",
@@ -467,12 +608,21 @@ function AddressAutocomplete({ form, error, onChange, disabled }) {
         value={form.address}
         onChange={handleInput}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onBlur={handleBlur}
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         disabled={disabled}
         placeholder="Start typing a Melaka address…"
         autoComplete="off"
       />
-      {!disabled && <span className="admin-field-hint">Pick a suggestion to auto-fill the map coordinates.</span>}
+      {!disabled && (
+        <span className="admin-field-hint">
+          {geocoding
+            ? "Finding coordinates…"
+            : open && suggestions.length === 0
+              ? "No matching location found. You can enter the location manually."
+              : "Pick a suggestion to auto-fill the map coordinates."}
+        </span>
+      )}
       {open && suggestions.length > 0 && (
         <ul className="admin-address-suggestions">
           {suggestions.map((feature, i) => {
@@ -493,7 +643,7 @@ function AddressAutocomplete({ form, error, onChange, disabled }) {
 
 // Shared by the Add Vendor modal, the Edit form, AND the read-only View —
 // `disabled` greys every control out for View, without duplicating markup.
-function VendorFormFields({ form, errors, onChange, onFileChange, disabled }) {
+function VendorFormFields({ form, errors, onChange, onFileChange, disabled, notify }) {
   return (
     <>
       <label>
@@ -502,17 +652,17 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled }) {
         <FieldError message={errors?.vendor_name} />
       </label>
 
-      <AddressAutocomplete form={form} error={errors?.address} onChange={onChange} disabled={disabled} />
+      <AddressAutocomplete form={form} error={errors?.address} onChange={onChange} disabled={disabled} notify={notify} />
 
       <div className="admin-modal-grid">
         <label>
           <span>Latitude</span>
-          <input type="number" step="any" name="latitude" value={form.latitude} onChange={onChange} disabled={disabled} placeholder="2.1946" />
+          <input type="number" step="any" name="latitude" value={form.latitude} onChange={onChange} disabled={disabled} placeholder="e.g. 2.1946" />
           <FieldError message={errors?.latitude} />
         </label>
         <label>
           <span>Longitude</span>
-          <input type="number" step="any" name="longitude" value={form.longitude} onChange={onChange} disabled={disabled} placeholder="102.2485" />
+          <input type="number" step="any" name="longitude" value={form.longitude} onChange={onChange} disabled={disabled} placeholder="e.g. 102.2485" />
           <FieldError message={errors?.longitude} />
         </label>
       </div>
@@ -661,28 +811,45 @@ function DuplicatesPanel({ groups, onClose, onDeleteRequest }) {
   );
 }
 
-function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, notify }) {
+function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, pendingGalleryDeletes, onRequestRemoveGallery, onUndoRemoveGallery, onManualGalleryAdd, notify }) {
+  // While editing, backdrop/×/Escape must go through the same path as the
+  // Cancel button (onCancelEdit) rather than the plain onClose — Cancel
+  // doesn't just drop unsaved text, it also rolls back any gallery photos
+  // this edit session already uploaded (uploads hit the server immediately
+  // on pick, see GalleryManager above). Routing backdrop/× straight to
+  // onClose left those uploads orphaned in storage the moment an admin
+  // clicked outside the modal instead of using Cancel — a real contributor
+  // to the orphaned-storage backlog scripts/auditOrphanStorage.js exists to
+  // clean up.
+  const dismiss = editing ? onCancelEdit : onClose;
+
+  useEffect(() => {
+    if (!vendor) return;
+    const onKey = (e) => { if (e.key === "Escape") dismiss(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [vendor, dismiss]);
+
   if (!vendor) return null;
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
+    <div className="admin-modal-backdrop" onClick={dismiss}>
       <div className="admin-modal-card wide" onClick={(e) => e.stopPropagation()}>
         <div className="admin-modal-header">
           <div>
             <h2>{editing ? "Edit Vendor" : vendor.name}</h2>
           </div>
-          <button type="button" className="admin-icon-btn subtle" onClick={onClose}>×</button>
+          <button type="button" className="admin-icon-btn subtle" onClick={dismiss}>×</button>
         </div>
 
         <div className="admin-modal-form">
-          <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing} />
+          <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing} notify={notify} />
 
           {editing && (
             <PhotoDiscoveryPanel
               vendorId={vendor.id}
               latitude={form.latitude}
               longitude={form.longitude}
-              sourceVideoUrl={form.source_video_url}
               coverLocked={vendor.coverLocked}
               onPhotoCommitted={(role, url) => {
                 if (role === "cover") onCoverDiscovered(url);
@@ -696,7 +863,11 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
             vendorId={vendor.id}
             images={vendor.galleryUrls || []}
             disabled={!editing}
+            pendingDeletes={pendingGalleryDeletes}
             onChange={onGalleryChange}
+            onRequestRemove={editing ? onRequestRemoveGallery : undefined}
+            onUndoRemove={onUndoRemoveGallery}
+            onManualAdd={onManualGalleryAdd}
             notify={notify}
           />
 
@@ -704,7 +875,6 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
             <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--admin-muted)" }}>
               <span>Source: {vendor.sourcePlatform}</span>
               <span>Location: {vendor.locationPrecision || "Unknown"}</span>
-              <span>AI Score: {vendor.aiScore ? Number(vendor.aiScore).toFixed(1) : "—"}</span>
             </div>
           )}
 
@@ -713,8 +883,10 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, error, onClo
           <div className="admin-modal-actions">
             {editing ? (
               <>
-                <button type="button" className="admin-secondary-btn compact" onClick={onCancelEdit}>Cancel</button>
-                <button type="button" className="admin-primary-btn compact" onClick={onSave} disabled={saving}>
+                <button type="button" className="admin-secondary-btn compact" onClick={onCancelEdit} disabled={cancelling}>
+                  {cancelling ? "Cancelling…" : "Cancel"}
+                </button>
+                <button type="button" className="admin-primary-btn compact" onClick={onSave} disabled={saving || cancelling}>
                   {saving ? "Saving…" : "Save Changes"}
                 </button>
               </>
@@ -801,7 +973,10 @@ function AddVendorModal({ onClose, onCreated, notify }) {
   const handleSave = () => {
     const errs = validateForm(form);
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) {
+      notify("Please fix the highlighted fields before saving.", true);
+      return;
+    }
     doSave(false);
   };
 
@@ -835,7 +1010,6 @@ function AddVendorModal({ onClose, onCreated, notify }) {
               vendorId={createdVendor.id}
               latitude={createdVendor.latitude}
               longitude={createdVendor.longitude}
-              sourceVideoUrl={createdVendor.source_video_url}
               coverLocked={coverLocked}
               onPhotoCommitted={(role, url) => {
                 if (role === "cover") { setCoverUrl(url); setCoverLocked(false); }
@@ -871,7 +1045,7 @@ function AddVendorModal({ onClose, onCreated, notify }) {
           <button type="button" className="admin-icon-btn subtle" onClick={onClose}>×</button>
         </div>
         <div className="admin-modal-form">
-          <VendorFormFields form={form} errors={errors} onChange={handleChange} onFileChange={handleFileChange} disabled={false} />
+          <VendorFormFields form={form} errors={errors} onChange={handleChange} onFileChange={handleFileChange} disabled={false} notify={notify} />
           {error && <div className="admin-feedback error">{error}</div>}
           {duplicates && (
             <div className="admin-feedback warning">
@@ -916,6 +1090,20 @@ export default function AdminVendorManagementPage() {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  // Snapshot of `form` taken the moment Edit starts — the baseline Cancel
+  // restores back to and Save diffs against to decide whether there's
+  // anything to save at all.
+  const [editSnapshot, setEditSnapshot] = useState(null);
+  // Gallery photos the admin has confirmed for removal but not yet saved —
+  // rendered as "pending removal" and only actually deleted from
+  // storage/DB when Save Changes runs.
+  const [pendingGalleryDeletes, setPendingGalleryDeletes] = useState(() => new Set());
+  // Gallery photos uploaded (via the manual Add button) during this edit
+  // session — those already hit the server immediately, so Cancel has to
+  // actively undo them, not just drop local state.
+  const [pendingGalleryAdds, setPendingGalleryAdds] = useState(() => new Set());
+  const [confirmDeleteGalleryUrl, setConfirmDeleteGalleryUrl] = useState(null);
+  const [cancellingEdit, setCancellingEdit] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -1026,6 +1214,32 @@ export default function AdminVendorManagementPage() {
     setError("");
     setErrors({});
     setForm(makeForm(vendor));
+    setEditSnapshot(null);
+    setPendingGalleryDeletes(new Set());
+    setPendingGalleryAdds(new Set());
+  };
+
+  // Opens a vendor straight into Edit mode — used by both the row's Edit
+  // (pencil) shortcut and the "Edit Vendor" button inside the View modal.
+  // The one thing that must never be skipped here is editSnapshot: it's the
+  // pre-edit baseline handleSave diffs the live form against to decide
+  // whether anything actually changed. The row shortcut used to call
+  // openVendor() (which explicitly nulls editSnapshot, correct for View
+  // mode) and then just flip editing on — leaving editSnapshot null while
+  // editing=true, which made `editSnapshot ? !formFieldsEqual(...) : false`
+  // permanently evaluate to false. Every edit through that shortcut looked
+  // unchanged no matter what was actually typed, always blocked with "No
+  // changes to save" — confirmed live via the debug logging in handleSave.
+  const openVendorForEdit = (vendor) => {
+    const freshForm = makeForm(vendor);
+    setSelectedVendor(vendor);
+    setError("");
+    setErrors({});
+    setForm(freshForm);
+    setEditSnapshot({ form: freshForm });
+    setPendingGalleryDeletes(new Set());
+    setPendingGalleryAdds(new Set());
+    setEditing(true);
   };
 
   const handlePageChange = (page) => {
@@ -1036,40 +1250,119 @@ export default function AdminVendorManagementPage() {
     if (!selectedVendor) return;
     const errs = validateForm(form);
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) {
+      // Every other failure path in this function shows a toast — this one
+      // didn't, so a blocked save (e.g. latitude/longitude never got filled
+      // in) looked identical to a silent no-op instead of an actual error.
+      notify("Please fix the highlighted fields before saving.", true);
+      return;
+    }
+
+    const fieldsChanged = editSnapshot ? !formFieldsEqual(form, editSnapshot.form) : false;
+    const coverChanged = !!form.imageFile;
+    const galleryChanged = pendingGalleryDeletes.size > 0 || pendingGalleryAdds.size > 0;
+
+    if (!fieldsChanged && !coverChanged && !galleryChanged) {
+      notify("No changes to save.");
+      return;
+    }
 
     setSaving(true);
     setError("");
     try {
-      await updateAdminVendor(selectedVendor.id, {
-        vendor_name: form.vendor_name,
-        address: form.address,
-        cuisine_types: form.cuisine_types,
-        signature_dishes: form.signature_dishes,
-        price_range: formatPriceRange(form.priceMin, form.priceMax),
-        phone: form.phone,
-        latitude: form.latitude,
-        longitude: form.longitude,
-        operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
-        status: form.status,
-        source_video_url: form.source_video_url,
-      });
-      if (form.imageFile) {
-        await uploadVendorImage(selectedVendor.id, form.imageFile);
+      if (fieldsChanged) {
+        await updateAdminVendor(selectedVendor.id, {
+          vendor_name: form.vendor_name,
+          address: form.address,
+          cuisine_types: form.cuisine_types,
+          signature_dishes: form.signature_dishes,
+          price_range: formatPriceRange(form.priceMin, form.priceMax),
+          phone: form.phone,
+          latitude: form.latitude,
+          longitude: form.longitude,
+          operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
+          status: form.status,
+          source_video_url: form.source_video_url,
+        });
+        // Persisted — if a gallery-delete failure below keeps the modal
+        // open for a retry, a second Save click must not resend this.
+        setEditSnapshot({ form });
       }
+      if (coverChanged) {
+        await uploadVendorImage(selectedVendor.id, form.imageFile);
+        setForm((cur) => ({ ...cur, imageFile: null }));
+      }
+
+      // Gallery removals only actually hit storage/DB now — the Remove
+      // button just staged them earlier, behind a confirmation. Each delete
+      // is independent (e.g. someone else may have already removed the same
+      // photo), so one failing must not abandon the rest mid-batch, and must
+      // not get retried forever — only the ones that actually failed stay
+      // pending for a follow-up Save.
+      const failedDeletes = new Set();
+      for (const url of pendingGalleryDeletes) {
+        try {
+          await deleteVendorGalleryImage(selectedVendor.id, url);
+        } catch {
+          failedDeletes.add(url);
+        }
+      }
+      setPendingGalleryDeletes(failedDeletes);
+      setPendingGalleryAdds(new Set());
+
       const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
       setData(refreshed);
-      // Saving closes the modal outright — same reasoning as Cancel, it
-      // shouldn't drop back into the read-only View screen.
-      setSelectedVendor(null);
-      setEditing(false);
-      notify("Vendor updated successfully.");
+
+      if (failedDeletes.size > 0) {
+        const msg = `Saved, but ${failedDeletes.size} gallery photo${failedDeletes.size === 1 ? "" : "s"} couldn't be deleted — try Save again.`;
+        setError(msg);
+        notify(msg, true);
+        // Leave the modal open so the admin can retry just the failed deletes.
+      } else {
+        // Saving closes the modal outright — same reasoning as Cancel, it
+        // shouldn't drop back into the read-only View screen.
+        setSelectedVendor(null);
+        setEditing(false);
+        setEditSnapshot(null);
+        notify("Changes saved successfully.");
+      }
     } catch (err) {
       setError(err.message);
       notify(err.message, true);
     } finally {
       setSaving(false);
     }
+  };
+
+  // Cancel discards all unsaved edits and restores the pre-edit state.
+  // Vendor fields / cover-image staging are plain local `form` state, so
+  // simply not saving them is enough. Gallery removals were only ever
+  // staged locally too (never sent to the server), so those are dropped the
+  // same way. Gallery *additions*, though, already hit the server the
+  // moment they were picked (same as the cover dropzone's upload-on-pick
+  // behavior) — so undoing them here means actively deleting them back out.
+  const handleCancelEdit = async () => {
+    if (selectedVendor && pendingGalleryAdds.size > 0) {
+      setCancellingEdit(true);
+      const ids = [...pendingGalleryAdds];
+      for (const url of ids) {
+        try {
+          await deleteVendorGalleryImage(selectedVendor.id, url);
+        } catch {
+          // Best-effort rollback — a failed undo just leaves that one photo
+          // in place rather than blocking the rest of Cancel.
+        }
+      }
+      await refreshList();
+      setCancellingEdit(false);
+    }
+    setPendingGalleryDeletes(new Set());
+    setPendingGalleryAdds(new Set());
+    setEditSnapshot(null);
+    setErrors({});
+    setError("");
+    setSelectedVendor(null);
+    setEditing(false);
   };
 
   const handleDelete = async (id) => {
@@ -1393,7 +1686,7 @@ export default function AdminVendorManagementPage() {
                       <button
                         type="button"
                         className="transition-colors hover:text-gray-600"
-                        onClick={() => { openVendor(vendor); setEditing(true); }}
+                        onClick={() => openVendorForEdit(vendor)}
                         aria-label={`Edit ${vendor.name}`}
                         title="Edit"
                       >
@@ -1445,22 +1738,11 @@ export default function AdminVendorManagementPage() {
         form={form}
         errors={errors}
         saving={saving}
+        cancelling={cancellingEdit}
         error={error}
         onClose={() => setSelectedVendor(null)}
-        onStartEdit={() => {
-          if (selectedVendor) setForm(makeForm(selectedVendor));
-          setErrors({});
-          setError("");
-          setEditing(true);
-        }}
-        onCancelEdit={() => {
-          // Cancelling out of Edit closes the modal outright — it shouldn't
-          // drop back into the read-only View screen the admin never asked for.
-          setErrors({});
-          setError("");
-          setSelectedVendor(null);
-          setEditing(false);
-        }}
+        onStartEdit={() => selectedVendor && openVendorForEdit(selectedVendor)}
+        onCancelEdit={handleCancelEdit}
         onChange={(e) => {
           const { name, value } = e.target;
           setForm((cur) => ({ ...cur, [name]: value }));
@@ -1468,6 +1750,14 @@ export default function AdminVendorManagementPage() {
         onFileChange={(file) => setForm((cur) => ({ ...cur, imageFile: file }))}
         onSave={handleSave}
         notify={notify}
+        pendingGalleryDeletes={pendingGalleryDeletes}
+        onRequestRemoveGallery={(url) => setConfirmDeleteGalleryUrl(url)}
+        onUndoRemoveGallery={(url) => setPendingGalleryDeletes((cur) => {
+          const next = new Set(cur);
+          next.delete(url);
+          return next;
+        })}
+        onManualGalleryAdd={(url) => setPendingGalleryAdds((cur) => new Set(cur).add(url))}
         onGalleryChange={(galleryUrls) => {
           // Keep both the open detail view and the underlying row in sync so
           // a reopened modal (or the table, if it ever grows a gallery
@@ -1506,6 +1796,19 @@ export default function AdminVendorManagementPage() {
           busy={deleting}
           onConfirm={() => handleDelete(confirmDeleteId)}
           onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      {confirmDeleteGalleryUrl && (
+        <ConfirmDialog
+          title="Delete gallery photo?"
+          message="Are you sure you want to delete this gallery photo? It won't be permanently removed until you save your changes."
+          busy={false}
+          onConfirm={() => {
+            setPendingGalleryDeletes((cur) => new Set(cur).add(confirmDeleteGalleryUrl));
+            setConfirmDeleteGalleryUrl(null);
+          }}
+          onCancel={() => setConfirmDeleteGalleryUrl(null)}
         />
       )}
 

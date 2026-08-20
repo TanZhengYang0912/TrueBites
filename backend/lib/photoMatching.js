@@ -8,7 +8,18 @@ import { haversine } from "../haversine.js";
 
 // Below this, a candidate is dropped before it ever reaches the admin UI —
 // not confident enough to be worth showing at all.
-export const NEEDS_CONFIRMATION_THRESHOLD = 60;
+//
+// Deliberately low (was 60 — required near-certain identity match). Product
+// direction: for the interactive "Find Photos Automatically" panel, an admin
+// reviews and hand-picks every candidate anyway, so LOCATION relevance
+// matters more than a confident identity match — a real nearby storefront/
+// street photo is worth showing even when the system can't confirm it's
+// THIS exact vendor, rather than showing nothing. This constant only gates
+// what reaches that admin-reviewed panel; the batch scripts
+// (fetchVendorCoverPhotos.js) that auto-commit a photo with no human look
+// use their own separate, much stricter AUTO_SUGGEST_THRESHOLD-based bar and
+// are untouched by this value.
+export const NEEDS_CONFIRMATION_THRESHOLD = 20;
 // At/above this, the UI may present the candidate as a safe one-click pick;
 // between the two thresholds it's still shown, just labelled "possible match".
 export const AUTO_SUGGEST_THRESHOLD = 85;

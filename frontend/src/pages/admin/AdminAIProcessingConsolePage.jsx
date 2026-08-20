@@ -1,8 +1,8 @@
 import { Check, Database, Download, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getAdminAiRecords } from "../../api/admin";
+import { getJobStatus, getBatchStatus, retryJob as retryAiJob, createDraft as createAiDraft } from "../../api/ai";
 import { getSelectionSummary, togglePageSelection, toggleSelection } from "../../lib/batchSelection";
-import { getAiApiBase } from "../../lib/aiApi";
 
 // ── AI module step components (reuse from /ai page) ──────────────────────────
 import StepIndicator     from "../../components/ai/StepIndicator";
@@ -15,7 +15,6 @@ import BatchResultsStep  from "../../components/ai/BatchResultsStep";
 
 // Import the ai-module styles (needed for step components)
 
-const AI_BASE  = getAiApiBase(import.meta.env.VITE_AI_API_BASE);
 const POLL_MS  = 2000;
 
 const PAGE_TO_STEP = {
@@ -60,9 +59,7 @@ function AIWorkflowPanel() {
     if (!jobId || page === "submit") return;
     pollerRef.current = setInterval(async () => {
       try {
-        const res  = await fetch(`${AI_BASE}/status/${jobId}`);
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await getJobStatus(jobId);
         setJobData(data);
         if (data.summary) setReviewSummary((current) => current || data.summary);
         if (data.status === "completed" || data.status === "error")
@@ -76,9 +73,7 @@ function AIWorkflowPanel() {
     if (!batchId || page === "submit") return;
     batchPollerRef.current = setInterval(async () => {
       try {
-        const res  = await fetch(`${AI_BASE}/batch-status/${batchId}`);
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await getBatchStatus(batchId);
         setBatchData(data);
         if (data.in_progress === 0) clearInterval(batchPollerRef.current);
       } catch { /* ignore */ }
@@ -110,9 +105,7 @@ function AIWorkflowPanel() {
   const handleRetry = async () => {
     if (!jobId) return;
     try {
-      const response = await fetch(`${AI_BASE}/retry/${jobId}`, { method: 'POST' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || 'Unable to retry processing');
+      const result = await retryAiJob(jobId);
       setJobData((current) => ({ ...current, ...result, status: 'queued', progress: 0, step: 0, step_label: 'Queued for retry', error: null }));
       setReviewSummary('');
       setPage('processing');
@@ -123,13 +116,7 @@ function AIWorkflowPanel() {
 
   const handleCreateDraft = async ({ summary, extracted, duplicate_acknowledged }) => {
     if (!jobId) throw new Error('No processing job is selected');
-    const response = await fetch(`${AI_BASE}/create-draft/${jobId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary, extracted, duplicate_acknowledged }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || 'Unable to create draft vendor');
+    const result = await createAiDraft(jobId, { summary, extracted, duplicate_acknowledged });
     setJobData((current) => ({ ...current, ...result }));
     return result;
   };

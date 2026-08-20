@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import VideoSelectionList from './VideoSelectionList';
-import { getAiApiBase } from '../../lib/aiApi';
-
-const API_BASE = getAiApiBase(import.meta.env.VITE_AI_API_BASE);
+import * as aiApi from '../../api/ai';
 
 export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
   const [mode, setMode]           = useState('single'); // 'single' | 'profile'
@@ -33,12 +31,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
     setError('');
     setPreview(null);
     try {
-      const res = await fetch(`${API_BASE}/validate-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json();
+      const data = await aiApi.validateUrl(url);
       if (!data.valid) {
         setError(data.error || 'Invalid URL');
       } else if (data.url_type === 'profile') {
@@ -46,8 +39,8 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
       } else {
         setPreview({ platform: data.platform });
       }
-    } catch {
-      setError(`AI service unavailable at ${API_BASE}. Start the FastAPI AI service and try again.`);
+    } catch (err) {
+      setError(err.message || 'Could not reach the AI backend. Make sure the Node server is running.');
     } finally {
       setLoading(false);
     }
@@ -60,20 +53,10 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/process`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setError(err.detail || 'Server error');
-        return;
-      }
-      const data = await res.json();
+      const data = await aiApi.startProcessing(url);
       onJobStarted(data.job_id, url, preview?.platform || 'Unknown');
-    } catch {
-      setError(`AI service unavailable at ${API_BASE}. Start the FastAPI AI service and try again.`);
+    } catch (err) {
+      setError(err.message || 'Server error');
     } finally {
       setLoading(false);
     }
@@ -93,22 +76,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
 
     try {
       // 1. Kick off the background scrape — returns immediately with a scrape_id
-      const res = await fetch(`${API_BASE}/scrape-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url,
-          start: parseInt(startIndex, 10) || 1,
-          end: parseInt(endIndex, 10) || 10
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setError(err.detail || 'Server error');
-        setLoading(false);
-        return;
-      }
-      const { scrape_id } = await res.json();
+      const { scrape_id } = await aiApi.scrapeProfile(url, parseInt(startIndex, 10) || 1, parseInt(endIndex, 10) || 10);
 
       // 2. Poll /scrape-status every 2s until done or error
       const startedAt = Date.now();
@@ -117,14 +85,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
         setScrapeStatus(`Fetching videos… (${elapsed}s)`);
 
         try {
-          const statusRes = await fetch(`${API_BASE}/scrape-status/${scrape_id}`);
-          if (!statusRes.ok) {
-            setError('Lost connection while waiting for scrape results.');
-            setScrapeStatus('');
-            setLoading(false);
-            return;
-          }
-          const data = await statusRes.json();
+          const data = await aiApi.getScrapeStatus(scrape_id);
 
           if (data.status === 'done') {
             if (data.videos.length === 0) {
@@ -143,15 +104,15 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
             // Still scraping — check again in 2s
             setTimeout(poll, 2000);
           }
-        } catch {
-      setError(`AI service unavailable at ${API_BASE} while polling.`);
+        } catch (err) {
+          setError(err.message || 'Lost connection while waiting for scrape results.');
           setScrapeStatus('');
           setLoading(false);
         }
       };
       setTimeout(poll, 2000);
-    } catch {
-      setError(`AI service unavailable at ${API_BASE}. Start the FastAPI AI service and try again.`);
+    } catch (err) {
+      setError(err.message || 'Server error');
       setScrapeStatus('');
       setLoading(false);
     }
@@ -163,23 +124,10 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/batch-process`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          urls: Array.from(selectedVideos),
-          profile_url: url 
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setError(err.detail || 'Server error');
-        return;
-      }
-      const data = await res.json();
+      const data = await aiApi.batchProcess(Array.from(selectedVideos), url);
       onBatchStarted(data.batch_id, data.total);
-    } catch {
-      setError('Could not connect to the backend server.');
+    } catch (err) {
+      setError(err.message || 'Could not connect to the backend server.');
     } finally {
       setLoading(false);
     }

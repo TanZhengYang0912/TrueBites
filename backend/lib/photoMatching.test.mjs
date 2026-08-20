@@ -36,10 +36,22 @@ test("similar-but-not-exact name + ~200m away -> lands in the confirmation band,
   assert.ok(confidence < AUTO_SUGGEST_THRESHOLD, `expected < ${AUTO_SUGGEST_THRESHOLD}, got ${confidence}`);
 });
 
-test("unrelated name -> low confidence even if nearby", () => {
+test("unrelated name right on top of the vendor's coordinates -> location alone clears the bar", () => {
+  // NEEDS_CONFIRMATION_THRESHOLD is deliberately low: for the admin-reviewed
+  // discovery panel, a real photo taken exactly at this vendor's location is
+  // worth surfacing even with an unrelated name attached — the admin makes
+  // the final call, not this score.
   const { confidence } = computePhotoMatchConfidence({
     vendor,
     candidate: { placeName: "Totally Different Shop", latitude: 2.1896, longitude: 102.2501, category: "restaurant" },
+  });
+  assert.ok(confidence >= NEEDS_CONFIRMATION_THRESHOLD, `expected >= ${NEEDS_CONFIRMATION_THRESHOLD}, got ${confidence}`);
+});
+
+test("unrelated name AND far away -> still too low to reach the admin", () => {
+  const { confidence } = computePhotoMatchConfidence({
+    vendor,
+    candidate: { placeName: "Totally Different Shop", latitude: 2.194, longitude: 102.254, category: null },
   });
   assert.ok(confidence < NEEDS_CONFIRMATION_THRESHOLD, `expected < ${NEEDS_CONFIRMATION_THRESHOLD}, got ${confidence}`);
 });

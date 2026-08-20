@@ -2,10 +2,10 @@ import { Router } from "express";
 import { supabase } from "../supabase.js";
 import { logActivity } from "../lib/auditLog.js";
 import { assertTransition, SUGGESTION_STATUSES } from "../lib/suggestionValidation.js";
+import { startProcessingJob, retryJob, createDraftFromJob } from "../lib/ai/pipeline.js";
+import { loadJob } from "../lib/ai/jobStore.js";
 
 const router = Router();
-const AI_SERVICE_BASE = String(process.env.AI_SERVICE_BASE || "http://localhost:8000").replace(/\/$/, "");
-const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY || "";
 
 const ADMIN_SELECT = `
   id, user_id, vendor_name, source_url, source_platform, location_text, category,
@@ -19,26 +19,18 @@ function cleanPage(value, fallback, max) {
   return Math.min(max, Math.max(1, Number.parseInt(value, 10) || fallback));
 }
 
-function aiHeaders(extra = {}) {
-  return {
-    "Content-Type": "application/json",
-    ...(AI_INTERNAL_KEY ? { "X-Internal-Key": AI_INTERNAL_KEY } : {}),
-    ...extra,
-  };
-}
-
-async function aiRequest(path, options = {}) {
-  const response = await fetch(`${AI_SERVICE_BASE}/api${path}`, {
-    ...options,
-    headers: aiHeaders(options.headers || {}),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(payload.detail || payload.error || "AI service request failed");
-    error.status = response.status;
+// loadJob() returns null for an unknown job — the AI pipeline calls below
+// used to be an HTTP request that could 404; this keeps the same
+// "throw an error with .status" contract so the existing catch blocks below
+// (checking error.status) don't need to change.
+async function loadJobOrThrow(jobId) {
+  const job = await loadJob(jobId);
+  if (!job) {
+    const error = new Error("Job not found");
+    error.status = 404;
     throw error;
   }
-  return payload;
+  return job;
 }
 
 async function getSuggestion(id) {
@@ -138,7 +130,7 @@ router.post("/suggestions/:id/process", async (req, res) => {
 
     let job;
     if (suggestion.status === "failed" && suggestion.ai_job_id) {
-      job = await aiRequest(`/retry/${suggestion.ai_job_id}`, { method: "POST" });
+      job = await retryJob(suggestion.ai_job_id);
     } else {
       if (suggestion.status === "under_review") {
         assertTransition("under_review", "accepted_for_processing");
@@ -152,7 +144,7 @@ router.post("/suggestions/:id/process", async (req, res) => {
           .eq("id", suggestion.id);
         if (acceptError) throw acceptError;
       }
-      job = await aiRequest("/process", { method: "POST", body: JSON.stringify({ url: suggestion.source_url }) });
+      job = await startProcessingJob(suggestion.source_url);
     }
 
     const patch = { ai_job_id: job.job_id, status: "processing", reviewed_by: req.callerUser.id === "dev" ? null : req.callerUser.id, reviewed_at: new Date().toISOString() };
@@ -172,7 +164,7 @@ router.get("/suggestions/:id/processing", async (req, res) => {
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
     if (!suggestion.ai_job_id) return res.status(409).json({ error: "This suggestion has not been sent to AI processing." });
 
-    const job = await aiRequest(`/status/${suggestion.ai_job_id}`);
+    const job = await loadJobOrThrow(suggestion.ai_job_id);
     let currentSuggestion = suggestion;
     if (job.status === "completed" && suggestion.status === "processing") {
       const { data } = await supabase.from("vendor_suggestions").update({ status: "admin_review" }).eq("id", suggestion.id).select(ADMIN_SELECT).single();
@@ -193,13 +185,10 @@ router.post("/suggestions/:id/create-draft", async (req, res) => {
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
     if (!suggestion.ai_job_id) return res.status(409).json({ error: "Process this suggestion before creating a draft." });
 
-    const result = await aiRequest(`/create-draft/${suggestion.ai_job_id}`, {
-      method: "POST",
-      body: JSON.stringify({
-        summary: req.body?.summary || "",
-        extracted: req.body?.extracted || {},
-        duplicate_acknowledged: Boolean(req.body?.duplicate_acknowledged),
-      }),
+    const result = await createDraftFromJob(suggestion.ai_job_id, {
+      summary: req.body?.summary || "",
+      extracted: req.body?.extracted || {},
+      duplicate_acknowledged: Boolean(req.body?.duplicate_acknowledged),
     });
     if (result.status === "duplicate_review_required") return res.json(result);
 

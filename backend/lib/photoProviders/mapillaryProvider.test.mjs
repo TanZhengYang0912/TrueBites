@@ -11,16 +11,20 @@ test("mapillaryConfidence is highest at 0m and decays to 0 at the search radius"
 
 // Real-API finding: Mapillary's `radius` param is hard-capped at 50m, and a
 // genuinely close photo (tested at 8m from a real vendor) needs to actually
-// clear NEEDS_CONFIRMATION_THRESHOLD (60) or it never reaches the admin at
-// all — the module comment explains why letting it also cross
-// AUTO_SUGGEST_THRESHOLD for near-exact matches is fine (admin still clicks
-// every candidate regardless of badge colour).
+// clear NEEDS_CONFIRMATION_THRESHOLD or it never reaches the admin at all —
+// the module comment explains why letting it also cross AUTO_SUGGEST_THRESHOLD
+// for near-exact matches is fine (admin still clicks every candidate
+// regardless of badge colour).
 test("a genuinely close match (~15m) clears NEEDS_CONFIRMATION_THRESHOLD", () => {
   assert.ok(mapillaryConfidence(15) >= NEEDS_CONFIRMATION_THRESHOLD, `expected >= ${NEEDS_CONFIRMATION_THRESHOLD}, got ${mapillaryConfidence(15)}`);
 });
 
-test("a distant match (half the search radius away) does not clear NEEDS_CONFIRMATION_THRESHOLD", () => {
-  assert.ok(mapillaryConfidence(25) < NEEDS_CONFIRMATION_THRESHOLD, `expected < ${NEEDS_CONFIRMATION_THRESHOLD}, got ${mapillaryConfidence(25)}`);
+// NEEDS_CONFIRMATION_THRESHOLD is deliberately low (location relevance over
+// exact identity — see photoMatching.js) — most of Mapillary's 50m search
+// radius now clears it, on purpose. Only a photo right at the radius's edge,
+// where "nearby" stops meaning anything useful, should still be dropped.
+test("a match right at the edge of the search radius does not clear NEEDS_CONFIRMATION_THRESHOLD", () => {
+  assert.ok(mapillaryConfidence(45) < NEEDS_CONFIRMATION_THRESHOLD, `expected < ${NEEDS_CONFIRMATION_THRESHOLD}, got ${mapillaryConfidence(45)}`);
 });
 
 test("mapillaryConfidence handles missing/invalid distance without throwing", () => {

@@ -4,7 +4,7 @@
 // (free developer token from mapillary.com, no credit card).
 //
 // Mapillary images carry NO place name or category — only GPS coordinates —
-// so unlike the TikTok/Flickr providers this can't use name-similarity at
+// so unlike the TikTok provider this can't use name-similarity at
 // all. Confidence here is distance-only, over a much tighter radius than
 // photoMatching.js's general 500m decay (Melaka's old-town shoplots sit only
 // metres apart, and there's no name to narrow things down). The confidence
@@ -29,10 +29,11 @@ const MAPILLARY_TOKEN = process.env.MAPILLARY_ACCESS_TOKEN;
 // added and the response was inspected directly.
 const SEARCH_RADIUS_METERS = 50;
 const MAX_CANDIDATES = 3;
-// Calibrated so a genuinely close match (~15m, well within normal GPS/
-// building-footprint slack) crosses NEEDS_CONFIRMATION_THRESHOLD (60) and so
-// only an almost-exact match (~7m or closer) crosses AUTO_SUGGEST_THRESHOLD
-// (85) — see the module comment above for why crossing that upper one is fine.
+// Calibrated so only an almost-exact match (~7m or closer) crosses
+// AUTO_SUGGEST_THRESHOLD (85) — see the module comment above for why
+// crossing that upper one is fine. NEEDS_CONFIRMATION_THRESHOLD itself is
+// now deliberately low (see photoMatching.js), so most of the 50m search
+// radius clears it — that's the point, not a bug.
 const MAX_CONFIDENCE = 90;
 
 // Linear decay to 0 at SEARCH_RADIUS_METERS, scaled to MAX_CONFIDENCE — a

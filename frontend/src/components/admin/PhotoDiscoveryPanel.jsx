@@ -16,7 +16,7 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
   const [dismissed, setDismissed] = useState(() => new Set());
   const [searchError, setSearchError] = useState("");
 
-  // Mapillary/Flickr need coordinates and the video-frame/TikTok-oEmbed
+  // Mapillary/Overpass need coordinates and the video-frame/TikTok-oEmbed
   // providers need the vendor's source video, but Wikimedia only needs the
   // vendor's name (every vendor has one) — so a search is always worth
   // trying now; it may just come back empty if no provider has a match.
@@ -106,6 +106,15 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
                 <div className="admin-photo-candidate-preview">
                   <img src={candidate.previewUrl} alt={candidate.placeName || "Candidate photo"} loading="lazy" />
                   <span className={`admin-confidence-badge ${confidenceClass}`}>{candidate.confidence}%</span>
+                  <button
+                    type="button"
+                    className="admin-photo-candidate-dismiss"
+                    onClick={() => setDismissed((cur) => new Set(cur).add(candidate.photoRef))}
+                    aria-label="Ignore this candidate"
+                    disabled={busy}
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
                 <div className="admin-photo-candidate-meta">
                   <strong>{candidate.breakdown.matchedPlaceName || candidate.placeName}</strong>
@@ -129,15 +138,6 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
                     disabled={busy}
                   >
                     <ImagePlus size={12} /> Add to Gallery
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-icon-btn subtle"
-                    onClick={() => setDismissed((cur) => new Set(cur).add(candidate.photoRef))}
-                    aria-label="Ignore this candidate"
-                    disabled={busy}
-                  >
-                    <X size={14} />
                   </button>
                 </div>
               </div>

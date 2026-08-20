@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { X, Heart, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
-  priceLabel, photoAltText,
+  priceLabel, photoAltText, FOOD_PHOTO_POSITION,
 } from "../../lib/vendorDisplay";
 import VendorGallery from "./VendorGallery";
 import { useSession } from "../../lib/SessionContext";
@@ -108,14 +108,13 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         {/* Hero image — autoplays through the storefront cover + food photos
             as soon as the modal opens; arrows/dots let a visitor take over.
             Taller than before (h-44/220 -> h-52/280) so VendorGallery's
-            object-contain has room to show a 4:3 Places photo close to full
-            width instead of leaving heavy blurred margins either side. */}
+            object-cover has more room to fill before anything gets cropped. */}
         <div className="relative h-52 overflow-hidden rounded-t-2xl sm:h-[280px]">
-          {/* Same top-biased crop as the card (VendorCard's IMAGE_POSITION)
-              so the cover photo frames identically in both places — a
-              storefront that looks right on the card shouldn't jump to a
+          {/* Same FOOD_PHOTO_POSITION crop as the card (imported from
+              vendorDisplay.js, not a local copy) so a photo frames
+              identically in both places — it shouldn't jump to a visibly
               different crop the moment the modal opens. */}
-          <VendorGallery images={images} alt={(_, i) => photoAltText(vendor, i)} interval={2600} showArrows showDots objectPosition="50% 18%" />
+          <VendorGallery images={images} alt={(_, i) => photoAltText(vendor, i)} interval={2600} showArrows showDots objectPosition={FOOD_PHOTO_POSITION} />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(64,84,74,0.72)_0%,transparent_55%)]" />
           {/* Category badge */}
           <span className="absolute left-3 top-3 rounded-full bg-forest px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-white">

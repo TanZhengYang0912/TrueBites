@@ -1,7 +1,5 @@
 // Free, keyless, no-login fallback source — Wikimedia Commons' search API
-// needs no registration at all (unlike Flickr, which now requires a paid
-// Flickr Pro subscription to even create an API key — confirmed directly
-// against Flickr's current signup flow, so it's not wired up as a provider).
+// needs no registration at all.
 //
 // Per the project's own scope notes, Commons is a narrow fallback: it mostly
 // documents notable/landmark places, not ordinary hawker stalls — tested
@@ -16,9 +14,8 @@
 // (the same distinctive-token matching the TikTok provider uses for video
 // captions) rather than computePhotoMatchConfidence's name+location formula.
 // That formula also wouldn't work well here anyway: Commons results almost
-// never carry usable coordinates or a business category, and without those
-// its max achievable score is 50 (name only) — always below
-// NEEDS_CONFIRMATION_THRESHOLD (60), so nothing would ever reach an admin.
+// never carry usable coordinates or a business category, so it'd be scoring
+// on name alone regardless — captionMatchConfidence is the more direct fit.
 import { captionMatchConfidence } from "../photoMatching.js";
 
 const MAX_CANDIDATES = 3;

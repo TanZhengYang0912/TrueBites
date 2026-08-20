@@ -1814,6 +1814,7 @@
   .admin-detail-grid {
     padding: 14px 18px 18px;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
 
@@ -2021,7 +2022,15 @@
     background: rgba(23, 33, 43, 0.65);
     color: #fff;
     cursor: pointer;
-    transition: background-color 140ms;
+    opacity: 0;
+    transition: background-color 140ms, opacity 140ms;
+  }
+
+  /* Only the thumb the mouse is actually over reveals its trash icon —
+     keyboard focus reveals it too, so it stays reachable without a mouse. */
+  .admin-gallery-thumb:hover .admin-gallery-thumb-remove,
+  .admin-gallery-thumb-remove:focus-visible {
+    opacity: 1;
   }
 
   .admin-gallery-thumb-remove:hover {
@@ -2031,6 +2040,35 @@
   .admin-gallery-thumb-remove:disabled {
     cursor: not-allowed;
     opacity: 0.6;
+  }
+
+  .admin-gallery-thumb.pending-removal img {
+    opacity: 0.35;
+  }
+
+  .admin-gallery-thumb-pending {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: rgba(23, 33, 43, 0.55);
+    color: #fff;
+    text-align: center;
+    padding: 4px;
+  }
+
+  .admin-gallery-thumb-pending span {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .admin-gallery-thumb-pending .admin-link-btn {
+    font-size: 10.5px;
   }
 
   .admin-gallery-add {
@@ -2050,9 +2088,14 @@
     transition: border-color 140ms, background 140ms, color 140ms;
   }
 
-  .admin-gallery-add:hover {
+  .admin-gallery-add:hover,
+  .admin-gallery-add.drag-over {
     border-color: var(--admin-navy);
     color: var(--admin-navy);
+  }
+
+  .admin-gallery-add.drag-over {
+    background: #eef2f8;
   }
 
   .admin-gallery-add:disabled {
@@ -2115,6 +2158,12 @@
     border: 1px solid var(--admin-border);
     border-radius: 8px;
     background: var(--admin-panel);
+    /* Grid items default to min-width:auto, i.e. "at least as wide as my
+       content's min-content size" — the actions row's un-wrapped button
+       text was wider than a narrow auto-fill column, so the card blew past
+       its track and visually overlapped the next one. This lets it shrink
+       to the track width like every other grid item here. */
+    min-width: 0;
   }
 
   .admin-photo-candidate-preview {
@@ -2152,6 +2201,35 @@
     color: var(--admin-warning-text);
   }
 
+  /* Moved off the actions row (was a 3rd flex item squeezed in with the two
+     text buttons) and onto the image itself, mirroring the gallery thumb's
+     own remove button — frees the actions row up to just the two real
+     choices, and gives this one a bigger, unambiguous touch target. */
+  .admin-photo-candidate-dismiss {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(23, 33, 43, 0.65);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 140ms;
+  }
+
+  .admin-photo-candidate-dismiss:hover {
+    background: var(--admin-danger-text);
+  }
+
+  .admin-photo-candidate-dismiss:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
   .admin-photo-candidate-meta {
     display: grid;
     gap: 2px;
@@ -2166,12 +2244,14 @@
 
   .admin-photo-candidate-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
   }
 
   .admin-photo-candidate-actions .admin-secondary-btn {
     flex: 1;
+    min-width: 0;
   }
 
   .admin-detail-row {
