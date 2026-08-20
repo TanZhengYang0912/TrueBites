@@ -1,8 +1,8 @@
 /**
  * Batch-fill COVER photos for vendors that currently have none —
- * storefront_image_url IS NULL — using Mapillary (street-level, free) and
- * Wikimedia Commons (free, keyless) only. Free, no API key requirement, no
- * Google Places.
+ * storefront_image_url IS NULL — using Mapillary (street-level, free),
+ * Overpass/OpenStreetMap (free, keyless), and Wikimedia Commons (free,
+ * keyless) only. Free, no API key requirement, no Google Places.
  *
  * SCOPE — deliberately does NOT touch the video-frame or TikTok-oEmbed
  * providers, even though they're registered in photoProviders/index.js for
@@ -12,8 +12,8 @@
  * confidently attributed to one specific shop, and cleared storefront_image_url
  * for exactly that reason (see scripts/vendor_photo_audit.json). Running
  * video-frame extraction here would just reintroduce that same misattribution
- * — so this script only ever calls findMapillaryCandidates/findWikimediaCandidates
- * directly, not the full discoverVendorPhotos() pipeline.
+ * — so this script only ever calls findMapillaryCandidates/findOverpassCandidates/
+ * findWikimediaCandidates directly, not the full discoverVendorPhotos() pipeline.
  *
  * AUTO-COMMIT SAFETY — this bypasses the normal admin manual-confirm step
  * (PhotoDiscoveryPanel), so it applies a stricter bar than the UI's own
@@ -27,14 +27,16 @@
  *     show an unrelated vendor's photo" requirement. Mapillary results are
  *     written to the needs-review report instead, for a human to check.
  *
- *   - Wikimedia candidates need confidence >= AUTO_SUGGEST_THRESHOLD (85)
- *     AND at least 2 distinctive tokens in the vendor's own name. Found by
+ *   - Wikimedia AND Overpass candidates need confidence >= AUTO_SUGGEST_THRESHOLD
+ *     (85) AND at least 2 distinctive tokens in the vendor's own name. Found by
  *     live-testing this exact pipeline: a vendor named just "Nyonya" hit
  *     Wikimedia's exact-substring-match branch (100% confidence) against an
  *     unrelated "Baba Nyonya Museum" photo, because the single word appears
  *     verbatim in both. A vendor name with only one distinctive word can't
  *     be trusted to identify one specific business without a human look —
  *     those go to the needs-review report too, regardless of confidence.
+ *     Overpass gets the same bar for the same reason: an OSM node's `name`
+ *     tag is just as capable of that same single-word false match.
  *
  * Everything that IS auto-committed still goes through the same storage +
  * DB write path as a manual admin commit (cover_photo_locked stays false,
@@ -44,9 +46,12 @@
  *   node scripts/fetchVendorCoverPhotos.js --yes
  *   node scripts/fetchVendorCoverPhotos.js --yes --limit=10
  *   node scripts/fetchVendorCoverPhotos.js --yes --vendor-id=<id>
+ *   node scripts/fetchVendorCoverPhotos.js --yes --force   # re-check vendors
+ *     already marked "done" in a previous run too — e.g. after adding a new
+ *     provider (like Overpass) that a past run never got to try.
  *
  * Requirements: backend/.env must have SUPABASE_URL, SUPABASE_SERVICE_KEY,
- * and ideally MAPILLARY_ACCESS_TOKEN (Wikimedia needs no key at all).
+ * and ideally MAPILLARY_ACCESS_TOKEN (Wikimedia and Overpass need no key at all).
  */
 
 import path from "path";
@@ -54,6 +59,7 @@ import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
 import { findMapillaryCandidates } from "../lib/photoProviders/mapillaryProvider.js";
+import { findOverpassCandidates } from "../lib/photoProviders/overpassProvider.js";
 import { findWikimediaCandidates } from "../lib/photoProviders/wikimediaProvider.js";
 import { downloadAndStorePhoto } from "../lib/photoProviders/photoStorage.js";
 import { captionMatchConfidence, AUTO_SUGGEST_THRESHOLD } from "../lib/photoMatching.js";
@@ -67,6 +73,7 @@ const opt = (name, fallback = null) => {
 };
 
 const CONFIRMED = flag("yes");
+const FORCE = flag("force");
 const LIMIT = opt("limit") ? parseInt(opt("limit"), 10) : null;
 const ONLY_VENDOR_ID = opt("vendor-id");
 const MIN_DISTINCTIVE_TOKENS = 2; // see AUTO-COMMIT SAFETY above
@@ -78,7 +85,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 if (!CONFIRMED) {
   console.log(
-    "This picks the best Mapillary/Wikimedia candidate for each cover-less\n" +
+    "This picks the best Mapillary/Overpass/Wikimedia candidate for each cover-less\n" +
     "vendor and, for candidates that clear a strict auto-commit bar, writes\n" +
     "it as the cover photo automatically (no admin click) — real writes to\n" +
     "the shared vendor-images bucket + vendors table. Anything that doesn't\n" +
@@ -117,7 +124,7 @@ async function main() {
   const eligible = vendors.filter((v) => !v.storefront_image_url);
   const log = loadLog();
   const doneSet = new Set(log.done);
-  let pending = eligible.filter((v) => !doneSet.has(v.id));
+  let pending = FORCE ? eligible : eligible.filter((v) => !doneSet.has(v.id));
   if (LIMIT) pending = pending.slice(0, LIMIT);
 
   console.log(`📄  ${vendors.length} vendors total | ${eligible.length} with no cover | ${pending.length} to process this run\n`);
@@ -129,16 +136,18 @@ async function main() {
     const vendor = pending[i];
     process.stdout.write(`[${i + 1}/${pending.length}] ${vendor.vendor_name} ... `);
 
-    const [mapillaryResult, wikimediaResult] = await Promise.allSettled([
+    const [mapillaryResult, overpassResult, wikimediaResult] = await Promise.allSettled([
       findMapillaryCandidates(vendor),
+      findOverpassCandidates(vendor),
       findWikimediaCandidates(vendor),
     ]);
     const mapillaryCandidates = mapillaryResult.status === "fulfilled" ? mapillaryResult.value : [];
+    const overpassCandidates = overpassResult.status === "fulfilled" ? overpassResult.value : [];
     const wikimediaCandidates = wikimediaResult.status === "fulfilled" ? wikimediaResult.value : [];
-    const allCandidates = [...mapillaryCandidates, ...wikimediaCandidates].sort((a, b) => b.confidence - a.confidence);
+    const allCandidates = [...mapillaryCandidates, ...overpassCandidates, ...wikimediaCandidates].sort((a, b) => b.confidence - a.confidence);
 
     const nameTokenCount = distinctiveTokenCount(vendor.vendor_name);
-    const autoEligible = wikimediaCandidates
+    const autoEligible = [...overpassCandidates, ...wikimediaCandidates]
       .filter((c) => c.confidence >= AUTO_SUGGEST_THRESHOLD && nameTokenCount >= MIN_DISTINCTIVE_TOKENS)
       .sort((a, b) => b.confidence - a.confidence)[0];
 
@@ -156,15 +165,24 @@ async function main() {
           })
           .eq("id", vendor.id);
         if (updateErr) throw new Error(updateErr.message);
-        console.log(`✅  auto-committed (wikimedia, ${autoEligible.confidence}%)`);
+        console.log(`✅  auto-committed (${autoEligible.provider}, ${autoEligible.confidence}%)`);
         autoCommitted++;
+        // Resolved — drop any stale needs-review entry from an earlier run
+        // (matters under --force, where a vendor can go from "flagged" to
+        // "auto-committed" once a new provider like Overpass finds a match).
+        for (let j = needsReview.length - 1; j >= 0; j--) {
+          if (needsReview[j].vendorId === vendor.id) needsReview.splice(j, 1);
+        }
       } catch (err) {
         console.log(`❌  ${err.message}`);
       }
     } else if (allCandidates.length) {
       console.log(`⚠️  ${allCandidates.length} candidate(s) found, none auto-eligible — flagged for review`);
       flaggedForReview++;
-      needsReview.push({
+      // Replace rather than duplicate — under --force this vendor may
+      // already have an entry from an earlier run.
+      const existingIdx = needsReview.findIndex((r) => r.vendorId === vendor.id);
+      const entry = {
         vendorId: vendor.id,
         vendorName: vendor.vendor_name,
         candidates: allCandidates.map((c) => ({
@@ -173,13 +191,15 @@ async function main() {
           previewUrl: c.previewUrl,
           note: c.breakdown.note,
         })),
-      });
+      };
+      if (existingIdx === -1) needsReview.push(entry);
+      else needsReview[existingIdx] = entry;
     } else {
       console.log("—  no candidates from either provider");
       noCandidates++;
     }
 
-    log.done.push(vendor.id);
+    if (!log.done.includes(vendor.id)) log.done.push(vendor.id);
     if ((i + 1) % 5 === 0) { saveLog(log); fs.writeFileSync(REVIEW_PATH, JSON.stringify(needsReview, null, 2)); }
     await sleep(DELAY_MS);
   }

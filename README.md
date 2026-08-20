@@ -102,7 +102,6 @@ This creates `admin@gmail.com` / `adminn` with `app_metadata.role: "superadmin"`
 
 ### Known limitations
 
-- `/ai` is gated client-side (`AuthGate`, plus the page not being reachable by customers through normal navigation) but the backend routes behind it (the AI service) do not themselves check for an admin token — don't rely on this for anything security-sensitive until that's added.
 - There's currently no way to promote an *existing* customer account to admin — `POST /api/admin/admins` only creates brand-new accounts and returns `409` if the email is already registered.
 
 ---
@@ -139,9 +138,10 @@ Then fill in the values — see the sections below.
 ### 4. Install dependencies and start the app
 
 ```bash
-# Terminal 1 — Backend
+# Terminal 1 — Backend (includes the AI content pipeline)
 cd backend
 npm install
+npm run setup:ytdlp   # fetches a yt-dlp binary into backend/bin/ (one-time)
 npm run dev
 # Runs at http://localhost:4000
 
@@ -150,23 +150,18 @@ cd frontend
 npm install
 npm run dev
 # Runs at http://localhost:5173
-
-# Terminal 3 — AI processing service
-cd backend
-# Recommended: use the Python 3.12 environment with the AI dependencies installed.
-# Create it once if it does not exist:
-# python3.12 -m venv venv-new
-source venv-new/bin/activate
-python -m pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-# Runs at http://localhost:8000
 ```
 
-The AI service requires Python 3.12 with the packages in `backend/requirements.txt`.
-`backend/venv-new` is the recommended local environment. `backend/venv312` is an older
-`uv`-managed Python 3.12 environment with the same dependencies, while `backend/venv313`
-is only a bare Python 3.13 environment and is not sufficient for this service. Virtual
-environments are local-only and must not be committed.
+The AI content pipeline (video download, transcription, extraction) runs in-process in
+the Node backend under `/api/ai` — no separate service or window needed. It requires two
+external tools on the machine running the backend:
+
+- **yt-dlp** — fetched automatically into `backend/bin/` by `npm run setup:ytdlp`.
+- **ffmpeg** / **ffprobe** — install separately (e.g. via your OS package manager) and
+  make sure they're on `PATH`, or point `FFMPEG_PATH`/`FFPROBE_PATH` at them.
+
+It also needs a `GROQ_API_KEY` (used for both transcription and vendor-info extraction —
+see `backend/.env.example`).
 
 ### Deploy the Node API to Render
 
@@ -188,10 +183,11 @@ set the Vercel frontend variable below and redeploy the frontend:
 VITE_API_BASE=https://your-render-service.onrender.com
 ```
 
-Do not append `/api`; the frontend API modules add that path themselves. The separate
-FastAPI/AI service is not deployed by this Blueprint. Deploy it independently and set
-`AI_SERVICE_BASE` on the Node service plus `VITE_AI_API_BASE` on the frontend when it is
-ready for production.
+Do not append `/api`; the frontend API modules add that path themselves. Set
+`GROQ_API_KEY` on the Render service too if you want the AI content pipeline to work in
+production — note that Render's Node runtime does not have ffmpeg/yt-dlp available by
+default, so the AI routes will not function there without extra setup (this was also true
+before the AI service was merged into this backend).
 
 ### 5. When your feature is ready, push and open a PR
 
@@ -214,9 +210,11 @@ Then open a Pull Request on GitHub to merge into `main`.
 | `GOOGLE_API_KEY` | Server-side key for Geocoding API + Directions API | Ask Tan Zheng Yang |
 | `SUPABASE_URL` | Supabase project URL | Ask Tan Zheng Yang |
 | `SUPABASE_SERVICE_KEY` | Supabase secret key (never committed) | Ask Tan Zheng Yang |
+| `GROQ_API_KEY` | Groq API key — powers AI transcription (Whisper) and vendor-info extraction | https://console.groq.com |
 | `WHISPER_LANGUAGE` | Whisper language hint for AI transcription | Leave as `ms` for Malay/English food content |
-| `AI_SERVICE_BASE` | Separately deployed FastAPI service URL | Leave unset when deploying only the Node API |
-| `AI_INTERNAL_KEY` | Optional shared secret between Node API and FastAPI AI service | Set the same long random value in both services for production |
+| `YTDLP_PATH` | Override path to a yt-dlp binary | Leave unset — `npm run setup:ytdlp` fetches one into `backend/bin/` |
+| `PUBLIC_BASE_URL` | Base URL used to build links to extracted gallery-photo frames | Leave unset locally; set to the deployed backend URL in production |
+| `AI_OUTPUTS_TTL_HOURS` | Hours to keep AI job artifacts on disk before the sweeper deletes them | Leave unset (defaults to 24) |
 | `PORT` | Server port (default 4000) | Leave as `4000` |
 
 ---
@@ -227,12 +225,11 @@ Then open a Pull Request on GitHub to merge into `main`.
 |---|---|---|
 | `VITE_MAPS_BROWSER_KEY` | Google Maps browser key | Ask Tan Zheng Yang |
 | `VITE_MAP_ID` | Google Maps map ID | Google Maps Platform console |
-| `VITE_API_BASE` | Node backend URL | Local: `http://localhost:4000`; production: Render service URL |
-| `VITE_AI_API_BASE` | FastAPI AI processing URL | Leave as `http://localhost:8000/api` |
+| `VITE_API_BASE` | Node backend URL (also serves the AI pipeline under `/api/ai`) | Local: `http://localhost:4000`; production: Render service URL |
 | `VITE_SUPABASE_URL` | Supabase project URL used by browser auth | Supabase project settings |
 | `VITE_SUPABASE_ANON_KEY` | Supabase public/anon key used by browser auth | Supabase project settings |
 
-> Never place `SUPABASE_SERVICE_KEY`, `GOOGLE_API_KEY`, or `AI_INTERNAL_KEY` in a
+> Never place `SUPABASE_SERVICE_KEY`, `GOOGLE_API_KEY`, or `GROQ_API_KEY` in a
 > `VITE_*` variable. Vite variables are embedded in the public browser bundle.
 
 ---

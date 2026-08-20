@@ -13,11 +13,12 @@ import {
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
 import { logActivity } from "../lib/auditLog.js";
 import { isSuspended } from "../lib/suspension.js";
+import { startProcessingJob } from "../lib/ai/pipeline.js";
+import { ytDlp } from "../lib/ai/binaries.js";
 
 const router = Router();
 
 const OUTPUTS_DIR = path.resolve(process.cwd(), "outputs");
-const AI_INTERNAL_KEY = process.env.AI_INTERNAL_KEY || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN DASHBOARD / VENDORS / AI PROCESSING / SETTINGS / REVIEWS
@@ -289,10 +290,6 @@ router.get("/vendors", async (req, res) => {
       builder = builder.order("vendor_name", { ascending: false });
     } else if (sort === "oldest") {
       builder = builder.order("created_at", { ascending: true, nullsFirst: false });
-    } else if (sort === "score_desc") {
-      builder = builder.order("sentiment_score", { ascending: false, nullsFirst: false });
-    } else if (sort === "score_asc") {
-      builder = builder.order("sentiment_score", { ascending: true, nullsFirst: false });
     } else if (sort === "status") {
       builder = builder.order("status", { ascending: true, nullsFirst: false });
     } else if (sort === "status_desc") {
@@ -478,51 +475,30 @@ router.post("/ai/submit", async (req, res) => {
   }
 
   try {
-    const target = `${process.env.AI_SERVICE_BASE || "http://localhost:8000"}/api/process`;
-    const response = await fetch(target, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(AI_INTERNAL_KEY ? { "X-Internal-Key": AI_INTERNAL_KEY } : {}),
-      },
-      body: JSON.stringify({ url }),
-    });
-
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: payload?.detail || payload?.error || "Failed to submit AI processing job",
-      });
-    }
-
+    const job = await startProcessingJob(url);
     await logActivity({ actor: req.callerUser, action: "ai.submit", entityType: "ai_job", metadata: { url } });
-    return res.json(payload);
+    return res.json(job);
   } catch (error) {
-    return res.status(502).json({
-      error: "AI processing service is unavailable",
-      details: error.message,
+    return res.status(error.status || 502).json({
+      error: error.message || "Failed to submit AI processing job",
     });
   }
 });
 
+// Used to proxy a health check to the separate Python AI service — now
+// there's no separate service to ask, so this instead reports whether the
+// AI toolchain this same process depends on (yt-dlp, Groq) is actually
+// usable, which is a more useful thing for an admin to know anyway.
 router.get("/ai/service-status", async (_req, res) => {
-  const base = process.env.AI_SERVICE_BASE || "http://localhost:8000";
-
   try {
-    const response = await fetch(`${base}/openapi.json`, {
-      headers: AI_INTERNAL_KEY ? { "X-Internal-Key": AI_INTERNAL_KEY } : {},
-    });
+    const version = await ytDlp(["--version"], { timeoutMs: 10_000 });
     return res.json({
-      available: response.ok,
-      base,
-      status: response.status,
+      available: version.code === 0 && Boolean(process.env.GROQ_API_KEY),
+      ytDlp: version.code === 0 ? version.stdout.trim() : null,
+      groq: Boolean(process.env.GROQ_API_KEY),
     });
   } catch (error) {
-    return res.json({
-      available: false,
-      base,
-      error: error.message,
-    });
+    return res.json({ available: false, error: error.message });
   }
 });
 
@@ -535,8 +511,8 @@ router.get("/settings", async (_req, res) => {
     ];
 
     const aiSettings = [
-      { label: "Whisper Model", value: "small" },
-      { label: "LLM Model", value: "llama-3.1-8b-instant" },
+      { label: "Whisper Model", value: "whisper-large-v3 (Groq)" },
+      { label: "LLM Model", value: "openai/gpt-oss-20b (Groq)" },
       { label: "Max Batch Size", value: "1000 videos" },
       { label: "Auto-save to Database", value: "Enabled (manual review before save)" },
       { label: "Backend API", value: process.env.PORT ? `localhost:${process.env.PORT}` : "localhost:4000" },

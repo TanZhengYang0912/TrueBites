@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { normalizeExtracted, normalizeTextList } from '../../lib/aiReview';
+import { downloadJobCsv } from '../../api/ai';
 
 const FIELD_CONFIG = [
   { key: 'vendor_name', label: '🏪 Vendor Name', placeholder: 'Vendor name' },
@@ -58,19 +59,9 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
   };
 
   const downloadCSV = async () => {
+    const vendorName = (mergedRecord.vendor_name || 'vendor').replace(/[^a-zA-Z0-9]/g, '_');
     try {
-      const res = await fetch(`http://localhost:8000/api/export-csv/${jobData.job_id}`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const vendorName = (mergedRecord.vendor_name || 'vendor').replace(/[^a-zA-Z0-9]/g, '_');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${vendorName}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await downloadJobCsv(jobData.job_id, `${vendorName}.csv`);
     } catch { /* ignore */ }
   };
 

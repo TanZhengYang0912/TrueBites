@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE = 'http://localhost:8000/api';
+import { saveToDatabase } from '../../api/ai';
 
 
 
@@ -75,23 +74,16 @@ export default function BatchResultsStep({ batchData, onReset }) {
     if (malaccaJobs.length === 0) return;
     setSaveState({ saving: true, result: null });
     try {
-      const payload = {
-        vendors: malaccaJobs.map(job => ({
-          job_id: job.job_id,
-          vendor_name: overrides[job.job_id]?.vendor_name,
-          address: overrides[job.job_id]?.address,
-          city: overrides[job.job_id]?.city,
-          state: overrides[job.job_id]?.state,
-          price_range: overrides[job.job_id]?.price_range,
-          operating_hours_raw: overrides[job.job_id]?.operating_hours_raw,
-        })),
-      };
-      const res = await fetch(`${API_BASE}/save-to-database`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
+      const vendors = malaccaJobs.map(job => ({
+        job_id: job.job_id,
+        vendor_name: overrides[job.job_id]?.vendor_name,
+        address: overrides[job.job_id]?.address,
+        city: overrides[job.job_id]?.city,
+        state: overrides[job.job_id]?.state,
+        price_range: overrides[job.job_id]?.price_range,
+        operating_hours_raw: overrides[job.job_id]?.operating_hours_raw,
+      }));
+      const data = await saveToDatabase(vendors);
       setSaveState({ saving: false, result: data });
     } catch (e) {
       setSaveState({ saving: false, result: { saved: [], failed: [{ reason: e.message }] } });

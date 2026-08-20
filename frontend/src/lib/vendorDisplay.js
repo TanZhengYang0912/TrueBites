@@ -1,6 +1,7 @@
 // Shared display helpers for vendor cards, the detail modal, and trip-panel
 // stops. Category keys are derived from cuisine_types first so discovery filters
 // use the database contract instead of a collection of visual guesses.
+import { categoryPhoto } from "./categoryPhotos.js";
 export const CATEGORY_FILTERS = [
   { key: "all", label: "All", values: null },
   { key: "local", label: "Malaysian / Local", values: ["Malaysian / Local"] },
@@ -73,28 +74,64 @@ export function categoryMatches(vendor, key) {
 }
 
 // ─── Vendor imagery ─────────────────────────────────────────────────────────────
+// Shared `object-position` for every vendor photo shown in the card-hover and
+// detail-modal carousels (VendorCard, VendorDetailModal) — a single exported
+// constant so the two surfaces can't drift apart, which matters here: the
+// same photo has to keep a visually consistent crop when a card is expanded
+// into the detail view.
+//
+// Nearly every vendor photo (TikTok video-frame covers and gallery frames
+// alike) is a portrait 9:16/3:4 source shown inside a landscape box, so
+// `object-fit: cover` discards more than half its height — object-position
+// decides which half survives. Tuned empirically against real vendor photos
+// (rendered at card size, compared side by side) rather than guessed:
+//   - A tight top bias (previously 18%) frequently lands the crop right on
+//     top of TikTok's caption/location-tag band creators burn into the top
+//     of the frame, which then dominates the card instead of the food —
+//     confirmed on several real photos where the caption text filled a
+//     quarter of the visible image.
+//   - Dead centre (50%) overcorrects the other way on wide table/stall
+//     shots (buffet spreads, market stalls), cropping the dish off the top
+//     of the frame while showing more of the counter/signage below.
+//   - ~38% down the frame cleared the caption band on every sampled photo
+//     while still keeping food that sits slightly above centre (the common
+//     case for these video frames) in view.
+export const FOOD_PHOTO_POSITION = "50% 38%";
+
 // Returns the real cover photo, or `null` when this vendor has none yet.
-// Deliberately does NOT fall back to a random stock/unrelated photo — showing
-// an unrelated restaurant's photo as if it belonged to this vendor is worse
-// than showing an honest "photo unavailable" state (see
-// PhotoUnavailablePlaceholder.jsx, which every caller of vendorGallery()
-// renders instead of an <img> whenever a slide is null). `storefront_image_url`
-// is the real DB/API column; `imageUrl` is how the admin console's API mapper
-// names it; `image_url` is kept as a last-resort legacy key in case anything
-// else still produces it.
+// Deliberately does NOT fall back to a stand-in here — this is also what the
+// admin console's "Edit Vendor" cover dropzone previews (via
+// AdminVendorManagementPage.jsx's makeForm), and showing a fake preview there
+// would make an admin think a real cover was already uploaded when it wasn't.
+// The public-facing fallback lives in vendorGallery() below instead, which
+// only ever feeds the customer-facing card/detail carousels.
+// `storefront_image_url` is the real DB/API column; `imageUrl` is how the
+// admin console's API mapper names it; `image_url` is kept as a last-resort
+// legacy key in case anything else still produces it.
 export function placeholderImage(vendor) {
   return vendor.storefront_image_url || vendor.imageUrl || vendor.image_url || null;
 }
 
 // Ordered image list for the card-hover / detail-modal carousels: the
-// storefront cover always leads (same photo `placeholderImage` returns, so
-// the first frame never "pops" when a carousel mounts), followed by any
-// admin-uploaded/fetched gallery photos in upload order. `gallery_image_urls`
-// is the raw DB/API field name; `galleryUrls` is how the admin console's list
-// mapper names it (see admin.js's item mapper) — both are accepted so this
-// works from either data source without a prop-mapping step at the call site.
+// storefront cover always leads (the same photo `placeholderImage` returns
+// when one exists, so the first frame never "pops" when a carousel mounts),
+// followed by any admin-uploaded/fetched gallery photos in upload order.
+// `gallery_image_urls` is the raw DB/API field name; `galleryUrls` is how the
+// admin console's list mapper names it (see admin.js's item mapper) — both
+// are accepted so this works from either data source without a prop-mapping
+// step at the call site.
+//
+// Unlike placeholderImage() itself, a vendor with no real cover here gets a
+// same-category stock dish photo (categoryPhotos.js) instead of `null` — a
+// customer-facing card sitting permanently empty (no free discovery source
+// ever found a usable photo for ~20 vendors, and there's no automated way to
+// close that gap) was judged worse than a generic, same-category stand-in.
+// This still never shows another SPECIFIC vendor's photo — that's the
+// actually misleading case the rest of this codebase guards against — a
+// same-category dish shot is a bounded, honest-enough placeholder, not a
+// fabricated identity.
 export function vendorGallery(vendor) {
-  const cover = placeholderImage(vendor);
+  const cover = placeholderImage(vendor) || categoryPhoto(categoryOf(vendor));
   const images = [cover];
 
   const uploaded = Array.isArray(vendor.gallery_image_urls)

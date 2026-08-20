@@ -452,7 +452,7 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
     }
   }
 
-  const KNOWN_PROVIDERS = ["tiktok_oembed", "mapillary", "flickr", "video_frame", "wikimedia"];
+  const KNOWN_PROVIDERS = ["tiktok_oembed", "mapillary", "overpass", "video_frame", "wikimedia"];
   if (!KNOWN_PROVIDERS.includes(provider)) {
     return res.status(400).json({ error: `unknown or unavailable photo provider: ${provider}` });
   }

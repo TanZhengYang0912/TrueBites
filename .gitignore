@@ -27,44 +27,19 @@ coverage/
 .coverage
 *.coverage
 
-# Python tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Migration script progress — local only
-backend/scripts/geocode_log.json
-
-# Python bytecode cache
-__pycache__/
-*.pyc
-*.pyo
-
 # AI pipeline runtime outputs (audio files, transcripts) — large binary files
 backend/outputs/
 
-# Downloaded ML model files (e.g. the YuNet face-detection model) — fetched
-# once at runtime and cached locally, not project source.
-backend/models/
-
-# Python virtual environments — large, never commit
-venv/
-venv-new/
-venv312/
-venv313/
-.venv/
-backend/venv/
-backend/venv-new/
-backend/venv312/
-backend/venv313/
-backend/.venv/
-
-# Python cache
-backend/routes/__pycache__/
-backend/services/__pycache__/
+# Standalone yt-dlp binary — fetched by scripts/installYtDlp.js, not source
+backend/bin/
 
 # Test files (local only)
 backend/tests/
+
+# Run-artifacts written by the admin one-off scripts (fetchVendorCoverPhotos.js,
+# fetchVendorGalleryFrames.js, auditOrphanStorage.js, etc.) — logs/review lists
+# that change on every run, not hand-authored source.
+backend/scripts/*.json
 
 # Local QA captures and generated review notes
 design-qa*.png

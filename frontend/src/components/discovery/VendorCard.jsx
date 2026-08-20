@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Bookmark, Check, MapPin, Plus, Star, Wallet } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
-  priceRangeLabel, hoursStatus, photoAltText,
+  priceRangeLabel, hoursStatus, photoAltText, FOOD_PHOTO_POSITION,
 } from "../../lib/vendorDisplay";
 import VendorGallery from "./VendorGallery";
 
@@ -14,15 +14,8 @@ const CLOSED_RED = "#C92A2A";
 // Fixed 4:3 aspect ratio (not a fixed pixel height) so proportions hold
 // correctly at every breakpoint — a card's width already changes with the
 // grid's column count (1/2/3-4 per row), and a flat height only ever looked
-// right at one of those widths. Every vendor photo is a portrait 9:16/3:4
-// video frame, so this crops more than a taller box would; the top-biased
-// IMAGE_POSITION below still keeps the shopfront signage in frame.
+// right at one of those widths.
 const IMAGE = "relative aspect-[4/3] cursor-pointer bg-sand";
-// TikTok captions sit dead-centre in the source frame — biasing the crop
-// toward the top keeps the shopfront signage/structure (which is what's up
-// top in these food-vlog frames) and trades away more of the caption band
-// than a centred crop would.
-const IMAGE_POSITION = "50% 18%";
 
 export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onOpenDetail }) {
   const handle = creatorHandle(vendor);
@@ -62,8 +55,8 @@ export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmar
           alt={(_, i) => photoAltText(vendor, i)}
           active={hovered}
           resetOnInactive
-          interval={1100}
-          objectPosition={IMAGE_POSITION}
+          interval={2200}
+          objectPosition={FOOD_PHOTO_POSITION}
           tapToAdvance
         />
 
