@@ -141,7 +141,6 @@ Then fill in the values — see the sections below.
 # Terminal 1 — Backend (includes the AI content pipeline)
 cd backend
 npm install
-npm run setup:ytdlp   # fetches a yt-dlp binary into backend/bin/ (one-time)
 npm run dev
 # Runs at http://localhost:4000
 
@@ -153,12 +152,15 @@ npm run dev
 ```
 
 The AI content pipeline (video download, transcription, extraction) runs in-process in
-the Node backend under `/api/ai` — no separate service or window needed. It requires two
-external tools on the machine running the backend:
+the Node backend under `/api/ai` — no separate service or window needed, and no OS-level
+tools to install by hand:
 
-- **yt-dlp** — fetched automatically into `backend/bin/` by `npm run setup:ytdlp`.
-- **ffmpeg** / **ffprobe** — install separately (e.g. via your OS package manager) and
-  make sure they're on `PATH`, or point `FFMPEG_PATH`/`FFPROBE_PATH` at them.
+- **yt-dlp** — fetched automatically into `backend/bin/` by a `postinstall` hook, so a
+  plain `npm install` gets it (re-run `npm run setup:ytdlp` any time to re-fetch, e.g. if
+  TikTok extraction breaks and a newer build is needed).
+- **ffmpeg** / **ffprobe** — bundled via the `ffmpeg-static` / `ffprobe-static` npm
+  packages (prebuilt binaries for win32/darwin/linux, no system package manager, no
+  Docker). Set `FFMPEG_PATH`/`FFPROBE_PATH` only if you need to override this.
 
 It also needs a `GROQ_API_KEY` (used for both transcription and vendor-info extraction —
 see `backend/.env.example`).
@@ -185,9 +187,12 @@ VITE_API_BASE=https://your-render-service.onrender.com
 
 Do not append `/api`; the frontend API modules add that path themselves. Set
 `GROQ_API_KEY` on the Render service too if you want the AI content pipeline to work in
-production — note that Render's Node runtime does not have ffmpeg/yt-dlp available by
-default, so the AI routes will not function there without extra setup (this was also true
-before the AI service was merged into this backend).
+production — yt-dlp and ffmpeg/ffprobe are both npm-bundled binaries now (see above), not
+system packages, so `npm ci` on Render's plain Node runtime should fetch them with no
+Docker or custom buildpack needed. Not yet verified against a real Render deploy, though —
+if the build environment blocks outbound network access during `npm ci`, ffmpeg-static's
+own install script has no fallback and would fail the build; check the deploy logs the
+first time.
 
 ### 5. When your feature is ready, push and open a PR
 

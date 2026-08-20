@@ -7,6 +7,8 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import ffmpegStaticPath from "ffmpeg-static";
+import ffprobeStatic from "ffprobe-static";
 
 // yt-dlp resolution order: explicit override -> the standalone binary
 // scripts/installYtDlp.js fetches into backend/bin/ (deliberately preferred
@@ -20,12 +22,15 @@ function resolveYtDlp() {
   return "yt-dlp";
 }
 
-// ffmpeg/ffprobe: this project's dev machines already have these on PATH
-// (confirmed via `ffmpeg -version` before this module was written) — no
-// WinGet-glob scanning needed here. FFMPEG_PATH/FFPROBE_PATH exist as an
-// escape hatch for a machine where that isn't true.
-const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
-const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
+// ffmpeg/ffprobe resolution order: explicit override -> the prebuilt binary
+// ffmpeg-static/ffprobe-static already downloaded into node_modules during
+// `npm install` (win32/darwin/linux, no system package manager, no Docker —
+// this is what makes the AI pipeline actually work on Render's plain Node
+// runtime, which has neither ffmpeg nor apt-get available) -> bare
+// "ffmpeg"/"ffprobe" as a last resort if the platform/arch combo is one
+// those packages don't ship a binary for.
+const FFMPEG = process.env.FFMPEG_PATH || ffmpegStaticPath || "ffmpeg";
+const FFPROBE = process.env.FFPROBE_PATH || ffprobeStatic?.path || "ffprobe";
 // Resolved once per process, not per call — installYtDlp.js only runs
 // occasionally, not mid-request.
 const YT_DLP = resolveYtDlp();
