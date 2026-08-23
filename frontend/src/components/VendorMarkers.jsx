@@ -3,12 +3,45 @@ import {
   AdvancedMarker,
   Pin,
   InfoWindow,
-  Circle,
   useAdvancedMarkerRef,
   useMap,
 } from "@vis.gl/react-google-maps";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { MAP_COLORS } from "../lib/mapColors";
+
+// Keep clustered vendors visually consistent with the rest of TrueBites.
+// Google Maps' built-in renderer switches between blue and red based on local
+// density, which implies a distinction we do not make in the product.
+function createBrandClusterRenderer() {
+  return {
+    render({ count, position }) {
+      const scale = count >= 100 ? 25 : count >= 10 ? 22 : 19;
+      const fontSize = count >= 100 ? "12px" : "13px";
+
+      return new google.maps.Marker({
+        position,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: MAP_COLORS.forest,
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeOpacity: 1,
+          strokeWeight: 3,
+          scale,
+        },
+        label: {
+          text: String(count),
+          color: "#FFFFFF",
+          fontFamily: "Arial, sans-serif",
+          fontSize,
+          fontWeight: "700",
+        },
+        title: `${count} vendors`,
+        zIndex: 1000 + count,
+      });
+    },
+  };
+}
 
 // Renders vendor pins with clustering, plus numbered pins for trip stops and a
 // "you are here" marker. Vendor data comes from Supabase: { id, name, address,
@@ -40,7 +73,7 @@ function VendorMarker({ vendor, position, stopNum, isSelected, isApproximate, on
   );
 }
 
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, tripOrder, userStopNumber, selectedId, openId, onOpenChange, radiusCenter, radiusKm }) {
+export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
@@ -72,7 +105,7 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
 
   useEffect(() => {
     if (!map) return;
-    const nextClusterer = new MarkerClusterer({ map });
+    const nextClusterer = new MarkerClusterer({ map, renderer: createBrandClusterRenderer() });
     clusterer.current = nextClusterer;
     refreshCluster();
     return () => {
@@ -108,21 +141,6 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
 
   return (
     <>
-      {/* The radius shown for the "Nearby to add" list.
-          clickable={false} is load-bearing — at 10 km this covers the whole
-          viewport and would otherwise swallow every pin click. */}
-      {radiusCenter && radiusKm && (
-        <Circle
-          center={radiusCenter}
-          radius={radiusKm * 1000}
-          clickable={false}
-          strokeColor={MAP_COLORS.forest}
-          strokeOpacity={0.5}
-          strokeWeight={1.5}
-          fillColor={MAP_COLORS.forest}
-          fillOpacity={0.06}
-        />
-      )}
       {vendors.map((v) => {
         const stopNum = tripOrder?.get(v.id);
         // AI-extracted vendors that only had a city/state (no street address) get

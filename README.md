@@ -177,6 +177,7 @@ Render prompts for them:
 | `GOOGLE_API_KEY` | Server-side Geocoding and Directions key |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_KEY` | Supabase service-role key; never expose this to Vite |
+| `PUBLIC_BASE_URL` | Public Render URL used in admin settings and generated frame links |
 
 The Blueprint uses `backend` as its root directory, runs `npm ci`, and starts the API
 with `npm start`. Render supplies `PORT`; do not hard-code it. Once deployment succeeds,

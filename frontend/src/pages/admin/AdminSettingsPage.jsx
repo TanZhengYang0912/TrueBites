@@ -219,7 +219,7 @@ export default function AdminSettingsPage() {
             <div className="admin-panel-header stack">
               <div>
                 <h2>Processing Overview</h2>
-                <p>From the latest local jobs</p>
+                <p>From the latest processing jobs</p>
               </div>
             </div>
             <div className="admin-settings-metric-grid">
@@ -256,7 +256,7 @@ export default function AdminSettingsPage() {
         <div className="admin-panel-header">
           <div>
             <h2>Recent Jobs</h2>
-            <p>{recentJobs.length ? `${recentJobs.length} latest processing jobs` : "No local processing activity yet"}</p>
+            <p>{recentJobs.length ? `${recentJobs.length} latest processing jobs` : "No processing activity yet"}</p>
           </div>
           {recentJobs.length > 0 && <span className="admin-settings-jobs-summary">{completedJobs} completed · {failedJobs} failed</span>}
         </div>
@@ -281,7 +281,7 @@ export default function AdminSettingsPage() {
               </div>
             ))
           ) : (
-            <div className="admin-empty-state">No recent local AI job files found yet.</div>
+            <div className="admin-empty-state">No recent AI job files found yet.</div>
           )}
         </div>
       </section>

@@ -32,3 +32,12 @@ test("user moderation supports selecting users for a batch suspend action", () =
   assert.doesNotMatch(source, /openUsersPdf/);
   assert.doesNotMatch(source, /Export PDF/);
 });
+
+test("settings page uses deployment-safe processing copy", () => {
+  const source = read("pages/admin/AdminSettingsPage.jsx");
+
+  assert.match(source, /From the latest processing jobs/);
+  assert.match(source, /No processing activity yet/);
+  assert.match(source, /No recent AI job files found yet/);
+  assert.doesNotMatch(source, /latest local jobs|local processing activity|local AI job files/);
+});

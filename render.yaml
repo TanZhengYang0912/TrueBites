@@ -17,3 +17,5 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false

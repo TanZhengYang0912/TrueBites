@@ -16,7 +16,7 @@ test("Render deploys the Node API from the backend workspace", async () => {
 test("Render keeps backend credentials out of source control", async () => {
   const config = await readFile(new URL("./render.yaml", import.meta.url), "utf8");
 
-  for (const key of ["GOOGLE_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GROQ_API_KEY"]) {
+  for (const key of ["GOOGLE_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GROQ_API_KEY", "PUBLIC_BASE_URL"]) {
     assert.match(
       config,
       new RegExp(`^      - key: ${key}\\r?\\n        sync: false$`, "m"),

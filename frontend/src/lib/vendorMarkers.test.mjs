@@ -19,3 +19,14 @@ test("marker refs update clusters without rerendering through an inline ref", as
   assert.match(source, /function VendorMarker/);
   assert.doesNotMatch(source, /ref=\{\(marker\) => setMarkerRef/);
 });
+
+test("map clusters use one brand-green renderer and do not render a nearby radius", async () => {
+  const source = await readFile(markerPath, "utf8");
+
+  assert.match(source, /function createBrandClusterRenderer/);
+  assert.match(source, /renderer:\s*createBrandClusterRenderer\(\)/);
+  assert.match(source, /fillColor:\s*MAP_COLORS\.forest/);
+  assert.doesNotMatch(source, /\bCircle\b/);
+  assert.doesNotMatch(source, /radiusCenter/);
+  assert.doesNotMatch(source, /radiusKm/);
+});

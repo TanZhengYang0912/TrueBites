@@ -158,14 +158,14 @@ export default function LoginPage() {
     if (error) setErrorMsg(error.message);
   }
 
-  // Already logged in — go back to the app (unless we're mid-redirect to onboarding).
-  // Admins land here whenever a customer surface asks a "guest" to sign in; send
-  // them to their console instead, so no page needs its own admin redirect.
+  // Already logged-in customers go back to the app. Keep the form available to
+  // admins so they can switch into a customer account without first finding a
+  // separate sign-out flow.
   // Waits for the session context's initial read (and any Google OAuth code
   // exchange it's resolving) before deciding — otherwise a fast redirect back
   // from Google can render this page as logged-out for a frame.
-  if (!sessionLoading && session && !justSignedUp) {
-    navigate(isAdmin(session) ? "/admin" : "/map", { replace: true });
+  if (!sessionLoading && session && !justSignedUp && !isAdmin(session)) {
+    navigate("/map", { replace: true });
     return null;
   }
 

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
@@ -15,6 +16,19 @@ const TOGGLE_ACTIVE = `${TOGGLE} bg-white text-forest shadow-sm`;
 const TOGGLE_IDLE = `${TOGGLE} text-muted`;
 
 const AVATAR = "grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-forest text-sm font-semibold text-white";
+
+function HeaderAvatar({ avatarUrl, initials }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarUrl]);
+
+  if (avatarUrl && !imageFailed) {
+    return <img src={avatarUrl} alt="" className="size-full object-cover" onError={() => setImageFailed(true)} />;
+  }
+  return initials;
+}
 
 export default function DiscoveryHeader({
   onOpenMap,
@@ -107,7 +121,7 @@ export default function DiscoveryHeader({
               title={userEmail}
               aria-label={`Open profile${firstName ? ` for ${firstName}` : ""}`}
             >
-              {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : initials}
+              <HeaderAvatar avatarUrl={avatarUrl} initials={initials} />
             </button>
           </>
         ) : (
