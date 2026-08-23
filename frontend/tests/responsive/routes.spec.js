@@ -15,6 +15,8 @@ const routes = [
   ["admin-overview", "/admin"],
   ["admin-set-password", "/admin-set-password"],
   ["admin-vendors", "/admin/vendors2"],
+  ["admin-suggestions", "/admin/suggestions"],
+  ["admin-audit-log", "/admin/audit-log"],
   ["profile", "/profile"],
   ["admin-ai", "/admin/ai"],
   ["reset-password", "/reset-password"],
