@@ -17,7 +17,7 @@ function EditableField({ label, value, placeholder, multiline = false, onChange 
     padding: '7px 10px',
     borderRadius: 8,
     border: '1px dashed var(--border)',
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--admin-panel-soft)',
     color: 'var(--text-primary)',
     fontSize: 13,
     width: '100%',
@@ -103,8 +103,8 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
             borderRadius: 8,
             fontSize: 13,
             fontWeight: 600,
-              backgroundColor: draft.is_in_malacca ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
-              color: draft.is_in_malacca ? 'var(--success)' : 'var(--text-muted)',
+              backgroundColor: draft.is_in_malacca ? 'var(--admin-success-bg)' : 'var(--admin-panel-soft)',
+              color: draft.is_in_malacca ? 'var(--admin-success-text)' : 'var(--admin-muted)',
             }}>
               {draft.is_in_malacca ? '📍 Verified Malacca Location' : '⚠️ Not in Malacca'}
             </span>
@@ -116,7 +116,7 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
           🍜 Cuisine Types
         </div>
         <div className="dishes-list">
-          {(draft.cuisine_types || []).map((cuisine, i) => <span key={`${cuisine}-${i}`} className="dish-tag" style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}>{cuisine}</span>)}
+          {(draft.cuisine_types || []).map((cuisine, i) => <span key={`${cuisine}-${i}`} className="dish-tag" style={{ background: 'var(--admin-warning-bg)', color: 'var(--admin-warning-text)' }}>{cuisine}</span>)}
         </div>
         <input
           aria-label="Cuisine types"
@@ -124,7 +124,7 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
           value={(draft.cuisine_types || []).join(', ')}
           onChange={(event) => setListField('cuisine_types', event.target.value)}
           placeholder="e.g. Nyonya, Malaysian"
-          style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px dashed var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', fontSize: 13, width: '100%', outline: 'none' }}
+          style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px dashed var(--admin-border)', background: 'var(--admin-panel-soft)', color: 'var(--admin-text)', fontSize: 13, width: '100%', outline: 'none' }}
         />
       </div>
 
@@ -141,7 +141,7 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
           value={(draft.signature_dishes || []).join(', ')}
           onChange={(event) => setListField('signature_dishes', event.target.value)}
           placeholder="e.g. Chicken rice, Cendol"
-          style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px dashed var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', fontSize: 13, width: '100%', outline: 'none' }}
+          style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: '1px dashed var(--admin-border)', background: 'var(--admin-panel-soft)', color: 'var(--admin-text)', fontSize: 13, width: '100%', outline: 'none' }}
         />
       </div>
 
@@ -204,7 +204,7 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
 
       <details style={{ marginTop: 20 }}>
         <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', userSelect: 'none', padding: '8px 0' }}>🔍 View raw JSON</summary>
-        <pre style={{ marginTop: 10, padding: 16, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text-secondary)', overflow: 'auto', maxHeight: 300, fontFamily: 'monospace' }}>
+        <pre style={{ marginTop: 10, padding: 16, background: 'var(--admin-panel-soft)', border: '1px solid var(--admin-border)', borderRadius: 10, fontSize: 12, color: 'var(--admin-text)', overflow: 'auto', maxHeight: 300, fontFamily: 'monospace' }}>
           {JSON.stringify(mergedRecord, null, 2)}
         </pre>
       </details>

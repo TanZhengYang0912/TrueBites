@@ -154,7 +154,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
               const isExpanded = expandedRow === job.job_id;
               const isMalacca = ext.is_in_malacca === true;
               const rowOpacity = isMalacca ? 1 : 0.4;
-              const rowBg = isMalacca ? 'rgba(16,185,129,0.03)' : 'transparent';
+              const rowBg = isMalacca ? 'var(--admin-success-bg)' : 'transparent';
 
               const priceRange = getField(job, 'price_range');
               const opHours    = getField(job, 'operating_hours_raw');
@@ -167,7 +167,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                     </td>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                       {ext.vendor_name || '-'}
-                      {isMalacca && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', background: 'var(--success)', color: '#000', borderRadius: 4, fontWeight: 700 }}>📍 MLK</span>}
+                      {isMalacca && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', background: 'var(--admin-success-bg)', color: 'var(--admin-success-text)', borderRadius: 4, fontWeight: 700 }}>📍 MLK</span>}
                     </td>
                     <td style={{ wordBreak: 'break-word' }}>
                       {editingAddress[job.job_id] ? (
@@ -182,7 +182,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                             padding: '3px 6px',
                             borderRadius: 6,
                             border: '1px solid var(--border)',
-                            background: 'rgba(255,255,255,0.05)',
+                            background: 'var(--admin-panel-soft)',
                             color: 'var(--text-primary)',
                             fontSize: 12,
                           }}
@@ -212,8 +212,8 @@ export default function BatchResultsStep({ batchData, onReset }) {
                               padding: '2px 7px',
                               borderRadius: 4,
                               fontSize: 11,
-                              background: 'rgba(124,58,237,0.12)',
-                              color: '#a78bfa',
+                              background: 'var(--admin-focus)',
+                              color: 'var(--admin-navy)',
                               whiteSpace: 'normal',
                               wordBreak: 'break-word',
                               maxWidth: '100%',
@@ -230,8 +230,8 @@ export default function BatchResultsStep({ batchData, onReset }) {
                               padding: '2px 7px',
                               borderRadius: 4,
                               fontSize: 11,
-                              background: 'rgba(59,130,246,0.12)',
-                              color: '#60a5fa',
+                              background: 'var(--admin-warning-bg)',
+                              color: 'var(--admin-warning-text)',
                               whiteSpace: 'normal',
                               wordBreak: 'break-word',
                               maxWidth: '100%',
@@ -258,7 +258,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                             {/* Left: Summary */}
                             <div>
                               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>📝 Summary</div>
-                              <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8, fontSize: 13, lineHeight: 1.6 }}>
+                              <div style={{ background: 'var(--admin-panel)', padding: 12, borderRadius: 8, fontSize: 13, lineHeight: 1.6 }}>
                                 {job.summary}
                               </div>
                             </div>
@@ -284,7 +284,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                                         padding: '3px 8px',
                                         borderRadius: 6,
                                         border: '1px solid var(--border)',
-                                        background: 'rgba(255,255,255,0.05)',
+                                        background: 'var(--admin-panel-soft)',
                                         color: 'var(--text-primary)',
                                         fontSize: 12,
                                         width: 160,
@@ -309,7 +309,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
                                         padding: '3px 8px',
                                         borderRadius: 6,
                                         border: '1px solid var(--border)',
-                                        background: 'rgba(255,255,255,0.05)',
+                                        background: 'var(--admin-panel-soft)',
                                         color: 'var(--text-primary)',
                                         fontSize: 12,
                                         width: 160,
@@ -367,7 +367,7 @@ export default function BatchResultsStep({ batchData, onReset }) {
             </div>
           )}
           {saveState.result.failed.length > 0 && (
-            <div style={{ color: '#f87171', marginTop: 4 }}>
+            <div style={{ color: 'var(--admin-danger-text)', marginTop: 4 }}>
               ⚠️ {saveState.result.failed.length} failed: {saveState.result.failed.map(f => f.reason).join('; ')}
             </div>
           )}
