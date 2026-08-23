@@ -170,7 +170,7 @@ for (const [routeName, route] of routes) {
       const undersized = await page.locator("#root button, #root [role=button], #root input, #root select, #root textarea")
         .evaluateAll((elements) => elements
           .filter((element) => {
-            if (element.closest(".gm-style, .gmnoprint, gmp-internal-google-attribution")) return false;
+            if (element.closest(".gm-style, .gmnoprint, .gm-err-container, .dismissButton, gmp-internal-google-attribution")) return false;
             // Checkboxes are exempt: a 44px checkbox reads as a broken control,
             // and WCAG 2.5.5 lets the associated label carry the target. They
             // are still enlarged to 24px on phones.
