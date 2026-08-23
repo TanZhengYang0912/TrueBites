@@ -93,7 +93,7 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
         <span>📋</span> Information Extraction
       </div>
       <div className="card-subtitle">
-        Structured eatery data extracted from the transcript by Groq llama-3.1-8b.
+        Structured eatery data extracted from the transcript by Groq openai/gpt-oss-20b.
       </div>
 
       {draft.is_in_malacca !== undefined && (

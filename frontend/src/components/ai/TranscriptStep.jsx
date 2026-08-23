@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 
 const PIPELINE_STEPS = [
   { status: 'downloading', label: 'Downloading audio from video', step: 1 },
-  { status: 'transcribing', label: 'Transcribing with Whisper (small)', step: 2 },
-  { status: 'summarizing', label: 'Summarizing with Groq llama3.1', step: 3 },
+  { status: 'transcribing', label: 'Transcribing with Groq whisper-large-v3', step: 2 },
+  { status: 'summarizing', label: 'Summarizing with Groq openai/gpt-oss-20b', step: 3 },
   { status: 'extracting', label: 'Extracting structured information', step: 4 },
 ];
 
@@ -32,7 +32,7 @@ export default function TranscriptStep({ jobData, onTranscriptReady, onRetry }) 
         <span>🎙️</span> AI Speech-to-Text Transcription
       </div>
       <div className="card-subtitle">
-        Whisper (small model) is converting the video audio into text.
+        Groq whisper-large-v3 is converting the video audio into text.
       </div>
 
       {/* Progress */}

@@ -13,8 +13,7 @@ export function groqClient() {
 }
 
 // openai/gpt-oss-20b is Groq's hosted open-weight model used for both
-// summarization and extraction — same model id the Python service used
-// (its own in-file comments calling it "llama-3.1-8b-instant" were stale;
-// this MODEL_NAME constant is what actually ran).
+// summarization and extraction. Keep this in one place so the UI and status
+// endpoints can report the actual model consistently.
 export const CHAT_MODEL = "openai/gpt-oss-20b";
 export const WHISPER_MODEL = "whisper-large-v3";

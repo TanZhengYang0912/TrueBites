@@ -22,12 +22,12 @@ export default function SummaryStep({ jobData, summaryValue, onSummaryChange, on
         <span>✨</span> AI Content Summarization
       </div>
       <div className="card-subtitle">
-        Groq (llama3.1:8b) has analyzed the transcript and produced a concise food content summary.
+        Groq openai/gpt-oss-20b has analyzed the transcript and produced a concise food content summary.
       </div>
 
       {/* Model badge */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="language-badge">🤖 llama3.1:8b</div>
+        <div className="language-badge">🤖 openai/gpt-oss-20b</div>
         {jobData.detected_language && (
           <div className="language-badge" style={{ background: 'rgba(124,58,237,0.1)', borderColor: 'rgba(124,58,237,0.25)', color: '#a78bfa' }}>
             🌐 {jobData.detected_language === 'ms' ? 'Malay' : jobData.detected_language === 'en' ? 'English' : jobData.detected_language.toUpperCase()}

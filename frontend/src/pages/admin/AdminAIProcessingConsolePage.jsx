@@ -275,8 +275,8 @@ export default function AdminAIProcessingConsolePage() {
           <h2>Food Influencer Content Analyzer</h2>
         </div>
         <div className="admin-model-strip">
-          <div><strong>small</strong><span>Whisper</span></div>
-          <div><strong>llama 3.1</strong><span>Groq</span></div>
+          <div><strong>whisper-large-v3</strong><span>Groq</span></div>
+          <div><strong>openai/gpt-oss-20b</strong><span>Groq</span></div>
           <div><strong>Live</strong><span>Supabase</span></div>
         </div>
       </section>
