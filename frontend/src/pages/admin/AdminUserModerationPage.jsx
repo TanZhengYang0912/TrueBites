@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { Search, XCircle, RotateCcw, Ticket } from "lucide-react";
+import { FileDown, Search, XCircle, RotateCcw, Ticket } from "lucide-react";
 import { getAdminUsers, suspendAdminUser, getAppealDetail, decideAppeal } from "../../api/admin";
+import { openUsersPdf } from "../../lib/exportPdf";
 
 const SUSPEND_OPTIONS = [
   { value: "1d", label: "1 day" },
@@ -207,12 +208,15 @@ export default function AdminUserModerationPage() {
   const [workingId, setWorkingId] = useState(null);
   const [decidingAppeal, setDecidingAppeal] = useState(false);
   const [toast, setToast] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const PAGE_SIZE = 15;
 
   const load = (page = data.pagination.page, q = draftQuery.trim()) => {
     setLoading(true);
     setError("");
+    setSelectedIds([]);
     return getAdminUsers({ page, pageSize: PAGE_SIZE, q })
       .then(setData)
       .catch((err) => setError(err.message))
@@ -224,6 +228,7 @@ export default function AdminUserModerationPage() {
     setLoading(true);
     setError("");
     const q = draftQuery.trim();
+    setSelectedIds([]);
     const t = setTimeout(() => {
       getAdminUsers({ page: 1, pageSize: PAGE_SIZE, q })
         .then((payload) => { if (active) setData(payload); })
@@ -235,6 +240,35 @@ export default function AdminUserModerationPage() {
   }, [draftQuery]);
 
   const handlePageChange = (page) => load(page);
+
+  const handleSelectAll = (event) => {
+    setSelectedIds(event.target.checked ? data.items.map((user) => user.id) : []);
+  };
+
+  const handleSelectOne = (event, id) => {
+    event.stopPropagation();
+    setSelectedIds((current) => event.target.checked
+      ? [...current, id]
+      : current.filter((selectedId) => selectedId !== id));
+  };
+
+  async function handleExportSelected() {
+    const selectedUsers = data.items.filter((user) => selectedIds.includes(user.id));
+    if (!selectedUsers.length) return;
+    setExportingPdf(true);
+    setError("");
+    try {
+      await openUsersPdf({
+        title: "User Moderation",
+        subtitle: `${selectedUsers.length} selected user${selectedUsers.length === 1 ? "" : "s"}`,
+        users: selectedUsers,
+      });
+    } catch (exportError) {
+      setError(exportError.message || "Unable to export selected users.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
 
   const handleSuspendConfirm = async (duration, reason) => {
     const user = suspendTarget;
@@ -281,6 +315,8 @@ export default function AdminUserModerationPage() {
     }
   };
 
+  const allSelected = data.items.length > 0 && selectedIds.length === data.items.length;
+
   return (
     <section className="admin-vendors-page">
       <div className="admin-toolbar">
@@ -290,6 +326,13 @@ export default function AdminUserModerationPage() {
         </div>
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
+          <span className="text-sm font-semibold text-blue-800">{selectedIds.length} user(s) selected</span>
+          <button type="button" disabled={exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
+        </div>
+      )}
+
       {error ? <div className="admin-feedback error">{error}</div> : null}
 
       <section className="admin-panel admin-table-panel">
@@ -297,6 +340,9 @@ export default function AdminUserModerationPage() {
           <table className="admin-table">
             <thead>
               <tr>
+                <th className="w-12 text-center">
+                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} aria-label="Select all users" className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
+                </th>
                 <th>User</th>
                 <th>Provider</th>
                 <th>Joined</th>
@@ -307,13 +353,16 @@ export default function AdminUserModerationPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6"><div className="admin-feedback">Loading users…</div></td></tr>
+                <tr><td colSpan="7"><div className="admin-feedback">Loading users…</div></td></tr>
               ) : data.items.length ? (
                 data.items.map((user) => (
                   <tr
                     key={user.id}
                     onClick={() => navigate(`/admin/users/${user.id}`, { state: { email: user.email, displayName: user.displayName } })}
                   >
+                    <td onClick={(e) => e.stopPropagation()} className="text-center">
+                      <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={(e) => handleSelectOne(e, user.id)} aria-label={`Select ${user.email}`} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
+                    </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         {user.avatarUrl ? (
@@ -384,7 +433,7 @@ export default function AdminUserModerationPage() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="6"><div className="admin-empty-state">No users matched this search.</div></td></tr>
+                <tr><td colSpan="7"><div className="admin-empty-state">No users matched this search.</div></td></tr>
               )}
             </tbody>
           </table>

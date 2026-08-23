@@ -20,3 +20,12 @@ test("my audit log has no duplicate page header", () => {
   assert.doesNotMatch(source, /admin-panel-header/);
   assert.doesNotMatch(source, /setTopbarAction/);
 });
+
+test("user moderation supports selecting users for a batch export", () => {
+  const source = read("pages/admin/AdminUserModerationPage.jsx");
+  assert.match(source, /selectedIds/);
+  assert.match(source, /handleSelectAll/);
+  assert.match(source, /handleSelectOne/);
+  assert.match(source, /openUsersPdf/);
+  assert.match(source, /Export PDF/);
+});

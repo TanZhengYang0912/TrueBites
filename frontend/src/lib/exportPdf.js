@@ -139,6 +139,24 @@ export async function openSuggestionsPdf({ title, subtitle, suggestions }) {
   });
 }
 
+export async function openUsersPdf({ title, subtitle, users }) {
+  return buildAndOpenPdf({
+    title,
+    subtitle,
+    head: ["User", "Email", "Provider", "Joined", "Last sign-in", "Status"],
+    rows: users.map((user) => [
+      user.displayName || "Unnamed user",
+      user.email || "—",
+      user.provider || "—",
+      user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—",
+      user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString() : "Never",
+      user.suspended ? "Suspended" : "Active",
+    ]),
+    emptyRow: ["—", "—", "—", "—", "—", "No users selected"],
+    countLabel: `${users.length} user${users.length === 1 ? "" : "s"}`,
+  });
+}
+
 function hexToRgb(hex) {
   const n = Number.parseInt(hex.replace("#", ""), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
