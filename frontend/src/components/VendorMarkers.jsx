@@ -89,24 +89,13 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
       {vendors.map((v) => {
         const stopNum = tripOrder?.get(v.id);
         // AI-extracted vendors that only had a city/state (no street address) get
-        // geocoded to a city centroid, not the real spot — flag them visually so
-        // users don't mistake a fuzzy guess for a precise pin.
+        // geocoded to a city centroid, not the real spot — the question-mark pin
+        // flags that uncertainty without obscuring the entire map with ranges.
         const isApproximate = v.location_precision === "city_level" || v.location_precision === "unknown";
         const isSelected = v.id === selectedId;
         const pos = displayPosition(v);
         return (
           <div key={v.id}>
-            {isApproximate && (
-              <Circle
-                center={pos}
-                radius={800}
-                strokeColor="#f5a623"
-                strokeOpacity={0.5}
-                strokeWeight={1}
-                fillColor="#f5a623"
-                fillOpacity={0.08}
-              />
-            )}
             <AdvancedMarker
               position={pos}
               ref={(marker) => setMarkerRef(marker, v.id, Boolean(stopNum) || isSelected)}
