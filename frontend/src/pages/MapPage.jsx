@@ -78,7 +78,7 @@ export default function MapPage() {
   const [openId, setOpenId] = useState(null); // vendor id whose InfoWindow is open
   const [userPos, setUserPos] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
-  const [radiusKm, setRadiusKm] = useState(2); // drives both the "Nearby to add" list and map pin visibility
+  const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
   const [filters, setFilters] = useState({ search: "", category: "all", creator: "all" });
   const updateFilters = (partial) => setFilters((f) => ({ ...f, ...partial }));
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
@@ -485,13 +485,12 @@ export default function MapPage() {
   // location set there is no anchor, and the panel says so.
   const anchor = userPos || null;
 
-  // "all" means no distance limit. Kept as Infinity at the call sites so
-  // mapVisibility.js keeps its simple numeric comparison.
+  // "all" means no distance limit for the nearby add-to-trip list.
   const effectiveRadiusKm = radiusKm === "all" ? Infinity : radiusKm;
   const stopIds = new Set(vendorStopOrder.keys());
 
-  // A stop's own pin must survive every filter — otherwise filtering to "Cafe"
-  // erases the nyonya stops you are currently routing through.
+  // Pins respect the active discovery filters, while trip stops survive so a
+  // route never loses one of its own markers.
   const pinVendors = vendors.filter((v) => stopIds.has(v.id) || matchesFilters(v, filters));
 
   const visibleVendors = selectVisibleVendors({
