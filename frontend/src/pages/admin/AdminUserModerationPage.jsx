@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { FileDown, Search, XCircle, RotateCcw, Ticket } from "lucide-react";
+import { Search, XCircle, RotateCcw, Ticket } from "lucide-react";
 import { getAdminUsers, suspendAdminUser, getAppealDetail, decideAppeal } from "../../api/admin";
-import { openUsersPdf } from "../../lib/exportPdf";
 
 const SUSPEND_OPTIONS = [
   { value: "1d", label: "1 day" },
@@ -209,7 +208,7 @@ export default function AdminUserModerationPage() {
   const [decidingAppeal, setDecidingAppeal] = useState(false);
   const [toast, setToast] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
-  const [exportingPdf, setExportingPdf] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
 
   const PAGE_SIZE = 15;
 
@@ -252,28 +251,43 @@ export default function AdminUserModerationPage() {
       : current.filter((selectedId) => selectedId !== id));
   };
 
-  async function handleExportSelected() {
-    const selectedUsers = data.items.filter((user) => selectedIds.includes(user.id));
+  const handleBatchSuspend = () => {
+    const selectedUsers = data.items.filter((user) => selectedIds.includes(user.id) && !user.suspended);
     if (!selectedUsers.length) return;
-    setExportingPdf(true);
-    setError("");
-    try {
-      await openUsersPdf({
-        title: "User Moderation",
-        subtitle: `${selectedUsers.length} selected user${selectedUsers.length === 1 ? "" : "s"}`,
-        users: selectedUsers,
-      });
-    } catch (exportError) {
-      setError(exportError.message || "Unable to export selected users.");
-    } finally {
-      setExportingPdf(false);
-    }
+    setSuspendTarget({
+      displayName: `${selectedUsers.length} selected users`,
+      email: "",
+      ids: selectedUsers.map((user) => user.id),
+      isBatch: true,
+    });
   }
 
   const handleSuspendConfirm = async (duration, reason) => {
-    const user = suspendTarget;
-    if (!user) return;
+    const target = suspendTarget;
+    if (!target) return;
     setSuspendTarget(null);
+
+    if (target.isBatch) {
+      setBatchBusy(true);
+      try {
+        const results = await Promise.allSettled(target.ids.map((id) => suspendAdminUser(id, duration, reason)));
+        const failed = results.filter((result) => result.status === "rejected");
+        await load();
+        setToast({
+          message: failed.length
+            ? `${target.ids.length - failed.length} user(s) suspended; ${failed.length} failed.`
+            : `${target.ids.length} user(s) suspended.`,
+          isError: failed.length > 0,
+        });
+      } catch (err) {
+        setToast({ message: err.message, isError: true });
+      } finally {
+        setBatchBusy(false);
+      }
+      return;
+    }
+
+    const user = target;
     setWorkingId(user.id);
     try {
       await suspendAdminUser(user.id, duration, reason);
@@ -329,7 +343,7 @@ export default function AdminUserModerationPage() {
       {selectedIds.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
           <span className="text-sm font-semibold text-blue-800">{selectedIds.length} user(s) selected</span>
-          <button type="button" disabled={loading || exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
+          <button type="button" disabled={loading || batchBusy || !data.items.some((user) => selectedIds.includes(user.id) && !user.suspended)} onClick={handleBatchSuspend} className="inline-flex min-h-9 items-center gap-2 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50"><XCircle size={14} /> Suspend selected</button>
         </div>
       )}
 
@@ -444,7 +458,7 @@ export default function AdminUserModerationPage() {
       {suspendTarget && (
         <SuspendDialog
           user={suspendTarget}
-          busy={workingId === suspendTarget.id}
+          busy={suspendTarget.isBatch ? batchBusy : workingId === suspendTarget.id}
           onConfirm={handleSuspendConfirm}
           onCancel={() => setSuspendTarget(null)}
         />
