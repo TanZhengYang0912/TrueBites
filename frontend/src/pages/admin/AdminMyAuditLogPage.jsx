@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
-import { FileDown } from "lucide-react";
 import { getMyActivity } from "../../api/admin";
-import { useSession } from "../../lib/SessionContext";
-import { fetchAllPages, openActivityLogPdf } from "../../lib/exportPdf";
 
 const PAGE_SIZE = 25;
 
@@ -31,13 +27,9 @@ function Pagination({ pagination, onPageChange }) {
 // audit_log data and table shape as a customer's activity log on the User
 // Moderation panel, just scoped to "me" instead of a specific account.
 export default function AdminMyAuditLogPage() {
-  const { setTopbarAction } = useOutletContext();
-  const { session } = useSession();
-  const adminEmail = session?.user?.email || "";
   const [data, setData] = useState({ items: [], pagination: { page: 1, totalPages: 1, total: 0 } });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [exporting, setExporting] = useState(false);
 
   const load = (page = 1) => {
     setLoading(true);
@@ -51,38 +43,6 @@ export default function AdminMyAuditLogPage() {
   useEffect(() => { load(); }, []);
 
   const items = data.items || [];
-
-  async function handleExport() {
-    setExporting(true);
-    try {
-      const entries = await fetchAllPages((pageOpts) => getMyActivity(pageOpts));
-      await openActivityLogPdf({
-        title: "My Audit Log",
-        subtitle: adminEmail || undefined,
-        entries,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  useEffect(() => {
-    setTopbarAction(
-      <button
-        type="button"
-        className="admin-secondary-btn compact"
-        onClick={handleExport}
-        disabled={exporting || loading}
-        style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-      >
-        <FileDown size={13} />
-        {exporting ? "Preparing PDF…" : "Export PDF"}
-      </button>
-    );
-    return () => setTopbarAction(null);
-  }, [setTopbarAction, exporting, loading, adminEmail]);
 
   return (
     <section className="admin-vendors-page">

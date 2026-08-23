@@ -10,13 +10,13 @@ test("admin suggestions uses the shared layout title and keeps refresh in the fi
   assert.doesNotMatch(source, /Customer contribution queue/);
   assert.doesNotMatch(source, /<h2[^>]*>Community suggestions/);
   assert.match(source, /RefreshCw/);
+  assert.match(source, /openSuggestionsPdf/);
+  assert.match(source, /Export PDF/);
   assert.match(source, /onClick=\{\(\) => load\(data\.pagination\.page\)\}/);
 });
 
-test("my audit log uses the layout topbar for export and has no duplicate page header", () => {
+test("my audit log has no duplicate page header", () => {
   const source = read("pages/admin/AdminMyAuditLogPage.jsx");
   assert.doesNotMatch(source, /admin-panel-header/);
-  assert.match(source, /useOutletContext/);
-  assert.match(source, /setTopbarAction/);
-  assert.match(source, /Export PDF/);
+  assert.doesNotMatch(source, /setTopbarAction/);
 });

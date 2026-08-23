@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, Search, Eye, Pencil } from "lucide-react";
+import { FileDown, RefreshCw, Search, Eye, Pencil } from "lucide-react";
 import { getAdminSuggestion, getAdminSuggestions, updateAdminSuggestionsBatch } from "../../api/admin";
 import SuggestionDetailModal from "../../components/admin/SuggestionDetailModal";
+import { openSuggestionsPdf } from "../../lib/exportPdf";
 
 const STATUS_OPTIONS = [
   ["all", "All statuses"],
@@ -27,6 +28,7 @@ export default function AdminSuggestionsPage() {
   const [selected, setSelected] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   async function load(page = data.pagination.page) {
     setLoading(true);
@@ -91,6 +93,24 @@ export default function AdminSuggestionsPage() {
     }
   }
 
+  async function handleExportSelected() {
+    const selectedSuggestions = data.suggestions.filter((suggestion) => selectedIds.includes(suggestion.id));
+    if (!selectedSuggestions.length) return;
+    setExportingPdf(true);
+    setError("");
+    try {
+      await openSuggestionsPdf({
+        title: "Community Suggestions",
+        subtitle: `${selectedSuggestions.length} selected suggestion${selectedSuggestions.length === 1 ? "" : "s"}`,
+        suggestions: selectedSuggestions,
+      });
+    } catch (exportError) {
+      setError(exportError.message || "Unable to export selected suggestions.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   const allSelected = data.suggestions.length > 0 && selectedIds.length === data.suggestions.length;
 
   return (
@@ -121,9 +141,10 @@ export default function AdminSuggestionsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
           <span className="text-sm font-semibold text-blue-800">{selectedIds.length} suggestion(s) selected</span>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("under_review")} className="min-h-9 rounded bg-forest px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50 hover:bg-forest/90">Start review</button>
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("duplicate")} className="min-h-9 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100">Mark as duplicate</button>
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("rejected")} className="min-h-9 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50">Reject</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("under_review")} className="min-h-9 rounded bg-forest px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50 hover:bg-forest/90">Start review</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("duplicate")} className="min-h-9 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100">Mark as duplicate</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("rejected")} className="min-h-9 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50">Reject</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
           </div>
         </div>
       )}
