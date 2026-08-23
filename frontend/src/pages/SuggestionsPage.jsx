@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
+import DiscoveryPageShell from "../components/discovery/DiscoveryPageShell";
+import DiscoveryPageIntro from "../components/discovery/DiscoveryPageIntro";
 import SuggestionStatusCard from "../components/suggestions/SuggestionStatusCard";
 import SuggestionForm from "../components/suggestions/SuggestionForm";
 import { getMySuggestions, updateSuggestion } from "../api/suggestions";
@@ -46,33 +47,30 @@ export default function SuggestionsPage() {
     return true;
   });
   return (
-    <div className="min-h-dvh bg-chalk text-ink">
-      <DiscoveryHeader
-        session={userSession}
-        userEmail={email}
-        initials={initials}
-        firstName={firstName}
-        avatarUrl={meta.avatar_url || ""}
-        activeSection="suggestions"
-        onOpenDiscover={() => navigate("/map")}
-        onOpenSaved={() => navigate("/engagement")}
-        onOpenReviews={() => navigate("/engagement?tab=reviews")}
-        onOpenSuggestions={() => navigate("/suggestions")}
-        onOpenProfile={() => navigate("/profile")}
-        onOpenMap={() => navigate("/map?view=map")}
-        onLogin={() => navigate("/login")}
-        onSignUp={() => navigate("/login")}
+    <DiscoveryPageShell
+      headerProps={{
+        session: userSession,
+        userEmail: email,
+        initials,
+        firstName,
+        avatarUrl: meta.avatar_url || "",
+        activeSection: "suggestions",
+        onOpenDiscover: () => navigate("/map"),
+        onOpenSaved: () => navigate("/engagement"),
+        onOpenReviews: () => navigate("/engagement?tab=reviews"),
+        onOpenSuggestions: () => navigate("/suggestions"),
+        onOpenProfile: () => navigate("/profile"),
+        onOpenMap: () => navigate("/map?view=map"),
+        onLogin: () => navigate("/login"),
+        onSignUp: () => navigate("/login"),
+      }}
+    >
+      <DiscoveryPageIntro
+        eyebrow="Your community discoveries"
+        title="My suggestions"
+        description="Track the hidden gems you have shared with TrueBites. We will keep the updates simple while our team verifies the details."
+        action={<button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded bg-forest px-4 text-sm font-semibold text-white">Suggest another vendor</button>}
       />
-
-      <main className="mx-auto w-full max-w-[1200px] px-4 py-8 md:px-6">
-        <div className="mb-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">Your community discoveries</p>
-            <h1 className="m-0 font-display text-[clamp(28px,5vw,44px)] font-medium leading-tight tracking-[-0.03em] text-ink">My suggestions</h1>
-            <p className="mb-0 mt-2 max-w-xl text-sm text-muted">Track the hidden gems you have shared with TrueBites. We will keep the updates simple while our team verifies the details.</p>
-          </div>
-          <button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded bg-forest px-4 text-sm font-semibold text-white">Suggest another vendor</button>
-        </div>
 
         <div className="mb-6 flex gap-2 overflow-x-auto border-b border-sand pb-px">
           {["all", "pending", "published", "rejected"].map((tab) => (
@@ -104,8 +102,6 @@ export default function SuggestionsPage() {
             {activeTab === "all" && <button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 rounded bg-forest px-4 text-sm font-semibold text-white">Share a hidden gem</button>}
           </div>
         )}
-      </main>
-
       {editingSuggestion && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
           <div className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded bg-white shadow-2xl">
@@ -137,6 +133,6 @@ export default function SuggestionsPage() {
           </div>
         </div>
       )}
-    </div>
+    </DiscoveryPageShell>
   );
 }

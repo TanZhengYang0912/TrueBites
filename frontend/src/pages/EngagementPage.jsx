@@ -7,14 +7,14 @@ import {
   getMyReviews,
 } from "../api/engagement";
 import Toast from "../components/engagement/Toast";
-import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
+import DiscoveryPageShell from "../components/discovery/DiscoveryPageShell";
+import DiscoveryPageIntro from "../components/discovery/DiscoveryPageIntro";
 import { useToast, sleep } from "../lib/useToast";
 import VendorCard from "../components/discovery/VendorCard";
 import { customerSession } from "../lib/roles";
 import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
-import Footer from "../components/Footer";
 
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
@@ -217,36 +217,31 @@ export default function EngagementPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-chalk font-body text-ink">
-      <DiscoveryHeader
-        onOpenMap={() => navigate("/map?view=map")}
-        session={session}
-        userEmail={userEmail}
-        initials={initials}
-        firstName={firstName}
-        avatarUrl={avatarUrl}
-        savedCount={bookmarks.length}
-        activeSection={tab === "reviews" ? "reviews" : "saved"}
-        onOpenDiscover={() => navigate("/map")}
-        onOpenSaved={() => { setTab("bookmarks"); navigate("/engagement"); }}
-        onOpenReviews={() => { setTab("reviews"); navigate("/engagement?tab=reviews"); }}
-        onOpenSuggestions={() => navigate("/suggestions")}
-        onLogin={() => navigate("/login")}
-        onSignUp={() => navigate("/login")}
-        onOpenProfile={() => navigate("/profile")}
-        onOpenVendor={(id) => navigate(`/map?vendor=${id}`)}
+    <DiscoveryPageShell
+      headerProps={{
+        onOpenMap: () => navigate("/map?view=map"),
+        session,
+        userEmail,
+        initials,
+        firstName,
+        avatarUrl,
+        savedCount: bookmarks.length,
+        activeSection: tab === "reviews" ? "reviews" : "saved",
+        onOpenDiscover: () => navigate("/map"),
+        onOpenSaved: () => { setTab("bookmarks"); navigate("/engagement"); },
+        onOpenReviews: () => { setTab("reviews"); navigate("/engagement?tab=reviews"); },
+        onOpenSuggestions: () => navigate("/suggestions"),
+        onLogin: () => navigate("/login"),
+        onSignUp: () => navigate("/login"),
+        onOpenProfile: () => navigate("/profile"),
+        onOpenVendor: (id) => navigate(`/map?vendor=${id}`),
+      }}
+    >
+      <DiscoveryPageIntro
+        eyebrow="Your TrueBites collection"
+        title={tab === "reviews" ? "My reviews" : "Saved places"}
+        description={tab === "reviews" ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
       />
-
-      <main className="mx-auto w-full max-w-[1200px] px-4 py-8 md:px-6">
-        <div className="mb-6">
-          <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">Your TrueBites collection</p>
-          <h1 className="m-0 font-display text-[clamp(28px,5vw,44px)] font-medium leading-tight tracking-[-0.03em] text-ink">
-            {tab === "reviews" ? "My reviews" : "Saved places"}
-          </h1>
-          <p className="mb-0 mt-2 text-sm text-muted">
-            {tab === "reviews" ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
-          </p>
-        </div>
         {tab === "bookmarks" && (
           <div className="flex flex-col gap-5">
             {/* Folder tabs — horizontal row, Instagram-style */}
@@ -391,10 +386,6 @@ export default function EngagementPage() {
             )}
           </section>
         )}
-      </main>
-
-      <Footer />
-
       {detailVendor && (
         <VendorDetailModal
           vendor={detailVendor}
@@ -476,7 +467,7 @@ export default function EngagementPage() {
       )}
 
       <Toast toast={toast} />
-    </div>
+    </DiscoveryPageShell>
   );
 }
 
