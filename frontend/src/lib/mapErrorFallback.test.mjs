@@ -14,4 +14,6 @@ test("map page handles Google Maps authorization failures without rendering a br
   assert.match(source, /MutationObserver/);
   assert.match(source, /Map temporarily unavailable/);
   assert.match(source, /onError=\{\(error\) => setMapError/);
+  assert.match(source, /if \(mapError\) \{\s*return \(/);
+  assert.doesNotMatch(source, /\{mapError \? \(/);
 });
