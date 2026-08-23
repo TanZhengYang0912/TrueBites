@@ -11,6 +11,36 @@ const SUSPEND_OPTIONS = [
   { value: "indefinite", label: "Until disabled" },
 ];
 
+function UserAvatar({ user }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const label = (user.displayName || user.email || "?").trim();
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [user.avatarUrl]);
+
+  if (user.avatarUrl && !imageFailed) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt=""
+        onError={() => setImageFailed(true)}
+        style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="avatar-fallback"
+      aria-label={`${label} avatar`}
+      style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--admin-panel-soft)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}
+    >
+      {label[0]?.toUpperCase() || "?"}
+    </div>
+  );
+}
+
 function Pagination({ pagination, onPageChange }) {
   const { page, totalPages, total } = pagination;
   if (totalPages <= 1) return null;
@@ -379,13 +409,7 @@ export default function AdminUserModerationPage() {
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        {user.avatarUrl ? (
-                          <img src={user.avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--admin-panel-soft)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}>
-                            {(user.displayName || user.email || "?")[0].toUpperCase()}
-                          </div>
-                        )}
+                        <UserAvatar user={user} />
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <strong>{user.displayName || "Unnamed user"}</strong>
