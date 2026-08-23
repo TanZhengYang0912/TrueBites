@@ -127,6 +127,11 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
                     <ExternalLink size={14} /> View Source Video
                   </a>
                 </div>
+
+                <div>
+                  <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Recommended by</h4>
+                  <p className="m-0 mt-1 text-base font-medium text-ink">{current.influencer_name || "Not provided"}</p>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

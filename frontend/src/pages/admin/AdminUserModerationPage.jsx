@@ -11,6 +11,36 @@ const SUSPEND_OPTIONS = [
   { value: "indefinite", label: "Until disabled" },
 ];
 
+function UserAvatar({ user }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const label = (user.displayName || user.email || "?").trim();
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [user.avatarUrl]);
+
+  if (user.avatarUrl && !imageFailed) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt=""
+        onError={() => setImageFailed(true)}
+        style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="avatar-fallback"
+      aria-label={`${label} avatar`}
+      style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--admin-panel-soft)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}
+    >
+      {label[0]?.toUpperCase() || "?"}
+    </div>
+  );
+}
+
 function Pagination({ pagination, onPageChange }) {
   const { page, totalPages, total } = pagination;
   if (totalPages <= 1) return null;
@@ -207,12 +237,15 @@ export default function AdminUserModerationPage() {
   const [workingId, setWorkingId] = useState(null);
   const [decidingAppeal, setDecidingAppeal] = useState(false);
   const [toast, setToast] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [batchBusy, setBatchBusy] = useState(false);
 
   const PAGE_SIZE = 15;
 
   const load = (page = data.pagination.page, q = draftQuery.trim()) => {
     setLoading(true);
     setError("");
+    setSelectedIds([]);
     return getAdminUsers({ page, pageSize: PAGE_SIZE, q })
       .then(setData)
       .catch((err) => setError(err.message))
@@ -224,6 +257,7 @@ export default function AdminUserModerationPage() {
     setLoading(true);
     setError("");
     const q = draftQuery.trim();
+    setSelectedIds([]);
     const t = setTimeout(() => {
       getAdminUsers({ page: 1, pageSize: PAGE_SIZE, q })
         .then((payload) => { if (active) setData(payload); })
@@ -236,10 +270,54 @@ export default function AdminUserModerationPage() {
 
   const handlePageChange = (page) => load(page);
 
+  const handleSelectAll = (event) => {
+    setSelectedIds(event.target.checked ? data.items.map((user) => user.id) : []);
+  };
+
+  const handleSelectOne = (event, id) => {
+    event.stopPropagation();
+    setSelectedIds((current) => event.target.checked
+      ? [...current, id]
+      : current.filter((selectedId) => selectedId !== id));
+  };
+
+  const handleBatchSuspend = () => {
+    const selectedUsers = data.items.filter((user) => selectedIds.includes(user.id) && !user.suspended);
+    if (!selectedUsers.length) return;
+    setSuspendTarget({
+      displayName: `${selectedUsers.length} selected users`,
+      email: "",
+      ids: selectedUsers.map((user) => user.id),
+      isBatch: true,
+    });
+  }
+
   const handleSuspendConfirm = async (duration, reason) => {
-    const user = suspendTarget;
-    if (!user) return;
+    const target = suspendTarget;
+    if (!target) return;
     setSuspendTarget(null);
+
+    if (target.isBatch) {
+      setBatchBusy(true);
+      try {
+        const results = await Promise.allSettled(target.ids.map((id) => suspendAdminUser(id, duration, reason)));
+        const failed = results.filter((result) => result.status === "rejected");
+        await load();
+        setToast({
+          message: failed.length
+            ? `${target.ids.length - failed.length} user(s) suspended; ${failed.length} failed.`
+            : `${target.ids.length} user(s) suspended.`,
+          isError: failed.length > 0,
+        });
+      } catch (err) {
+        setToast({ message: err.message, isError: true });
+      } finally {
+        setBatchBusy(false);
+      }
+      return;
+    }
+
+    const user = target;
     setWorkingId(user.id);
     try {
       await suspendAdminUser(user.id, duration, reason);
@@ -281,6 +359,8 @@ export default function AdminUserModerationPage() {
     }
   };
 
+  const allSelected = data.items.length > 0 && selectedIds.length === data.items.length;
+
   return (
     <section className="admin-vendors-page">
       <div className="admin-toolbar">
@@ -290,6 +370,13 @@ export default function AdminUserModerationPage() {
         </div>
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
+          <span className="text-sm font-semibold text-blue-800">{selectedIds.length} user(s) selected</span>
+          <button type="button" disabled={loading || batchBusy || !data.items.some((user) => selectedIds.includes(user.id) && !user.suspended)} onClick={handleBatchSuspend} className="inline-flex min-h-9 items-center gap-2 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50"><XCircle size={14} /> Suspend selected</button>
+        </div>
+      )}
+
       {error ? <div className="admin-feedback error">{error}</div> : null}
 
       <section className="admin-panel admin-table-panel">
@@ -297,6 +384,9 @@ export default function AdminUserModerationPage() {
           <table className="admin-table">
             <thead>
               <tr>
+                <th className="w-12 text-center">
+                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} disabled={loading} aria-label="Select all users on this page" className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:cursor-not-allowed" />
+                </th>
                 <th>User</th>
                 <th>Provider</th>
                 <th>Joined</th>
@@ -307,22 +397,19 @@ export default function AdminUserModerationPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6"><div className="admin-feedback">Loading users…</div></td></tr>
+                <tr><td colSpan="7"><div className="admin-feedback">Loading users…</div></td></tr>
               ) : data.items.length ? (
                 data.items.map((user) => (
                   <tr
                     key={user.id}
                     onClick={() => navigate(`/admin/users/${user.id}`, { state: { email: user.email, displayName: user.displayName } })}
                   >
+                    <td onClick={(e) => e.stopPropagation()} className="text-center">
+                      <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={(e) => handleSelectOne(e, user.id)} disabled={loading} aria-label={`Select ${user.email}`} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:cursor-not-allowed" />
+                    </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        {user.avatarUrl ? (
-                          <img src={user.avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--admin-panel-soft)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}>
-                            {(user.displayName || user.email || "?")[0].toUpperCase()}
-                          </div>
-                        )}
+                        <UserAvatar user={user} />
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <strong>{user.displayName || "Unnamed user"}</strong>
@@ -384,7 +471,7 @@ export default function AdminUserModerationPage() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="6"><div className="admin-empty-state">No users matched this search.</div></td></tr>
+                <tr><td colSpan="7"><div className="admin-empty-state">No users matched this search.</div></td></tr>
               )}
             </tbody>
           </table>
@@ -395,7 +482,7 @@ export default function AdminUserModerationPage() {
       {suspendTarget && (
         <SuspendDialog
           user={suspendTarget}
-          busy={workingId === suspendTarget.id}
+          busy={suspendTarget.isBatch ? batchBusy : workingId === suspendTarget.id}
           onConfirm={handleSuspendConfirm}
           onCancel={() => setSuspendTarget(null)}
         />

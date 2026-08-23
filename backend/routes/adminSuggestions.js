@@ -8,7 +8,7 @@ import { loadJob } from "../lib/ai/jobStore.js";
 const router = Router();
 
 const ADMIN_SELECT = `
-  id, user_id, vendor_name, source_url, source_platform, location_text, category,
+  id, user_id, vendor_name, influencer_name, source_url, source_platform, location_text, category,
   reason, signature_dish, price_range, additional_note, status, admin_note,
   rejection_reason, ai_job_id, vendor_id, reviewed_by, reviewed_at,
   published_at, created_at, updated_at,

@@ -7,7 +7,7 @@ import { validateSuggestionInput } from "../lib/suggestionValidation.js";
 const router = Router();
 
 const CUSTOMER_SELECT = `
-  id, vendor_name, source_url, source_platform, location_text, category,
+  id, vendor_name, influencer_name, source_url, source_platform, location_text, category,
   reason, signature_dish, price_range, additional_note, status,
   rejection_reason, admin_note, vendor_id, created_at, updated_at, reviewed_at, published_at,
   vendor:vendors(id, vendor_name, status, address, latitude, longitude)
@@ -44,7 +44,7 @@ router.post("/suggestions", requireUser, async (req, res) => {
     action: "vendor_suggestion.create",
     entityType: "vendor_suggestion",
     entityId: data.id,
-    metadata: { source_platform: clean.source_platform, vendor_name: clean.vendor_name },
+    metadata: { source_platform: clean.source_platform, vendor_name: clean.vendor_name, influencer_name: clean.influencer_name },
   });
 
   res.status(201).json({ suggestion: data });
@@ -124,7 +124,7 @@ router.put("/suggestions/:id", requireUser, async (req, res) => {
     action: "vendor_suggestion.update",
     entityType: "vendor_suggestion",
     entityId: data.id,
-    metadata: { source_platform: clean.source_platform, vendor_name: clean.vendor_name, previous_status: current.status, next_status: "under_review" },
+    metadata: { source_platform: clean.source_platform, vendor_name: clean.vendor_name, influencer_name: clean.influencer_name, previous_status: current.status, next_status: "under_review" },
   });
 
   res.json({ suggestion: data });

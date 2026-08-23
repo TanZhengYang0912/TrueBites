@@ -15,6 +15,7 @@ import { logActivity } from "../lib/auditLog.js";
 import { isSuspended } from "../lib/suspension.js";
 import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
+import { resolvePublicBaseUrl } from "../lib/publicBaseUrl.js";
 
 const router = Router();
 
@@ -502,7 +503,7 @@ router.get("/ai/service-status", async (_req, res) => {
   }
 });
 
-router.get("/settings", async (_req, res) => {
+router.get("/settings", async (req, res) => {
   try {
     const platformSettings = [
       { label: "Platform Name", value: "TrueBites" },
@@ -515,7 +516,14 @@ router.get("/settings", async (_req, res) => {
       { label: "LLM Model", value: "openai/gpt-oss-20b (Groq)" },
       { label: "Max Batch Size", value: "1000 videos" },
       { label: "Auto-save to Database", value: "Enabled (manual review before save)" },
-      { label: "Backend API", value: process.env.PORT ? `localhost:${process.env.PORT}` : "localhost:4000" },
+      {
+        label: "Backend API",
+        value: resolvePublicBaseUrl({
+          configuredBaseUrl: process.env.PUBLIC_BASE_URL,
+          protocol: req.protocol,
+          host: req.get("host"),
+        }) || "Not configured",
+      },
     ];
 
     const recentJobs = [];

@@ -16,14 +16,14 @@ test("haversineKm measures real ground distance", () => {
   assert.ok(d > 0.5 && d < 0.9, `expected ~0.7 km, got ${d}`);
 });
 
-test("without an anchor no non-stop vendor is shown", () => {
+test("showAll includes every mapped vendor without an anchor", () => {
   const out = selectVisibleVendors({ ...base, vendors: [NEAR, FAR], anchor: null });
-  assert.deepEqual(out, []);
+  assert.deepEqual(ids(out), ["a", "b"]);
 });
 
-test("vendors inside the radius are shown, ones outside are not", () => {
+test("showAll ignores the nearby radius", () => {
   const out = selectVisibleVendors({ ...base, vendors: [NEAR, FAR] });
-  assert.deepEqual(ids(out), ["a"]);
+  assert.deepEqual(ids(out), ["a", "b"]);
 });
 
 test("a trip stop stays visible even outside the radius", () => {

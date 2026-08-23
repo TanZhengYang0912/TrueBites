@@ -29,12 +29,12 @@ export default function SummaryStep({ jobData, summaryValue, onSummaryChange, on
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <div className="language-badge">🤖 openai/gpt-oss-20b</div>
         {jobData.detected_language && (
-          <div className="language-badge" style={{ background: 'rgba(124,58,237,0.1)', borderColor: 'rgba(124,58,237,0.25)', color: '#a78bfa' }}>
+          <div className="language-badge" style={{ background: 'var(--admin-focus)', borderColor: 'var(--admin-navy)', color: 'var(--admin-navy)' }}>
             🌐 {jobData.detected_language === 'ms' ? 'Malay' : jobData.detected_language === 'en' ? 'English' : jobData.detected_language.toUpperCase()}
           </div>
         )}
         {jobData.title && (
-          <div className="language-badge" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.25)', color: 'var(--success)' }}>
+          <div className="language-badge" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'var(--admin-success-bg)', borderColor: 'var(--admin-success-text)', color: 'var(--admin-success-text)' }}>
             🎬 {jobData.title}
           </div>
         )}

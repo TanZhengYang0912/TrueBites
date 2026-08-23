@@ -241,7 +241,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
         <div className="video-preview">
           <div style={{
             width: 80, height: 56, borderRadius: 8,
-            background: 'linear-gradient(135deg,#7c3aed,#06b6d4)',
+            background: 'var(--admin-navy)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, flexShrink: 0,
           }}>
@@ -282,7 +282,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
       )}
 
       {scrapedVideos.length === 0 && (
-        <div style={{ marginTop: 28, padding: '16px 20px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ marginTop: 28, padding: '16px 20px', background: 'var(--admin-panel-soft)', borderRadius: 12, border: '1px solid var(--admin-border)' }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>
             Supported Platforms
           </div>
@@ -291,7 +291,7 @@ export default function URLSubmissionStep({ onJobStarted, onBatchStarted }) {
               { icon: '🎵', name: 'TikTok', example: mode === 'profile' ? 'tiktok.com/@username' : 'vt.tiktok.com / tiktok.com' },
               { icon: '▶️', name: 'YouTube', example: mode === 'profile' ? 'youtube.com/@channel' : 'youtube.com / youtu.be' },
             ].map((p) => (
-              <div key={p.name} style={{ flex: 1, padding: '12px 14px', background: 'rgba(124,58,237,0.06)', borderRadius: 10, border: '1px solid rgba(124,58,237,0.15)' }}>
+              <div key={p.name} style={{ flex: 1, padding: '12px 14px', background: 'var(--admin-panel)', borderRadius: 10, border: '1px solid var(--admin-border)' }}>
                 <div style={{ fontSize: 18, marginBottom: 4 }}>{p.icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{p.example}</div>

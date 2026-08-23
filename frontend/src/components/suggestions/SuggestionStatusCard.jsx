@@ -19,7 +19,7 @@ export default function SuggestionStatusCard({ suggestion, onEdit }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="m-0 font-display text-2xl font-medium text-ink">{suggestion.vendor_name}</h2>
-          <p className="mb-0 mt-1 text-sm text-muted">{suggestion.location_text} · {suggestion.source_platform}</p>
+      <p className="mb-0 mt-1 text-sm text-muted">{suggestion.location_text} · {suggestion.source_platform}{suggestion.influencer_name ? ` · ${suggestion.influencer_name}` : ""}</p>
         </div>
         <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{label}</span>
       </div>

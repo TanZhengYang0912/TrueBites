@@ -121,6 +121,24 @@ export async function openVendorsPdf({ title, subtitle, vendors }) {
   });
 }
 
+export async function openSuggestionsPdf({ title, subtitle, suggestions }) {
+  return buildAndOpenPdf({
+    title,
+    subtitle,
+    head: ["Vendor", "Category", "Location", "Source", "Status", "Submitted"],
+    rows: suggestions.map((suggestion) => [
+      suggestion.vendor_name || "—",
+      suggestion.category || "—",
+      suggestion.location_text || "—",
+      suggestion.source_platform || "—",
+      String(suggestion.status || "—").replace(/_/g, " "),
+      suggestion.created_at ? new Date(suggestion.created_at).toLocaleDateString() : "—",
+    ]),
+    emptyRow: ["—", "—", "—", "—", "No suggestions selected", "—"],
+    countLabel: `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"}`,
+  });
+}
+
 function hexToRgb(hex) {
   const n = Number.parseInt(hex.replace("#", ""), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];

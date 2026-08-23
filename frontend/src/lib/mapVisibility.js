@@ -13,14 +13,14 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
   return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Trip stops ignore the radius on purpose: adding a stop further away than the
-// current radius would otherwise make that stop's own pin disappear.
-export function selectVisibleVendors({ vendors, anchor, radiusKm, showAll, stopIds, focusVendor }) {
+// "Show vendors" is the normal map mode: every mapped vendor is visible, with
+// Google Maps clustering the dense areas. The nearby radius belongs to the
+// add-to-trip list, not to the discoverability of pins. Turning vendor pins off
+// still leaves trip stops visible.
+export function selectVisibleVendors({ vendors, showAll, stopIds, focusVendor }) {
   const visible = vendors.filter((v) => {
     if (v.latitude == null || v.longitude == null) return false;
-    if (stopIds.has(v.id)) return true;
-    if (!showAll || !anchor) return false;
-    return haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) <= radiusKm;
+    return showAll || stopIds.has(v.id);
   });
   if (focusVendor && focusVendor.latitude != null && focusVendor.longitude != null && !visible.some((v) => v.id === focusVendor.id)) visible.push(focusVendor);
   return visible;

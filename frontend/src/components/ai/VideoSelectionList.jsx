@@ -16,7 +16,7 @@ export default function VideoSelectionList({ videos, selected, onToggle, onSelec
         <div className="video-list-title">
           📋 {videos.length} Videos Found
           {selected.size > 0 && (
-            <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 500, color: '#a78bfa' }}>
+            <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 500, color: 'var(--admin-navy)' }}>
               ({selected.size} selected)
             </span>
           )}

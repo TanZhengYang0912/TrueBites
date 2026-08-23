@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Lightbulb, RefreshCw, Search, Eye, Pencil } from "lucide-react";
+import { FileDown, RefreshCw, Search, Eye, Pencil } from "lucide-react";
 import { getAdminSuggestion, getAdminSuggestions, updateAdminSuggestionsBatch } from "../../api/admin";
 import SuggestionDetailModal from "../../components/admin/SuggestionDetailModal";
+import { openSuggestionsPdf } from "../../lib/exportPdf";
 
 const STATUS_OPTIONS = [
   ["all", "All statuses"],
@@ -27,6 +28,7 @@ export default function AdminSuggestionsPage() {
   const [selected, setSelected] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   async function load(page = data.pagination.page) {
     setLoading(true);
@@ -91,24 +93,28 @@ export default function AdminSuggestionsPage() {
     }
   }
 
+  async function handleExportSelected() {
+    const selectedSuggestions = data.suggestions.filter((suggestion) => selectedIds.includes(suggestion.id));
+    if (!selectedSuggestions.length) return;
+    setExportingPdf(true);
+    setError("");
+    try {
+      await openSuggestionsPdf({
+        title: "Community Suggestions",
+        subtitle: `${selectedSuggestions.length} selected suggestion${selectedSuggestions.length === 1 ? "" : "s"}`,
+        suggestions: selectedSuggestions,
+      });
+    } catch (exportError) {
+      setError(exportError.message || "Unable to export selected suggestions.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   const allSelected = data.suggestions.length > 0 && selectedIds.length === data.suggestions.length;
 
   return (
     <div className="grid gap-5">
-      <section className="border border-sand bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:p-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="grid size-11 shrink-0 place-items-center rounded-full bg-forest text-white"><Lightbulb size={20} /></div>
-            <div>
-              <p className="mb-1 mt-0 text-[10px] font-bold uppercase tracking-[0.14em] text-terracotta">Customer contribution queue</p>
-              <h2 className="m-0 font-display text-3xl font-medium text-ink">Community suggestions</h2>
-              <p className="mb-0 mt-2 max-w-xl text-sm leading-6 text-muted">Review Malacca hidden-gem submissions before they enter the AI content workflow or vendor catalogue.</p>
-            </div>
-          </div>
-          <button type="button" onClick={() => load(data.pagination.page)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-sand px-3 text-sm font-semibold text-ink hover:border-blue-600 hover:text-blue-600"><RefreshCw size={15} /> Refresh</button>
-        </div>
-      </section>
-
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 lg:max-w-2xl">
           <Search size={16} className="text-gray-400" />
@@ -124,6 +130,7 @@ export default function AdminSuggestionsPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
+          <button type="button" onClick={() => load(data.pagination.page)} className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"><RefreshCw size={15} /> Refresh</button>
           <button type="button" onClick={() => setQuery(search.trim())} className="inline-flex h-10 items-center justify-center rounded-full bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">Apply filters</button>
         </div>
       </div>
@@ -134,9 +141,10 @@ export default function AdminSuggestionsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
           <span className="text-sm font-semibold text-blue-800">{selectedIds.length} suggestion(s) selected</span>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("under_review")} className="min-h-9 rounded bg-forest px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50 hover:bg-forest/90">Start review</button>
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("duplicate")} className="min-h-9 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100">Mark as duplicate</button>
-            <button type="button" disabled={batchBusy} onClick={() => handleBatchAction("rejected")} className="min-h-9 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50">Reject</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("under_review")} className="min-h-9 rounded bg-forest px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50 hover:bg-forest/90">Start review</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("duplicate")} className="min-h-9 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100">Mark as duplicate</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={() => handleBatchAction("rejected")} className="min-h-9 rounded border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-colors disabled:opacity-50 hover:bg-red-50">Reject</button>
+            <button type="button" disabled={batchBusy || exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
           </div>
         </div>
       )}

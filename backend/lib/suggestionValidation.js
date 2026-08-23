@@ -57,6 +57,7 @@ export function isMalaccaLocation(value) {
 export function validateSuggestionInput(input = {}) {
   const errors = {};
   const vendorName = text(input.vendor_name);
+  const influencerName = text(input.influencer_name);
   const sourceUrl = text(input.source_url);
   const location = text(input.location_text);
   const reason = text(input.reason);
@@ -68,7 +69,7 @@ export function validateSuggestionInput(input = {}) {
   else if (!isMalaccaLocation(location)) errors.location_text = "Only Malacca/Melaka vendors can be submitted.";
   if (reason.length < 10 || reason.length > 1000) errors.reason = "Tell us why this hidden gem is worth trying (10–1,000 characters).";
 
-  for (const [key, max] of [["category", 80], ["signature_dish", 160], ["price_range", 80], ["additional_note", 1000]]) {
+  for (const [key, max] of [["influencer_name", 120], ["category", 80], ["signature_dish", 160], ["price_range", 80], ["additional_note", 1000]]) {
     if (text(input[key]).length > max) errors[key] = `${key.replaceAll("_", " ")} is too long.`;
   }
 
@@ -76,6 +77,7 @@ export function validateSuggestionInput(input = {}) {
     errors,
     clean: {
       vendor_name: vendorName,
+      influencer_name: influencerName || null,
       source_url: sourceUrl,
       source_platform: platform,
       location_text: location,

@@ -3,19 +3,97 @@ import {
   AdvancedMarker,
   Pin,
   InfoWindow,
-  Circle,
+  useAdvancedMarkerRef,
   useMap,
 } from "@vis.gl/react-google-maps";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { MAP_COLORS } from "../lib/mapColors";
 
+// Keep clustered vendors visually consistent with the rest of TrueBites.
+// Google Maps' built-in renderer switches between blue and red based on local
+// density, which implies a distinction we do not make in the product.
+function createBrandClusterRenderer() {
+  return {
+    render({ count, position }) {
+      const scale = count >= 100 ? 25 : count >= 10 ? 22 : 19;
+      const fontSize = count >= 100 ? "12px" : "13px";
+
+      return new google.maps.Marker({
+        position,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: MAP_COLORS.forest,
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeOpacity: 1,
+          strokeWeight: 3,
+          scale,
+        },
+        label: {
+          text: String(count),
+          color: "#FFFFFF",
+          fontFamily: "Arial, sans-serif",
+          fontSize,
+          fontWeight: "700",
+        },
+        title: `${count} vendors`,
+        zIndex: 1000 + count,
+      });
+    },
+  };
+}
+
 // Renders vendor pins with clustering, plus numbered pins for trip stops and a
 // "you are here" marker. Vendor data comes from Supabase: { id, name, address,
 // latitude, longitude }.
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, tripOrder, userStopNumber, selectedId, openId, onOpenChange, radiusCenter, radiusKm }) {
+function VendorMarker({ vendor, position, stopNum, isSelected, isApproximate, onSelect, onOpenChange, onMarkerChange }) {
+  const [markerRef, marker] = useAdvancedMarkerRef();
+  const excludeFromCluster = Boolean(stopNum) || isSelected;
+
+  useEffect(() => {
+    onMarkerChange(vendor.id, marker, excludeFromCluster);
+    return () => onMarkerChange(vendor.id, null, true);
+  }, [vendor.id, marker, excludeFromCluster, onMarkerChange]);
+
+  return (
+    <AdvancedMarker
+      position={position}
+      ref={markerRef}
+      onClick={() => { onOpenChange(vendor.id); onSelect(vendor); }}
+      zIndex={isSelected ? 999 : undefined}
+    >
+      <Pin
+        background={isSelected ? MAP_COLORS.danger : stopNum ? MAP_COLORS.terracotta : isApproximate ? MAP_COLORS.warning : MAP_COLORS.success}
+        glyphColor="#fff"
+        borderColor="#fff"
+        scale={isSelected ? 1.5 : 1}
+        glyph={stopNum ? String(stopNum) : isSelected ? undefined : isApproximate ? "?" : ""}
+      />
+    </AdvancedMarker>
+  );
+}
+
+export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
+
+  const refreshCluster = useCallback(() => {
+    if (!clusterer.current) return;
+    clusterer.current.clearMarkers();
+    clusterer.current.addMarkers(Object.values(markers.current));
+  }, []);
+
+  const setClusterMarker = useCallback((id, marker, excludeFromCluster) => {
+    if (marker && !excludeFromCluster) {
+      if (markers.current[id] === marker) return;
+      markers.current[id] = marker;
+    } else {
+      if (!markers.current[id]) return;
+      delete markers.current[id];
+    }
+    refreshCluster();
+  }, [refreshCluster]);
 
   useEffect(() => {
     if (document.getElementById("user-loc-marker-style")) return;
@@ -27,23 +105,15 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
 
   useEffect(() => {
     if (!map) return;
-    if (!clusterer.current) clusterer.current = new MarkerClusterer({ map });
-  }, [map]);
-
-  useEffect(() => {
-    if (!clusterer.current) return;
-    clusterer.current.clearMarkers();
-    clusterer.current.addMarkers(Object.values(markers.current));
-  }, [vendors, tripOrder, selectedId]);
-
-  // Trip stops and the selected pin carry meaning (their number, their red
-  // highlight) that a cluster bubble would swallow — two nearby stops would
-  // collapse into an anonymous "2" bubble instead of showing stop 2 and stop 3.
-  // Keep those out of the clusterer entirely so they always render individually.
-  const setMarkerRef = useCallback((marker, id, excludeFromCluster) => {
-    if (marker && !excludeFromCluster) markers.current[id] = marker;
-    else delete markers.current[id];
-  }, []);
+    const nextClusterer = new MarkerClusterer({ map, renderer: createBrandClusterRenderer() });
+    clusterer.current = nextClusterer;
+    refreshCluster();
+    return () => {
+      nextClusterer.clearMarkers();
+      nextClusterer.setMap(null);
+      if (clusterer.current === nextClusterer) clusterer.current = null;
+    };
+  }, [map, refreshCluster]);
 
   // Trip stops that share the exact same coordinates (confirmed real case: two
   // vendors both geocoded to the same generic area centroid, e.g. no street
@@ -71,57 +141,26 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
 
   return (
     <>
-      {/* The radius the "Nearby to add" list and the vendor pins are filtered by.
-          clickable={false} is load-bearing — at 10 km this covers the whole
-          viewport and would otherwise swallow every pin click. */}
-      {radiusCenter && radiusKm && (
-        <Circle
-          center={radiusCenter}
-          radius={radiusKm * 1000}
-          clickable={false}
-          strokeColor={MAP_COLORS.forest}
-          strokeOpacity={0.5}
-          strokeWeight={1.5}
-          fillColor={MAP_COLORS.forest}
-          fillOpacity={0.06}
-        />
-      )}
       {vendors.map((v) => {
         const stopNum = tripOrder?.get(v.id);
         // AI-extracted vendors that only had a city/state (no street address) get
-        // geocoded to a city centroid, not the real spot — flag them visually so
-        // users don't mistake a fuzzy guess for a precise pin.
+        // geocoded to a city centroid, not the real spot — the question-mark pin
+        // flags that uncertainty without obscuring the entire map with ranges.
         const isApproximate = v.location_precision === "city_level" || v.location_precision === "unknown";
         const isSelected = v.id === selectedId;
         const pos = displayPosition(v);
         return (
-          <div key={v.id}>
-            {isApproximate && (
-              <Circle
-                center={pos}
-                radius={800}
-                strokeColor="#f5a623"
-                strokeOpacity={0.5}
-                strokeWeight={1}
-                fillColor="#f5a623"
-                fillOpacity={0.08}
-              />
-            )}
-            <AdvancedMarker
-              position={pos}
-              ref={(marker) => setMarkerRef(marker, v.id, Boolean(stopNum) || isSelected)}
-              onClick={() => { onOpenChange(v.id); onSelect(v); }}
-              zIndex={isSelected ? 999 : undefined}
-            >
-              <Pin
-                background={isSelected ? MAP_COLORS.danger : stopNum ? MAP_COLORS.terracotta : isApproximate ? MAP_COLORS.warning : MAP_COLORS.success}
-                glyphColor="#fff"
-                borderColor="#fff"
-                scale={isSelected ? 1.5 : 1}
-                glyph={stopNum ? String(stopNum) : isSelected ? undefined : isApproximate ? "?" : ""}
-              />
-            </AdvancedMarker>
-          </div>
+          <VendorMarker
+            key={v.id}
+            vendor={v}
+            position={pos}
+            stopNum={stopNum}
+            isSelected={isSelected}
+            isApproximate={isApproximate}
+            onSelect={onSelect}
+            onOpenChange={onOpenChange}
+            onMarkerChange={setClusterMarker}
+          />
         );
       })}
 
