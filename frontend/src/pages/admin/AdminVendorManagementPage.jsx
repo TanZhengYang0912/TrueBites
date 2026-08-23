@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, List, MapPinned, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
@@ -8,6 +8,7 @@ import {
 import Toast from "../../components/engagement/Toast";
 import ImageLightbox from "../../components/engagement/ImageLightbox";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
+import AdminVendorMap from "../../components/admin/AdminVendorMap";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
 import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
@@ -1117,6 +1118,9 @@ export default function AdminVendorManagementPage() {
   const [dupDeleteId, setDupDeleteId] = useState(null);
   const [dupDeleting, setDupDeleting] = useState(false);
   const [exportingVendors, setExportingVendors] = useState(false);
+  const [viewMode, setViewMode] = useState("list");
+  const [mapVendors, setMapVendors] = useState([]);
+  const [mapLoading, setMapLoading] = useState(false);
 
   const loadDuplicates = () =>
     getAdminVendorDuplicates()
@@ -1185,6 +1189,19 @@ export default function AdminVendorManagementPage() {
   };
 
   useEffect(() => {
+    if (viewMode !== "map") return undefined;
+    let active = true;
+    setMapLoading(true);
+    fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
+      params: { status, category, sort, q: query },
+    })
+      .then((vendors) => { if (active) setMapVendors(vendors); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setMapLoading(false); });
+    return () => { active = false; };
+  }, [viewMode, status, category, sort, query]);
+
+  useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
@@ -1240,6 +1257,11 @@ export default function AdminVendorManagementPage() {
     setPendingGalleryDeletes(new Set());
     setPendingGalleryAdds(new Set());
     setEditing(true);
+  };
+
+  const handleMapDragEnd = (vendor, position) => {
+    openVendorForEdit({ ...vendor, latitude: position.lat, longitude: position.lng });
+    notify("Pin moved. Save Changes to keep the new location.");
   };
 
   const handlePageChange = (page) => {
@@ -1312,6 +1334,12 @@ export default function AdminVendorManagementPage() {
 
       const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
       setData(refreshed);
+      if (viewMode === "map") {
+        const refreshedMap = await fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
+          params: { status, category, sort, q: query },
+        });
+        setMapVendors(refreshedMap);
+      }
 
       if (failedDeletes.size > 0) {
         const msg = `Saved, but ${failedDeletes.size} gallery photo${failedDeletes.size === 1 ? "" : "s"} couldn't be deleted — try Save again.`;
@@ -1515,6 +1543,24 @@ export default function AdminVendorManagementPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex h-10 items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors ${viewMode === "list" ? "bg-slate-100 text-blue-700" : "text-gray-500 hover:bg-gray-50"}`}
+              aria-pressed={viewMode === "list"}
+              onClick={() => setViewMode("list")}
+            >
+              <List size={15} /> List
+            </button>
+            <button
+              type="button"
+              className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors ${viewMode === "map" ? "bg-slate-100 text-blue-700" : "text-gray-500 hover:bg-gray-50"}`}
+              aria-pressed={viewMode === "map"}
+              onClick={() => setViewMode("map")}
+            >
+              <MapPinned size={15} /> Map
+            </button>
+          </div>
           <div className="relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={category} onChange={(e) => { setCategory(e.target.value); resetToFirstPage(); }}>
               <option value="all">All Categories</option>
@@ -1569,7 +1615,7 @@ export default function AdminVendorManagementPage() {
         </div>
       ) : null}
 
-      {selectedIds.size > 0 && (
+      {viewMode === "list" && selectedIds.size > 0 && (
         <div className="admin-bulk-bar">
           <span className="admin-bulk-count">{selectedIds.size} selected</span>
           <div className="admin-bulk-actions">
@@ -1590,6 +1636,7 @@ export default function AdminVendorManagementPage() {
         </div>
       )}
 
+      {viewMode === "list" ? (
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
         <table className="w-full whitespace-nowrap text-left text-sm">
@@ -1731,6 +1778,26 @@ export default function AdminVendorManagementPage() {
           onPageSizeChange={handlePageSizeChange}
         />
       </section>
+      ) : (
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Vendor map</h2>
+              <p className="text-sm text-gray-500">
+                {mapLoading ? "Loading vendors…" : `${mapVendors.length} vendor${mapVendors.length === 1 ? "" : "s"} in the current filter`}
+              </p>
+            </div>
+            <span className="text-xs text-gray-500">Click a pin to view details · drag a pin to edit its coordinates</span>
+          </div>
+          {mapLoading ? (
+            <div className="grid min-h-[420px] place-items-center rounded-xl border border-gray-200 bg-slate-50 text-sm text-gray-500">
+              Loading vendor pins…
+            </div>
+          ) : (
+            <AdminVendorMap vendors={mapVendors} onSelect={openVendor} onDragEnd={handleMapDragEnd} />
+          )}
+        </section>
+      )}
 
       <VendorDetailModal
         vendor={selectedVendor}
