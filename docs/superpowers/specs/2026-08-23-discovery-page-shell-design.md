@@ -46,9 +46,11 @@ The page-specific layout remains inside each page:
 - Suggest uses the shell plus the suggestion CTA/form content.
 
 The shell should use the same effective container sizing as Discover:
-`mx-auto w-full max-w-[1200px] px-4 py-8 md:px-6`, with the intro and content
-sections following one consistent vertical rhythm. Short pages should still
-reserve the same bottom breathing room before the shared footer.
+`mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12
+xl:px-10`, with the intro and content sections following one consistent
+vertical rhythm. Short pages should still reserve the same bottom breathing
+room before the shared footer. Page-specific content may use a narrower inner
+wrapper when its controls or form benefit from it.
 
 ## Visual rules
 
