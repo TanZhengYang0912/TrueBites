@@ -329,7 +329,7 @@ export default function AdminUserModerationPage() {
       {selectedIds.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-5 py-3 shadow-sm">
           <span className="text-sm font-semibold text-blue-800">{selectedIds.length} user(s) selected</span>
-          <button type="button" disabled={exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
+          <button type="button" disabled={loading || exportingPdf} onClick={handleExportSelected} className="inline-flex min-h-9 items-center gap-2 rounded border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 transition-colors disabled:opacity-50 hover:bg-blue-100"><FileDown size={14} /> Export PDF</button>
         </div>
       )}
 
@@ -341,7 +341,7 @@ export default function AdminUserModerationPage() {
             <thead>
               <tr>
                 <th className="w-12 text-center">
-                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} aria-label="Select all users" className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
+                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} disabled={loading} aria-label="Select all users on this page" className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:cursor-not-allowed" />
                 </th>
                 <th>User</th>
                 <th>Provider</th>
@@ -361,7 +361,7 @@ export default function AdminUserModerationPage() {
                     onClick={() => navigate(`/admin/users/${user.id}`, { state: { email: user.email, displayName: user.displayName } })}
                   >
                     <td onClick={(e) => e.stopPropagation()} className="text-center">
-                      <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={(e) => handleSelectOne(e, user.id)} aria-label={`Select ${user.email}`} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
+                      <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={(e) => handleSelectOne(e, user.id)} disabled={loading} aria-label={`Select ${user.email}`} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:cursor-not-allowed" />
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
