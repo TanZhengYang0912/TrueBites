@@ -47,37 +47,38 @@ export default function SuggestionsPage() {
     return true;
   });
   return (
-    <DiscoveryPageShell
-      headerProps={{
-        session: userSession,
-        userEmail: email,
-        initials,
-        firstName,
-        avatarUrl: meta.avatar_url || "",
-        activeSection: "suggestions",
-        onOpenDiscover: () => navigate("/map"),
-        onOpenSaved: () => navigate("/engagement"),
-        onOpenReviews: () => navigate("/engagement?tab=reviews"),
-        onOpenSuggestions: () => navigate("/suggestions"),
-        onOpenProfile: () => navigate("/profile"),
-        onOpenMap: () => navigate("/map?view=map"),
-        onLogin: () => navigate("/login"),
-        onSignUp: () => navigate("/login"),
-      }}
-    >
-      <DiscoveryPageIntro
-        eyebrow="Your community discoveries"
-        title="My suggestions"
-        description="Track the hidden gems you have shared with TrueBites. We will keep the updates simple while our team verifies the details."
-        action={<button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded bg-forest px-4 text-sm font-semibold text-white">Suggest another vendor</button>}
-      />
+    <>
+      <DiscoveryPageShell
+        headerProps={{
+          session: userSession,
+          userEmail: email,
+          initials,
+          firstName,
+          avatarUrl: meta.avatar_url || "",
+          activeSection: "suggestions",
+          onOpenDiscover: () => navigate("/map"),
+          onOpenSaved: () => navigate("/engagement"),
+          onOpenReviews: () => navigate("/engagement?tab=reviews"),
+          onOpenSuggestions: () => navigate("/suggestions"),
+          onOpenProfile: () => navigate("/profile"),
+          onOpenMap: () => navigate("/map?view=map"),
+          onLogin: () => navigate("/login"),
+          onSignUp: () => navigate("/login"),
+        }}
+      >
+        <DiscoveryPageIntro
+          eyebrow="Your community discoveries"
+          title="My suggestions"
+          description="Track the hidden gems you have shared with TrueBites. We will keep the updates simple while our team verifies the details."
+          action={<button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded bg-forest px-4 text-sm font-semibold text-white">Suggest another vendor</button>}
+        />
 
         <div className="mb-6 flex gap-2 overflow-x-auto border-b border-sand pb-px">
           {["all", "pending", "published", "rejected"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold capitalize transition-colors ${activeTab === tab ? "border-forest text-ink" : "border-transparent text-muted hover:border-sand hover:text-ink"}`}
+              className={`flex min-h-11 items-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold capitalize transition-colors ${activeTab === tab ? "border-forest text-ink" : "border-transparent text-muted hover:border-sand hover:text-ink"}`}
             >
               {tab}
             </button>
@@ -102,6 +103,8 @@ export default function SuggestionsPage() {
             {activeTab === "all" && <button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 rounded bg-forest px-4 text-sm font-semibold text-white">Share a hidden gem</button>}
           </div>
         )}
+      </DiscoveryPageShell>
+
       {editingSuggestion && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
           <div className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded bg-white shadow-2xl">
@@ -133,6 +136,6 @@ export default function SuggestionsPage() {
           </div>
         </div>
       )}
-    </DiscoveryPageShell>
+    </>
   );
 }

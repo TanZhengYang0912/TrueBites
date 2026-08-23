@@ -23,5 +23,8 @@ test("secondary discovery pages compose the shared shell and intro", () => {
     const source = read(path);
     assert.match(source, /DiscoveryPageShell/);
     assert.match(source, /DiscoveryPageIntro/);
+    assert.doesNotMatch(source, /import .*DiscoveryHeader/);
+    assert.doesNotMatch(source, /max-w-\[1200px\]/);
+    assert.equal((source.match(/<h1\b/g) || []).length, 0);
   }
 });

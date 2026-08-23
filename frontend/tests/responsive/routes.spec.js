@@ -8,6 +8,7 @@ const routes = [
   ["ai", "/ai"],
   ["login", "/login"],
   ["engagement", "/engagement"],
+  ["engagement-reviews", "/engagement?tab=reviews"],
   ["suggestions", "/suggestions"],
   ["suggestions-new", "/suggestions/new"],
   ["admin-login", "/wsdasabi123&admin-login"],

@@ -217,7 +217,8 @@ export default function EngagementPage() {
   }
 
   return (
-    <DiscoveryPageShell
+    <>
+      <DiscoveryPageShell
       headerProps={{
         onOpenMap: () => navigate("/map?view=map"),
         session,
@@ -236,12 +237,12 @@ export default function EngagementPage() {
         onOpenProfile: () => navigate("/profile"),
         onOpenVendor: (id) => navigate(`/map?vendor=${id}`),
       }}
-    >
-      <DiscoveryPageIntro
-        eyebrow="Your TrueBites collection"
-        title={tab === "reviews" ? "My reviews" : "Saved places"}
-        description={tab === "reviews" ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
-      />
+      >
+        <DiscoveryPageIntro
+          eyebrow="Your TrueBites collection"
+          title={tab === "reviews" ? "My reviews" : "Saved places"}
+          description={tab === "reviews" ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
+        />
         {tab === "bookmarks" && (
           <div className="flex flex-col gap-5">
             {/* Folder tabs — horizontal row, Instagram-style */}
@@ -386,6 +387,8 @@ export default function EngagementPage() {
             )}
           </section>
         )}
+      </DiscoveryPageShell>
+
       {detailVendor && (
         <VendorDetailModal
           vendor={detailVendor}
@@ -467,7 +470,7 @@ export default function EngagementPage() {
       )}
 
       <Toast toast={toast} />
-    </DiscoveryPageShell>
+    </>
   );
 }
 
