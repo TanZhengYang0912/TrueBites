@@ -101,6 +101,37 @@ export default function MapPage() {
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
   const [accountStatus, setAccountStatus] = useState(null);
+  const [mapError, setMapError] = useState("");
+
+  useEffect(() => {
+    const mapAuthFailure = () => {
+      setMapError("Google Maps could not be authenticated. Please check the browser key, Maps JavaScript API, and billing settings.");
+    };
+    const detectMapFailure = () => {
+      const bodyText = document.body?.innerText || "";
+      if (/This page can't load Google Maps correctly|Do you own this website\?|BillingNotEnabledMapError|InvalidKeyMapError|ApiNotActivatedMapError/.test(bodyText)) {
+        mapAuthFailure();
+      }
+    };
+    const previousAuthFailure = window.gm_authFailure;
+    const onWindowError = (event) => {
+      const message = String(event?.message || event?.error?.message || "");
+      if (/BillingNotEnabledMapError|InvalidKeyMapError|ApiNotActivatedMapError/.test(message)) {
+        mapAuthFailure();
+      }
+    };
+    const observer = new MutationObserver(detectMapFailure);
+
+    window.gm_authFailure = mapAuthFailure;
+    window.addEventListener("error", onWindowError);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    detectMapFailure();
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      observer.disconnect();
+      if (window.gm_authFailure === mapAuthFailure) window.gm_authFailure = previousAuthFailure;
+    };
+  }, []);
 
   // Suspended customers can still sign in and browse (see backend/lib/suspension.js)
   // but shouldn't be able to use the interactive map/trip planner — checked
@@ -466,51 +497,75 @@ export default function MapPage() {
     : [];
 
   return (
-    <APIProvider apiKey={API_KEY} libraries={["geometry", "marker", "places"]}>
+    <APIProvider
+      apiKey={API_KEY}
+      libraries={["geometry", "marker", "places"]}
+      onError={(error) => setMapError(`Google Maps failed to load: ${error?.message || "authorization or billing error."}`)}
+    >
       <div className="relative h-dvh w-full overflow-hidden bg-chalk">
-        <GMap
-          defaultCenter={MELAKA_CENTER}
-          defaultZoom={13}
-          mapId={MAP_ID}
-          colorScheme={isDark ? "DARK" : "LIGHT"}
-          gestureHandling="greedy"
-          className="size-full"
-        >
-          <MelakaHighlight />
-          {/* FocusOnUser must commit before FocusOnVendor — React runs effects in
-              JSX order, and picking a vendor often triggers a first-time
-              locateMe() call in the same update. Without this order, "focus on
-              me" would win and undo the "focus on the vendor I picked" zoom. */}
-          <FocusOnUser pos={locateTarget} />
-          <FocusOnVendor vendor={focusVendor} />
-          <VendorMarkers
-            vendors={visibleVendors}
-            userPos={userPos}
-            onSelect={setSelected}
-            onAddStop={addStop}
-            tripOrder={vendorStopOrder}
-            userStopNumber={meIndex >= 0 ? meIndex + 1 : null}
-            selectedId={selected?.id}
-            openId={openId}
-            onOpenChange={setOpenId}
-            radiusCenter={anchor}
-            radiusKm={radiusKm}
-          />
-          {travelMode === "TRANSIT" && <TransitLayer />}
-          {travelMode
-            ? (
-              <DirectionsRenderer
-                stops={trip}
-                travelMode={travelMode}
-                routeIndex={routeIndex}
-                onSummary={setDirSummary}
-                onRoutes={setRouteOptions}
-                onTransitLegs={setTransitLegs}
+        {mapError ? (
+          <div className="absolute inset-0 grid place-items-center bg-chalk px-6 py-24">
+            <div className="max-w-lg rounded-2xl border border-sand bg-white p-8 text-center shadow-[0_10px_30px_rgba(32,42,53,0.08)]">
+              <div className="mb-3 text-3xl">🗺️</div>
+              <h2 className="mb-2 font-display text-2xl text-ink">Map temporarily unavailable</h2>
+              <p className="mb-6 text-sm leading-6 text-muted">
+                {mapError} The list view is still available while the map configuration is being updated.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button type="button" className="min-h-11 rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white" onClick={() => window.location.reload()}>
+                  Try again
+                </button>
+                <button type="button" className="min-h-11 rounded-lg border border-sand bg-white px-4 py-2 text-sm font-semibold text-ink" onClick={backToDashboard}>
+                  Back to list
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <GMap
+              defaultCenter={MELAKA_CENTER}
+              defaultZoom={13}
+              mapId={MAP_ID}
+              colorScheme={isDark ? "DARK" : "LIGHT"}
+              gestureHandling="greedy"
+              className="size-full"
+            >
+              <MelakaHighlight />
+              {/* FocusOnUser must commit before FocusOnVendor — React runs effects in
+                  JSX order, and picking a vendor often triggers a first-time
+                  locateMe() call in the same update. Without this order, "focus on
+                  me" would win and undo the "focus on the vendor I picked" zoom. */}
+              <FocusOnUser pos={locateTarget} />
+              <FocusOnVendor vendor={focusVendor} />
+              <VendorMarkers
+                vendors={visibleVendors}
+                userPos={userPos}
+                onSelect={setSelected}
+                onAddStop={addStop}
+                tripOrder={vendorStopOrder}
+                userStopNumber={meIndex >= 0 ? meIndex + 1 : null}
+                selectedId={selected?.id}
+                openId={openId}
+                onOpenChange={setOpenId}
+                radiusCenter={anchor}
+                radiusKm={radiusKm}
               />
-            )
-            : tripData?.path && <TripPolyline path={tripData.path} />
-          }
-        </GMap>
+              {travelMode === "TRANSIT" && <TransitLayer />}
+              {travelMode
+                ? (
+                  <DirectionsRenderer
+                    stops={trip}
+                    travelMode={travelMode}
+                    routeIndex={routeIndex}
+                    onSummary={setDirSummary}
+                    onRoutes={setRouteOptions}
+                    onTransitLegs={setTransitLegs}
+                  />
+                )
+                : tripData?.path && <TripPolyline path={tripData.path} />
+              }
+          </GMap>
+        )}
 
         {!mapFullscreen && (
           <div className="absolute inset-x-0 top-0 z-10">
