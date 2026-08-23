@@ -21,6 +21,7 @@ import { getAppealsPendingCount } from "../../api/admin";
 
 const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/notifications", label: "Notifications", icon: Bell },
   { to: "/admin/vendors2", label: "Vendors", icon: Store },
   { to: "/admin/ai", label: "AI Content Queue", icon: BrainCircuit },
   { to: "/admin/suggestions", label: "Community Suggestions", icon: Lightbulb },
@@ -61,9 +62,8 @@ export default function AdminLayout() {
     navigate("/wsdasabi123&admin-login", { replace: true });
     await supabase.auth.signOut();
   }
-  // Notifications and Account are reachable only via the bell icon / user
-  // card, not a sidebar tab, so they aren't in NAV_ITEMS — checked first or
-  // they'd fall through to "Overview".
+  // Account is reachable via the user card, not a sidebar tab. Notifications
+  // has a sidebar tab and is checked by NAV_ITEMS below.
   const pageName = location.pathname.startsWith("/admin/notifications")
     ? "Notifications"
     : location.pathname.startsWith("/admin/account")
