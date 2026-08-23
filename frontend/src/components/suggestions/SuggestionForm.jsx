@@ -1,7 +1,9 @@
 import { useState } from "react";
+import AddressAutocomplete from "./AddressAutocomplete";
 
 const INITIAL = {
   vendor_name: "",
+  influencer_name: "",
   source_url: "",
   location_text: "",
   category: "",
@@ -60,20 +62,7 @@ export default function SuggestionForm({ onSubmit, submitting = false, serverErr
         </label>
         <label className="text-sm font-semibold text-ink">
           Malacca area or address <span className="text-terracotta">*</span>
-          <input list="malacca-areas" className={inputClass("location_text")} value={values.location_text} onChange={(event) => update("location_text", event.target.value)} placeholder="e.g. Jonker Street, Melaka" maxLength={180} />
-          <datalist id="malacca-areas">
-            <option value="Jonker Street, Melaka" />
-            <option value="Melaka Raya, Melaka" />
-            <option value="Klebang, Melaka" />
-            <option value="Ayer Keroh, Melaka" />
-            <option value="Kota Laksamana, Melaka" />
-            <option value="Alor Gajah, Melaka" />
-            <option value="Jasin, Melaka" />
-            <option value="Bukit Beruang, Melaka" />
-            <option value="Ujong Pasir, Melaka" />
-            <option value="Tengkera, Melaka" />
-          </datalist>
-          {fieldError("location_text") && <span className="mt-1 block text-xs font-normal text-red-600">{fieldError("location_text")}</span>}
+          <AddressAutocomplete value={values.location_text} onChange={(value) => update("location_text", value)} error={fieldError("location_text")} />
         </label>
       </div>
 
@@ -82,6 +71,13 @@ export default function SuggestionForm({ onSubmit, submitting = false, serverErr
         <input type="url" className={inputClass("source_url")} value={values.source_url} onChange={(event) => update("source_url", event.target.value)} placeholder="https://www.tiktok.com/@creator/video/..." maxLength={1000} />
         <span className="mt-1 block text-xs font-normal text-muted">Share a video about this vendor. Our admin team will review it before any AI processing.</span>
         {fieldError("source_url") && <span className="mt-1 block text-xs font-normal text-red-600">{fieldError("source_url")}</span>}
+      </label>
+
+      <label className="text-sm font-semibold text-ink">
+        Recommended by influencer or channel
+        <input className={inputClass("influencer_name")} value={values.influencer_name} onChange={(event) => update("influencer_name", event.target.value)} placeholder="e.g. Melaka Foodie or @melakafoodie" maxLength={120} />
+        <span className="mt-1 block text-xs font-normal text-muted">Optional — the person or channel behind the source video.</span>
+        {fieldError("influencer_name") && <span className="mt-1 block text-xs font-normal text-red-600">{fieldError("influencer_name")}</span>}
       </label>
 
       <div className="grid gap-5 md:grid-cols-3">

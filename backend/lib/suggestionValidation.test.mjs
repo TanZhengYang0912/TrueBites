@@ -29,6 +29,7 @@ test("recognises both Malacca spellings and rejects other locations", () => {
 test("validates the complete customer submission", () => {
   const result = validateSuggestionInput({
     vendor_name: "Kedai Nyonya",
+    influencer_name: "Melaka Foodie",
     source_url: "https://www.youtube.com/watch?v=abc123",
     location_text: "Jonker Street, Melaka",
     reason: "The handmade nyonya kuih is excellent and worth sharing.",
@@ -36,6 +37,27 @@ test("validates the complete customer submission", () => {
   });
   assert.deepEqual(result.errors, {});
   assert.equal(result.clean.source_platform, "YouTube");
+  assert.equal(result.clean.influencer_name, "Melaka Foodie");
+});
+
+test("keeps influencer name optional while enforcing its length", () => {
+  const withoutInfluencer = validateSuggestionInput({
+    vendor_name: "Kedai Nyonya",
+    source_url: "https://www.youtube.com/watch?v=abc123",
+    location_text: "Jonker Street, Melaka",
+    reason: "The handmade nyonya kuih is excellent and worth sharing.",
+  });
+  assert.equal(withoutInfluencer.errors.influencer_name, undefined);
+  assert.equal(withoutInfluencer.clean.influencer_name, null);
+
+  const tooLong = validateSuggestionInput({
+    vendor_name: "Kedai Nyonya",
+    influencer_name: "x".repeat(121),
+    source_url: "https://www.youtube.com/watch?v=abc123",
+    location_text: "Jonker Street, Melaka",
+    reason: "The handmade nyonya kuih is excellent and worth sharing.",
+  });
+  assert.ok(tooLong.errors.influencer_name);
 });
 
 test("rejects non-Malacca and short submissions", () => {

@@ -46,8 +46,9 @@ Admins review the queue at `/admin/suggestions`, then can accept a submission fo
 AI transcript/summary/extraction workflow, inspect the result, create a vendor draft, and publish
 it as an active vendor. This keeps AI as an admin assistant while human review controls publication.
 
-The database migration is `supabase/migrations/202608180001_vendor_suggestions.sql`. Apply it to
-the Supabase project used by `backend/.env` before using the feature. The Node API owns the
+The database migrations are `supabase/migrations/202608180001_vendor_suggestions.sql` and
+`supabase/migrations/202608230001_add_influencer_name_to_vendor_suggestions.sql`. Apply both to
+the Supabase project used by `backend/.env` before deploying or using the feature. The Node API owns the
 customer/admin authorization boundaries and the table also has RLS policies as defense in depth.
 
 ---
