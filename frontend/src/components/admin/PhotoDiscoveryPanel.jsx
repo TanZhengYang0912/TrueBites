@@ -31,7 +31,13 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
     setSearchError("");
     setDismissed(new Set());
     try {
-      const { candidates: found } = await discoverVendorPhotos(vendorId);
+      // Send the coordinates currently in the form — including an unsaved
+      // marker drag or manual edit — so the search reflects where the pin
+      // is right now, not just what's already persisted for this vendor.
+      const { candidates: found } = await discoverVendorPhotos(
+        vendorId,
+        coordsInRange ? { latitude: latNum, longitude: lngNum } : null
+      );
       setCandidates(found);
     } catch (err) {
       setSearchError(err.message || "Search failed — please try again.");

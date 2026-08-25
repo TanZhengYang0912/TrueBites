@@ -164,6 +164,14 @@ export default function ExtractionStep({ jobData, reviewSummary, onBack, onReset
         multiline
         onChange={(value) => setField('special_notes', value)}
       />
+      {/* The vendors table has no special_notes column — this field is kept
+          for reference while reviewing the AI extraction, but its content is
+          never written to the vendor record on Create Draft / Save to
+          Database. Said so explicitly rather than letting an admin assume it
+          persisted, which it silently didn't. */}
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -8 }}>
+        Not saved to the vendor record — for your reference while reviewing this extraction only.
+      </p>
 
       {saveState.status === 'duplicate' && (
         <div className="error-card" style={{ marginTop: 18 }}>

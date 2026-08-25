@@ -391,6 +391,7 @@ export default function EngagementPage() {
 
       {detailVendor && (
         <VendorDetailModal
+          key={detailVendor.id}
           vendor={detailVendor}
           inTrip={false}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}

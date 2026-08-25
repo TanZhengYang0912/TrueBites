@@ -20,7 +20,7 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
-export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated, focusVendorId, onFocusVendorHandled }) {
+export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated, focusVendorId, onFocusVendorHandled }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [search, setSearch] = useState("");
@@ -179,6 +179,8 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: PAGE_SIZE }).map((_, i) => <VendorCardSkeleton key={i} />)}
               </div>
+            ) : loadError && vendors.length === 0 ? (
+              <LoadError message={loadError} onRetry={onRetryLoad} />
             ) : displayed.length === 0 ? (
               <Empty onClear={() => { setSearch(""); setCategory("all"); setCreator("all"); }} />
             ) : (
@@ -208,6 +210,7 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
 
       {detailVendor && (
         <VendorDetailModal
+          key={detailVendor.id}
           vendor={detailVendor}
           inTrip={isInTrip(detailVendor.id)} bookmarked={bookmarks.has(detailVendor.id)}
           onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
@@ -220,6 +223,28 @@ export default function Dashboard({ vendors, loading, bookmarks, onToggleBookmar
       )}
 
       <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
+    </div>
+  );
+}
+
+// Distinct from Empty (a genuinely empty result) — a failed fetch used to
+// fall through to the exact same "No places found / Clear filters" UI,
+// which is actively misleading: there's nothing to clear, and "Try again"
+// (not a filter reset) is the only action that can actually help.
+function LoadError({ message, onRetry }) {
+  return (
+    <div className="mt-6 border border-sand bg-white px-6 py-12 text-center md:py-16">
+      <h2 className="mb-2 mt-0 font-display text-2xl text-ink">Couldn't load vendors</h2>
+      <p className="mb-5 mt-0 text-[13px] text-muted">{message || "Something went wrong. Check your connection and try again."}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="min-h-11 rounded border border-forest bg-forest px-4 text-white"
+        >
+          Try again
+        </button>
+      )}
     </div>
   );
 }

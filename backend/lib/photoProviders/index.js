@@ -30,6 +30,7 @@ import { findVideoFrameCandidates } from "./videoFrameProvider.js";
 import { findTikTokCandidates } from "./tiktokOEmbedProvider.js";
 import { findWikimediaCandidates } from "./wikimediaProvider.js";
 import { NEEDS_CONFIRMATION_THRESHOLD } from "../photoMatching.js";
+import { photoDebugLog } from "./debugLog.js";
 
 const VIDEO_PROVIDERS = [
   { name: "video_frame", findCandidates: findVideoFrameCandidates },
@@ -62,9 +63,11 @@ async function runTier(providers, vendor) {
   const results = await Promise.allSettled(providers.map(({ findCandidates }) => findCandidates(vendor)));
 
   const candidates = [];
+  const droppedBelowThreshold = [];
   results.forEach((result, i) => {
     if (result.status === "rejected") {
       console.error(`photo provider "${providers[i].name}" failed for vendor ${vendor.id}:`, result.reason?.message);
+      photoDebugLog(providers[i].name, vendor.id, "provider threw (see console.error above)", result.reason?.message);
       return;
     }
     for (const candidate of result.value) {
@@ -74,18 +77,28 @@ async function runTier(providers, vendor) {
         : candidate.confidence;
       if (confidence >= NEEDS_CONFIRMATION_THRESHOLD) {
         candidates.push({ ...candidate, confidence });
+      } else {
+        droppedBelowThreshold.push({ provider: candidate.provider, confidence });
       }
     }
   });
+  if (droppedBelowThreshold.length) {
+    photoDebugLog("tier", vendor.id, `${droppedBelowThreshold.length} candidate(s) dropped below NEEDS_CONFIRMATION_THRESHOLD=${NEEDS_CONFIRMATION_THRESHOLD}`, droppedBelowThreshold);
+  }
   return candidates.sort((a, b) => b.confidence - a.confidence);
 }
 
 export async function discoverVendorPhotos(vendor) {
+  photoDebugLog("discover", vendor.id, `starting — has source_video_url=${Boolean(vendor.source_video_url)} lat=${vendor.latitude} lng=${vendor.longitude}`);
+
   if (vendor.source_video_url) {
     const videoCandidates = await runTier(VIDEO_PROVIDERS, vendor);
+    photoDebugLog("discover", vendor.id, `video tier produced ${videoCandidates.length} candidate(s)`);
     if (videoCandidates.length) return videoCandidates;
   }
-  return runTier(LOCATION_PROVIDERS, vendor);
+  const locationCandidates = await runTier(LOCATION_PROVIDERS, vendor);
+  photoDebugLog("discover", vendor.id, `location tier produced ${locationCandidates.length} candidate(s)`);
+  return locationCandidates;
 }
 
 export { describeManualUpload } from "./manualUploadProvider.js";

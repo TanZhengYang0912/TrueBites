@@ -11,6 +11,7 @@
 // and (via getTikTokOEmbed) scripts/fetchVendorTiktokThumbnails.js, so the
 // batch tool and the admin-triggered discovery panel can never drift apart.
 import { captionMatchConfidence } from "../photoMatching.js";
+import { photoDebugLog } from "./debugLog.js";
 
 export async function getTikTokOEmbed(videoUrl) {
   const url = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`;
@@ -30,12 +31,20 @@ export async function getTikTokOEmbed(videoUrl) {
 // provider's — the discovery endpoint just concatenates whatever each
 // provider finds.
 export async function findTikTokCandidates(vendor) {
-  if (!vendor.source_video_url || !/tiktok\.com/i.test(vendor.source_video_url)) return [];
+  if (!vendor.source_video_url || !/tiktok\.com/i.test(vendor.source_video_url)) {
+    photoDebugLog("tiktok_oembed", vendor.id, "skipped — no TikTok source_video_url on this vendor");
+    return [];
+  }
 
   const oembed = await getTikTokOEmbed(vendor.source_video_url);
-  if (!oembed) return [];
+  if (!oembed) {
+    photoDebugLog("tiktok_oembed", vendor.id, "oEmbed lookup returned nothing — video may be deleted/private, or expired");
+    return [];
+  }
+  photoDebugLog("tiktok_oembed", vendor.id, "oEmbed caption", oembed.caption);
 
   const { confidence, matched } = captionMatchConfidence(vendor.vendor_name, oembed.caption || "");
+  photoDebugLog("tiktok_oembed", vendor.id, `confidence=${confidence} matched=[${matched.join(", ")}]`);
 
   return [{
     provider: "tiktok_oembed",

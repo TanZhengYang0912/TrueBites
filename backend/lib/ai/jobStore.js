@@ -160,9 +160,22 @@ async function sweepOnce(ttlMs) {
     if (!stat) continue;
     if (now - stat.mtimeMs < ttlMs) continue;
 
+    // Read from disk (not just the in-memory cache) so this is correct
+    // regardless of whether the job happens to be cached yet — loadJob()
+    // falls back to status.json and populates the cache as a side effect.
+    const job = await loadJob(entry.name).catch(() => null);
+
     // Never delete a directory whose job is still actively running.
-    const job = jobs.get(entry.name);
     if (job && NON_TERMINAL.has(job.status)) continue;
+    // Never delete a job that finished processing but hasn't been turned
+    // into a vendor draft yet — an admin's transcript/summary/extraction
+    // review is still pending. Directory mtime only reflects when the last
+    // pipeline stage wrote a file (roughly "completion time"), not "last
+    // reviewed", so a completed job sitting in the queue over a slow
+    // weekend was previously swept out from under the admin with no
+    // warning — see GET /suggestions/:id/processing and
+    // POST /ai/create-draft/:jobId, both of which 404 once this runs.
+    if (job && job.status === "completed" && job.review_status !== "draft_created") continue;
 
     await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
     jobs.delete(entry.name);

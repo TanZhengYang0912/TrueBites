@@ -11,6 +11,7 @@ import {
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
 import { discoverVendorPhotos, describeManualUpload, downloadAndStorePhoto } from "../lib/photoProviders/index.js";
+import { photoDebugLog } from "../lib/photoProviders/debugLog.js";
 const router = Router();
 
 // Best-effort metadata write — a vendor_photos insert failing (e.g. the
@@ -409,8 +410,16 @@ router.post("/vendors/:id/photos/discover", adminOnly, async (req, res) => {
     .single();
   if (findErr || !vendor) return res.status(404).json({ error: "vendor not found" });
 
-  const lat = Number(vendor.latitude);
-  const lng = Number(vendor.longitude);
+  // The Edit Vendor form may pass the coordinates currently on screen —
+  // e.g. a dragged map marker or a manual edit — that haven't been saved
+  // yet. When present, search around those instead of the persisted row, so
+  // the admin doesn't have to Save Changes before finding photos for where
+  // the pin actually is now.
+  const { latitude: overrideLat, longitude: overrideLng } = req.body || {};
+  const hasOverride = overrideLat !== undefined && overrideLat !== "" && overrideLng !== undefined && overrideLng !== "";
+
+  const lat = Number(hasOverride ? overrideLat : vendor.latitude);
+  const lng = Number(hasOverride ? overrideLng : vendor.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({ error: "this vendor has no valid latitude/longitude yet — add coordinates before searching for photos" });
   }
@@ -422,7 +431,10 @@ router.post("/vendors/:id/photos/discover", adminOnly, async (req, res) => {
     return res.status(400).json({ error: "Please enter a valid latitude and longitude." });
   }
 
-  const candidates = await discoverVendorPhotos(vendor);
+  photoDebugLog("route", vendor.id, `search coords lat=${lat} lng=${lng} (${hasOverride ? "unsaved form value" : "saved DB value"})`);
+
+  const candidates = await discoverVendorPhotos(hasOverride ? { ...vendor, latitude: lat, longitude: lng } : vendor);
+  photoDebugLog("route", vendor.id, `returning ${candidates.length} candidate(s) to the admin panel`);
   res.json({ candidates });
 });
 
@@ -479,10 +491,15 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
       .eq("id", vendor.id);
     if (updateErr) return res.status(500).json({ error: "database update failed", details: updateErr.message });
 
-    const oldPath = storagePathFromUrl(vendor.storefront_image_url);
-    if (oldPath && oldPath !== stored.storagePath) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
-    }
+    // Deliberately NOT deleting the previous cover's storage object here
+    // (unlike the manual-upload route below, where the replacement is
+    // Save-deferred and this is genuinely the final word). A photo-discovery
+    // commit persists immediately even inside the Edit Vendor modal's
+    // Save/Cancel flow — if the admin clicks Cancel, AdminVendorManagementPage
+    // restores storefront_image_url back to this old URL, which only works if
+    // the file is still there. The now-possibly-orphaned old object (if Save
+    // is clicked instead) is exactly what scripts/auditOrphanStorage.js exists
+    // to reclaim later.
   } else {
     const existing = Array.isArray(vendor.gallery_image_urls) ? vendor.gallery_image_urls : [];
     if (existing.includes(stored.url)) {
@@ -502,6 +519,17 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
   res.status(201).json({ url: stored.url, role });
 });
 
+const REVIEW_PHOTO_BUCKET = "review-photos";
+
+// Extract the object path for an arbitrary public bucket URL — storagePathFromUrl
+// above is hardcoded to STORAGE_BUCKET (vendor-images).
+function pathFromUrl(bucket, url) {
+  if (!url) return null;
+  const marker = `/object/public/${bucket}/`;
+  const idx = url.indexOf(marker);
+  return idx === -1 ? null : decodeURIComponent(url.slice(idx + marker.length));
+}
+
 router.delete("/vendors/:id", adminOnly, async (req, res) => {
   const { data: vendor, error: findErr } = await supabase
     .from("vendors")
@@ -509,6 +537,26 @@ router.delete("/vendors/:id", adminOnly, async (req, res) => {
     .eq("id", req.params.id)
     .single();
   if (findErr || !vendor) return res.status(404).json({ error: "vendor not found" });
+
+  // Clean up related records in FK-safe order (children first) so nothing is
+  // orphaned regardless of whether the DB has ON DELETE CASCADE — matches
+  // DELETE /api/admin/vendors/:id (routes/admin.js), the endpoint the admin
+  // console actually calls; this one is kept in sync so it can't silently
+  // leave orphaned reviews/bookmarks/photos if ever invoked directly.
+  const { data: reviews } = await supabase.from("reviews").select("id").eq("vendor_id", req.params.id);
+  const reviewIds = (reviews || []).map((r) => r.id);
+
+  if (reviewIds.length) {
+    const { data: photos } = await supabase
+      .from("review_photos").select("url").in("review_id", reviewIds);
+    const photoPaths = (photos || []).map((p) => pathFromUrl(REVIEW_PHOTO_BUCKET, p.url)).filter(Boolean);
+    if (photoPaths.length) await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove(photoPaths);
+    await supabase.from("review_photos").delete().in("review_id", reviewIds);
+    await supabase.from("review_votes").delete().in("review_id", reviewIds);
+  }
+
+  await supabase.from("reviews").delete().eq("vendor_id", req.params.id);
+  await supabase.from("bookmarks").delete().eq("vendor_id", req.params.id);
 
   const { error } = await supabase.from("vendors").delete().eq("id", req.params.id);
   if (error) {

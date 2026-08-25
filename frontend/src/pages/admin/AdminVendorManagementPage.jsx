@@ -9,6 +9,7 @@ import Toast from "../../components/engagement/Toast";
 import ImageLightbox from "../../components/engagement/ImageLightbox";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import AdminVendorMap from "../../components/admin/AdminVendorMap";
+import VendorLocationPicker from "../../components/admin/VendorLocationPicker";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
 import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
@@ -668,6 +669,8 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         </label>
       </div>
 
+      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} />
+
       <div className="admin-modal-grid admin-modal-grid-3">
         <label>
           <span>Category</span>
@@ -853,8 +856,16 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, 
               longitude={form.longitude}
               coverLocked={vendor.coverLocked}
               onPhotoCommitted={(role, url) => {
-                if (role === "cover") onCoverDiscovered(url);
-                else onGalleryChange([...(vendor.galleryUrls || []), url]);
+                if (role === "cover") {
+                  onCoverDiscovered(url);
+                } else {
+                  onGalleryChange([...(vendor.galleryUrls || []), url]);
+                  // Committed to the server immediately, same as a manual
+                  // gallery upload — register it as a pending add so Cancel's
+                  // existing rollback (below) deletes it back out instead of
+                  // silently leaving a "discovered" photo saved after Cancel.
+                  onManualGalleryAdd(url);
+                }
               }}
               notify={notify}
             />
@@ -1253,7 +1264,11 @@ export default function AdminVendorManagementPage() {
     setError("");
     setErrors({});
     setForm(freshForm);
-    setEditSnapshot({ form: freshForm });
+    // coverUrl/coverLocked back the cover-photo Cancel rollback below —
+    // PhotoDiscoveryPanel's "Set as Cover" commits to the server immediately
+    // (unlike the dropzone, which stays local until Save), so Cancel needs
+    // to know what to restore it to.
+    setEditSnapshot({ form: freshForm, coverUrl: vendor.imageUrl ?? null, coverLocked: vendor.coverLocked ?? false });
     setPendingGalleryDeletes(new Set());
     setPendingGalleryAdds(new Set());
     setEditing(true);
@@ -1370,7 +1385,10 @@ export default function AdminVendorManagementPage() {
   // moment they were picked (same as the cover dropzone's upload-on-pick
   // behavior) — so undoing them here means actively deleting them back out.
   const handleCancelEdit = async () => {
-    if (selectedVendor && pendingGalleryAdds.size > 0) {
+    const coverChangedByDiscovery = selectedVendor && editSnapshot
+      && (selectedVendor.imageUrl ?? null) !== editSnapshot.coverUrl;
+
+    if (selectedVendor && (pendingGalleryAdds.size > 0 || coverChangedByDiscovery)) {
       setCancellingEdit(true);
       const ids = [...pendingGalleryAdds];
       for (const url of ids) {
@@ -1379,6 +1397,22 @@ export default function AdminVendorManagementPage() {
         } catch {
           // Best-effort rollback — a failed undo just leaves that one photo
           // in place rather than blocking the rest of Cancel.
+        }
+      }
+      // "Set as Cover" from Find Photos Automatically commits to the server
+      // immediately, same as a manual gallery add — restore the pre-edit
+      // cover the same best-effort way. (The old cover's storage object is
+      // deliberately NOT deleted by /photos/commit until Save is confirmed —
+      // see the comment there — so this URL still resolves to a real file.)
+      if (coverChangedByDiscovery) {
+        try {
+          await updateAdminVendor(selectedVendor.id, {
+            storefront_image_url: editSnapshot.coverUrl,
+            cover_photo_locked: editSnapshot.coverLocked,
+          });
+        } catch {
+          // Best-effort — a failed restore leaves the discovered cover in
+          // place rather than blocking the rest of Cancel.
         }
       }
       await refreshList();

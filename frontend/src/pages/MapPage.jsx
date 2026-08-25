@@ -155,11 +155,25 @@ export default function MapPage() {
   }, [view, accountStatus]);
 
   // Load vendors (Supabase, sorted from Melaka centre as a default reference).
-  useEffect(() => {
+  // Failures are surfaced two ways: a toast (transient) and vendorsError
+  // (persistent — the empty-result grid otherwise looked identical to a
+  // genuinely-empty result, with no way to tell "nothing matched" from
+  // "the fetch failed" or retry without a full page reload).
+  const [vendorsError, setVendorsError] = useState("");
+  function loadVendors() {
+    setVendorsLoading(true);
+    setVendorsError("");
     getRestaurants(MELAKA_CENTER.lat, MELAKA_CENTER.lng)
       .then(setVendors)
-      .catch((e) => { console.error("failed to load vendors:", e.message); notify("Couldn't load vendors. Check your connection and try again.", true); })
+      .catch((e) => {
+        console.error("failed to load vendors:", e.message);
+        setVendorsError(e.message || "Couldn't load vendors. Check your connection and try again.");
+        notify("Couldn't load vendors. Check your connection and try again.", true);
+      })
       .finally(() => setVendorsLoading(false));
+  }
+  useEffect(() => {
+    loadVendors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -427,6 +441,8 @@ export default function MapPage() {
         <Dashboard
           vendors={vendors}
           loading={vendorsLoading}
+          loadError={vendorsError}
+          onRetryLoad={loadVendors}
           bookmarks={bookmarks}
           onToggleBookmark={toggleBookmark}
           onOpenMap={openMapNearby}
