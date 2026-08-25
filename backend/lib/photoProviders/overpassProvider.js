@@ -14,6 +14,7 @@
 // returns nothing when there's no tagged photo nearby.
 import { computePhotoMatchConfidence } from "../photoMatching.js";
 import { haversine } from "../../haversine.js";
+import { photoDebugLog } from "./debugLog.js";
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 // Wider than Mapillary's 50m — image-tagged OSM nodes are rare enough that a
@@ -48,7 +49,12 @@ function resolveImageUrl(tags) {
 }
 
 export async function findOverpassCandidates(vendor) {
-  if (vendor.latitude == null || vendor.longitude == null) return [];
+  if (vendor.latitude == null || vendor.longitude == null) {
+    photoDebugLog("overpass", vendor.id, "skipped — vendor has no latitude/longitude");
+    return [];
+  }
+
+  photoDebugLog("overpass", vendor.id, `request lat=${vendor.latitude} lng=${vendor.longitude} radius=${SEARCH_RADIUS_METERS}m`);
 
   let payload;
   try {
@@ -56,16 +62,22 @@ export async function findOverpassCandidates(vendor) {
       method: "POST",
       body: overpassQuery(vendor.latitude, vendor.longitude),
     });
-    if (!res.ok) return []; // rate-limited/down — fail quiet, never crash discovery
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      photoDebugLog("overpass", vendor.id, `HTTP ${res.status} response body`, body);
+      return []; // rate-limited/down — fail quiet, never crash discovery
+    }
     payload = await res.json();
-  } catch {
+  } catch (err) {
+    photoDebugLog("overpass", vendor.id, "request threw", err.message);
     return []; // network failure
   }
 
   const elements = Array.isArray(payload?.elements) ? payload.elements : [];
+  photoDebugLog("overpass", vendor.id, `raw elements returned: ${elements.length}`, elements);
   if (!elements.length) return [];
 
-  return elements
+  const candidates = elements
     .map((el) => {
       const tags = el.tags || {};
       const previewUrl = resolveImageUrl(tags);
@@ -103,4 +115,7 @@ export async function findOverpassCandidates(vendor) {
     .filter(Boolean)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_CANDIDATES);
+
+  photoDebugLog("overpass", vendor.id, `${candidates.length} candidate(s) after mapping`, candidates.map((c) => ({ confidence: c.confidence, distanceMeters: c.breakdown.distanceMeters, placeName: c.placeName })));
+  return candidates;
 }

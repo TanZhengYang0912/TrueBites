@@ -176,6 +176,19 @@ export function validateVendorPatch(body = {}) {
     if (has(k)) clean[k] = str(body[k]);
   }
 
+  // storefront_image_url/cover_photo_locked: not part of the normal Edit
+  // Vendor form (those go through the dedicated /vendors/:id/image and
+  // /photos/commit routes) — accepted here only so the admin console's
+  // Cancel-edit flow can restore a cover that "Find Photos Automatically"
+  // committed mid-session back to its pre-edit value. `null` explicitly
+  // clears it (a vendor with no cover yet).
+  if (body.storefront_image_url !== undefined) {
+    clean.storefront_image_url = body.storefront_image_url === null ? null : str(body.storefront_image_url) || null;
+  }
+  if (body.cover_photo_locked !== undefined) {
+    clean.cover_photo_locked = Boolean(body.cover_photo_locked);
+  }
+
   // Optional — see the matching comment in validateVendor. An empty string
   // explicitly clears it (unlike the other has() fields, `null`/undefined
   // just means "not included in this patch").

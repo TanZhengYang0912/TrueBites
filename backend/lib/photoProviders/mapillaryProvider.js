@@ -19,6 +19,7 @@
 // colour, so a "high confidence" Mapillary photo is not published any more
 // automatically than a "needs confirmation" one.
 import { haversine } from "../../haversine.js";
+import { photoDebugLog } from "./debugLog.js";
 
 const MAPILLARY_TOKEN = process.env.MAPILLARY_ACCESS_TOKEN;
 // Mapillary's Graph API hard-caps this parameter at 50 — a higher value
@@ -45,8 +46,14 @@ export function mapillaryConfidence(distanceMeters) {
 }
 
 export async function findMapillaryCandidates(vendor) {
-  if (!MAPILLARY_TOKEN) return [];
-  if (vendor.latitude == null || vendor.longitude == null) return [];
+  if (!MAPILLARY_TOKEN) {
+    photoDebugLog("mapillary", vendor.id, "skipped — MAPILLARY_ACCESS_TOKEN is not set");
+    return [];
+  }
+  if (vendor.latitude == null || vendor.longitude == null) {
+    photoDebugLog("mapillary", vendor.id, "skipped — vendor has no latitude/longitude");
+    return [];
+  }
 
   const params = new URLSearchParams({
     access_token: MAPILLARY_TOKEN,
@@ -60,6 +67,8 @@ export async function findMapillaryCandidates(vendor) {
     limit: String(MAX_CANDIDATES * 2),
   });
 
+  photoDebugLog("mapillary", vendor.id, `request lat=${vendor.latitude} lng=${vendor.longitude} radius=${SEARCH_RADIUS_METERS}m`);
+
   let payload;
   try {
     const res = await fetch(`https://graph.mapillary.com/images?${params}`);
@@ -67,19 +76,23 @@ export async function findMapillaryCandidates(vendor) {
       // Never crash discovery over this — but do log it, so a bad/expired
       // token or a request-shape bug (like the radius cap above) shows up
       // somewhere instead of silently looking like "no imagery nearby".
-      console.error(`Mapillary request failed (HTTP ${res.status}) for vendor ${vendor.id}:`, await res.text().catch(() => ""));
+      const body = await res.text().catch(() => "");
+      console.error(`Mapillary request failed (HTTP ${res.status}) for vendor ${vendor.id}:`, body);
+      photoDebugLog("mapillary", vendor.id, `HTTP ${res.status} response body`, body);
       return [];
     }
     payload = await res.json();
   } catch (err) {
     console.error(`Mapillary request errored for vendor ${vendor.id}:`, err.message);
+    photoDebugLog("mapillary", vendor.id, "request threw", err.message);
     return [];
   }
 
   const data = Array.isArray(payload?.data) ? payload.data : [];
+  photoDebugLog("mapillary", vendor.id, `raw images returned: ${data.length}`, payload);
   if (!data.length) return [];
 
-  return data
+  const candidates = data
     .map((img) => {
       const [lng, lat] = img.geometry?.coordinates || [];
       if (lat == null || lng == null || !img.thumb_1024_url) return null;
@@ -105,4 +118,7 @@ export async function findMapillaryCandidates(vendor) {
     .filter(Boolean)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_CANDIDATES);
+
+  photoDebugLog("mapillary", vendor.id, `${candidates.length} candidate(s) after mapping`, candidates.map((c) => ({ confidence: c.confidence, distanceMeters: c.breakdown.distanceMeters })));
+  return candidates;
 }

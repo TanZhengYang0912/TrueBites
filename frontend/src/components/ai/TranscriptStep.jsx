@@ -117,6 +117,33 @@ export default function TranscriptStep({ jobData, onTranscriptReady, onRetry }) 
           </div>
         </div>
       )}
+
+      {/* No speech was detected (or Whisper's output was flagged unreliable —
+          repeated-phrase loop, wrong script) — transcriber.js already
+          collapsed it to an empty string, and the pipeline still completed
+          and ran summary/extraction off the video title alone. Without this,
+          the transcript box above never renders (hasTranscript is false) and
+          there was no way to reach "View Summary" or retry — a dead end at
+          100% progress with no error shown. */}
+      {jobData.status === 'completed' && !hasTranscript && (
+        <div className="error-card mt-6">
+          <div className="error-card-icon">⚠️</div>
+          <div className="error-card-body">
+            <h3>No usable transcript</h3>
+            <p>
+              No speech could be reliably transcribed from this video's audio — it may have
+              no clear dialogue, or Whisper's output was flagged as unreliable. The summary and
+              extracted fields below are based on the video title only and will likely need
+              manual completion. To reprocess, submit the same URL again as a new job.
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button id="next-to-summary-btn" className="btn btn-primary" onClick={onTranscriptReady}>
+                Continue anyway →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

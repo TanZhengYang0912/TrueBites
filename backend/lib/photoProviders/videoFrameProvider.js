@@ -12,6 +12,7 @@
 // now it's a direct in-process call, no network hop, no second server.
 import { randomUUID } from "node:crypto";
 import { extractFrames } from "../ai/frameExtractor.js";
+import { photoDebugLog } from "./debugLog.js";
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
 
@@ -31,7 +32,10 @@ const BASE_CONFIDENCE = 95;
 const SHARPNESS_FOR_FULL_CONFIDENCE = 1500;
 
 export async function findVideoFrameCandidates(vendor) {
-  if (!vendor.source_video_url) return [];
+  if (!vendor.source_video_url) {
+    photoDebugLog("video_frame", vendor.id, "skipped — vendor has no source_video_url");
+    return [];
+  }
 
   // "frames-<uuid>" matches the job-directory naming convention every
   // other extract-frames call uses under backend/outputs/.
@@ -39,12 +43,14 @@ export async function findVideoFrameCandidates(vendor) {
   let frames;
   try {
     frames = await extractFrames(vendor.source_video_url, jobId);
-  } catch {
+  } catch (err) {
+    photoDebugLog("video_frame", vendor.id, "extractFrames threw", err.message);
     return []; // download/extraction failed — fail quiet, never crash discovery
   }
+  photoDebugLog("video_frame", vendor.id, `raw frames extracted: ${frames.length}`, frames.map((f) => ({ filename: f.filename, sharpness: f.sharpness })));
   if (!frames.length) return [];
 
-  return frames.map((frame) => {
+  const candidates = frames.map((frame) => {
     const qualityFactor = Math.min(1, frame.sharpness / SHARPNESS_FOR_FULL_CONFIDENCE);
     const confidence = Math.round(BASE_CONFIDENCE * qualityFactor);
     const url = `${PUBLIC_BASE_URL}/outputs/${jobId}/frames/${frame.filename}`;
@@ -65,4 +71,7 @@ export async function findVideoFrameCandidates(vendor) {
       photoRef: url,
     };
   });
+
+  photoDebugLog("video_frame", vendor.id, `${candidates.length} candidate(s) after scoring`, candidates.map((c) => c.confidence));
+  return candidates;
 }

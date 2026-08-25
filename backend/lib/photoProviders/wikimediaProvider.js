@@ -17,6 +17,7 @@
 // never carry usable coordinates or a business category, so it'd be scoring
 // on name alone regardless — captionMatchConfidence is the more direct fit.
 import { captionMatchConfidence } from "../photoMatching.js";
+import { photoDebugLog } from "./debugLog.js";
 
 const MAX_CANDIDATES = 3;
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
@@ -26,12 +27,16 @@ function stripHtml(value) {
 }
 
 export async function findWikimediaCandidates(vendor) {
-  if (!vendor.vendor_name) return [];
+  if (!vendor.vendor_name) {
+    photoDebugLog("wikimedia", vendor.id, "skipped — vendor has no vendor_name");
+    return [];
+  }
 
+  const gsrsearch = `${vendor.vendor_name} Melaka Malaysia`;
   const params = new URLSearchParams({
     action: "query",
     generator: "search",
-    gsrsearch: `${vendor.vendor_name} Melaka Malaysia`,
+    gsrsearch,
     gsrnamespace: "6", // File namespace — actual media, not category/talk pages
     gsrlimit: String(MAX_CANDIDATES * 3),
     prop: "imageinfo",
@@ -41,19 +46,27 @@ export async function findWikimediaCandidates(vendor) {
     origin: "*",
   });
 
+  photoDebugLog("wikimedia", vendor.id, `request gsrsearch="${gsrsearch}" (text search only — no coordinates involved)`);
+
   let payload;
   try {
     const res = await fetch(`${COMMONS_API}?${params}`);
-    if (!res.ok) return []; // Commons down/rate-limited — fail quiet, never crash discovery
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      photoDebugLog("wikimedia", vendor.id, `HTTP ${res.status} response body`, body);
+      return []; // Commons down/rate-limited — fail quiet, never crash discovery
+    }
     payload = await res.json();
-  } catch {
+  } catch (err) {
+    photoDebugLog("wikimedia", vendor.id, "request threw", err.message);
     return []; // network failure
   }
 
   const pages = Object.values(payload?.query?.pages || {});
+  photoDebugLog("wikimedia", vendor.id, `raw pages returned: ${pages.length}`, payload?.query);
   if (!pages.length) return [];
 
-  return pages
+  const candidates = pages
     .map((page) => {
       const info = page.imageinfo?.[0];
       if (!info?.thumburl) return null;
@@ -104,4 +117,7 @@ export async function findWikimediaCandidates(vendor) {
     .filter(Boolean)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_CANDIDATES);
+
+  photoDebugLog("wikimedia", vendor.id, `${candidates.length} candidate(s) after mapping`, candidates.map((c) => ({ confidence: c.confidence, placeName: c.placeName })));
+  return candidates;
 }

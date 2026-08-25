@@ -180,8 +180,17 @@ export async function deleteVendorGalleryImage(id, url) {
 
 // Automatic photo discovery — preview only, downloads nothing server-side
 // until commitVendorPhoto is called for the one candidate the admin picks.
-export async function discoverVendorPhotos(id) {
-  return requestJson(`/api/vendors/${id}/photos/discover`, { method: "POST" });
+// `coords`, when given a valid { latitude, longitude }, searches around that
+// position instead of the vendor's saved one — lets an unsaved drag of the
+// map marker (or a manual coordinate edit) feed the search immediately,
+// without requiring Save Changes first.
+export async function discoverVendorPhotos(id, coords) {
+  const hasCoords = coords && coords.latitude !== "" && coords.latitude != null && coords.longitude !== "" && coords.longitude != null;
+  return requestJson(`/api/vendors/${id}/photos/discover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(hasCoords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
+  });
 }
 
 export async function commitVendorPhoto(id, { provider, photoRef, role, confidence, matchMeta }) {
