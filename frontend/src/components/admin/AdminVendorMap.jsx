@@ -47,6 +47,7 @@ export default function AdminVendorMap({ vendors, onSelect, onDragEnd }) {
           defaultZoom={13}
           mapId={MAP_ID}
           gestureHandling="greedy"
+          keyboardShortcuts={false}
           className="h-[min(68vh,620px)] min-h-[420px] w-full"
         >
           <FitVendorBounds vendors={mappedVendors.map(({ vendor }) => vendor)} />

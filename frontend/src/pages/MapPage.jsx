@@ -546,6 +546,7 @@ export default function MapPage() {
           mapId={MAP_ID}
           colorScheme={isDark ? "DARK" : "LIGHT"}
           gestureHandling="greedy"
+          keyboardShortcuts={false}
           className="size-full"
         >
               <MelakaHighlight />
