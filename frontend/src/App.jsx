@@ -34,6 +34,7 @@ import AdminMyAuditLogPage             from "./pages/admin/AdminMyAuditLogPage";
 import AdminNotificationsPage          from "./pages/admin/AdminNotificationsPage";
 import AdminAccountPage                from "./pages/admin/AdminAccountPage";
 import AdminViewingBar                 from "./components/AdminViewingBar";
+import TripFab                         from "./components/TripFab";
 import { DISABLE_AUTH } from "./lib/testMode";
 import { randomDisplayName } from "./lib/randomName";
 
@@ -105,6 +106,7 @@ export default function App() {
     <BrowserRouter>
       <SessionProvider>
       <AdminViewingBar />
+      <TripFab />
       <AuthGate>
         <Routes>
           {/* Editorial landing — the new front door */}
