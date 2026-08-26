@@ -25,7 +25,7 @@ function RecenterOnPosition({ position, hasCoords }) {
     if (!map) return;
     map.panTo(position);
     if (!zoomedOnce.current) {
-      map.setZoom(hasCoords ? 17 : 13);
+      map.setZoom(hasCoords ? 19 : 15);
       zoomedOnce.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,9 +75,10 @@ export default function VendorLocationPicker({ latitude, longitude, onChange, di
         >
           <GMap
             defaultCenter={position}
-            defaultZoom={hasCoords ? 17 : 13}
+            defaultZoom={hasCoords ? 19 : 15}
             mapId={MAP_ID}
             gestureHandling="greedy"
+            keyboardShortcuts={false}
             className="size-full"
           >
             <RecenterOnPosition position={position} hasCoords={hasCoords} />
