@@ -84,6 +84,12 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
         </button>
       </div>
 
+      <p className="admin-field-hint">
+        Searches this vendor's own source video first (if it has one), then falls back to free
+        public sources near its coordinates — Mapillary street-level imagery, OpenStreetMap-tagged
+        photos, and a Wikimedia Commons name search. Never another vendor's photos.
+      </p>
+
       {coordsProvided && !coordsInRange && (
         <p className="admin-field-hint">Please enter a valid latitude and longitude.</p>
       )}
