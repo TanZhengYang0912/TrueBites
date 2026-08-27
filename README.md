@@ -36,20 +36,24 @@ JOSHUA - I have added a frontend for login page. I just need Tan Zheng Yang's Su
 - Day/Night map mode — auto-detects OS preference, manual toggle available
 - Night style is hardcoded in `MapPage.jsx` — no configuration needed
 
-### Community vendor suggestions
+### Community suggestions
 
-Customers can submit a hidden-gem vendor from the customer home flow at `/suggestions/new`.
-The submission is limited to a Malacca/Melaka location and a TikTok or YouTube source URL.
+Customers can submit either a hidden-gem vendor or a food influencer/channel from `/suggestions/new`.
+Vendor submissions still require a Malacca/Melaka location and TikTok or YouTube video URL. Creator
+submissions require a TikTok or YouTube profile URL and a short description of the creator's focus.
 Customers can only see their own submission status; they never access the AI processing console.
 
-Admins review the queue at `/admin/suggestions`, then can accept a submission for the existing
-AI transcript/summary/extraction workflow, inspect the result, create a vendor draft, and publish
-it as an active vendor. This keeps AI as an admin assistant while human review controls publication.
+Admins review both types in the same queue at `/admin/suggestions`. Vendor suggestions can use the
+existing human-gated AI transcript/summary/extraction workflow. Creator suggestions skip vendor AI and
+use the same admin Publish suggestion action. Published vendor suggestions become active map vendors;
+creator suggestions remain in the suggestion history as an admin-approved recommendation record. No
+submission is auto-approved.
 
-The database migrations are `supabase/migrations/202608180001_vendor_suggestions.sql` and
-`supabase/migrations/202608230001_add_influencer_name_to_vendor_suggestions.sql`. Apply both to
-the Supabase project used by `backend/.env` before deploying or using the feature. The Node API owns the
-customer/admin authorization boundaries and the table also has RLS policies as defense in depth.
+The database migrations are `supabase/migrations/202608180001_vendor_suggestions.sql`,
+`supabase/migrations/202608230001_add_influencer_name_to_vendor_suggestions.sql`, and
+`supabase/migrations/202608270001_generalize_community_suggestions.sql`. Apply all three to the
+Supabase project used by `backend/.env` before deploying or using the feature. The Node API owns the
+customer/admin authorization boundaries and the tables also have RLS policies as defense in depth.
 
 ---
 
@@ -293,7 +297,7 @@ CREATE POLICY "Allow backend insert" ON restaurants FOR INSERT WITH CHECK (true)
 | `GET` | `/api/restaurants/nearby?lat=&lng=` | Return nearest restaurants sorted by Haversine |
 | `GET` | `/api/route?fromLat=&fromLng=&toLat=&toLng=` | Return road distance, ETA, and route polyline |
 | `DELETE` | `/api/account` | Delete the calling user's own Supabase auth account (token-derived id only) |
-| `POST` | `/api/suggestions` | *(customer)* Submit a Malacca vendor suggestion |
+| `POST` | `/api/suggestions` | *(customer)* Submit a vendor or creator suggestion |
 | `GET` | `/api/suggestions/mine` | *(customer)* List the calling user's own suggestions |
 | `GET` | `/api/suggestions/:id` | *(customer)* Read one owned suggestion |
 | `GET` | `/api/admin/suggestions` | *(admin)* Review the suggestion queue |

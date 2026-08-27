@@ -92,15 +92,18 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
   }
 
   const submitter = current.submitter?.name || current.submitter?.email || current.user_id || "Customer";
+  const isCreator = current.suggestion_type === "creator";
+  const subject = isCreator ? current.creator_name : current.vendor_name;
+  const sourceLabel = isCreator ? "View profile" : "View source video";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 md:items-center md:p-6" role="dialog" aria-modal="true" aria-label={`Suggestion for ${current.vendor_name}`}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 md:items-center md:p-6" role="dialog" aria-modal="true" aria-label={`Suggestion for ${subject}`}>
       <div className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto bg-chalk shadow-2xl">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-sand bg-chalk/95 px-5 py-4 backdrop-blur md:px-7">
           <div>
             <p className="mb-1 mt-0 text-[10px] font-bold uppercase tracking-[0.14em] text-terracotta">Community suggestion</p>
-            <h2 className="m-0 font-display text-3xl font-medium text-ink">{current.vendor_name}</h2>
-            <p className="mb-0 mt-1 text-sm text-muted">{current.location_text} · submitted by {submitter}</p>
+            <h2 className="m-0 font-display text-3xl font-medium text-ink">{subject}</h2>
+            <p className="mb-0 mt-1 text-sm text-muted">{isCreator ? `${current.source_platform} influencer / channel` : current.location_text} · submitted by {submitter}</p>
           </div>
           <button type="button" onClick={onClose} className="grid size-10 shrink-0 place-items-center border border-sand text-xl text-muted hover:text-ink" aria-label="Close suggestion">×</button>
         </div>
@@ -122,18 +125,25 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
               </div>
               <div className="grid gap-5">
                 <div>
-                  <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Source Video</h4>
+                  <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">{isCreator ? "Profile" : "Source video"}</h4>
                   <a href={current.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded bg-forest/10 px-3 py-2 text-sm font-semibold text-forest transition-colors hover:bg-forest/20">
-                    <ExternalLink size={14} /> View Source Video
+                    <ExternalLink size={14} /> {sourceLabel}
                   </a>
                 </div>
 
-                <div>
+                {!isCreator && <div>
                   <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Recommended by</h4>
                   <p className="m-0 mt-1 text-base font-medium text-ink">{current.influencer_name || "Not provided"}</p>
-                </div>
+                </div>}
+
+                {isCreator && <div className="grid gap-4">
+                  <div><h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Content focus</h4><p className="m-0 mt-1 text-base font-medium text-ink">{current.creator_focus || "Not provided"}</p></div>
+                  <div><h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Main area or audience</h4><p className="m-0 mt-1 text-base font-medium text-ink">{current.creator_audience || "Not provided"}</p></div>
+                  {current.creator_sample_video_url && <div><h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Sample video</h4><a href={current.creator_sample_video_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-forest underline underline-offset-2">Open sample <ExternalLink size={13} /></a></div>}
+                  {current.creator_social_url && <div><h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Other social link</h4><a href={current.creator_social_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-forest underline underline-offset-2">Open link <ExternalLink size={13} /></a></div>}
+                </div>}
                 
-                <div className="grid grid-cols-2 gap-4">
+                {!isCreator && <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Category</h4>
                     <p className="m-0 mt-1 text-base font-medium text-ink">{current.category || "Not provided"}</p>
@@ -146,7 +156,7 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
                     <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Signature dish</h4>
                     <p className="m-0 mt-1 text-base font-medium text-ink">{current.signature_dish || "Not provided"}</p>
                   </div>
-                </div>
+                </div>}
 
                 <div className="rounded-md bg-sand/30 p-4">
                   <h4 className="m-0 text-[10px] font-bold uppercase tracking-wider text-muted">Why they recommend it</h4>
@@ -168,10 +178,11 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
               <h3 className="m-0 text-sm font-bold uppercase tracking-[0.1em] text-muted">Admin actions</h3>
               {current.status === "submitted" && <button type="button" disabled={busy} onClick={() => handleStatus("under_review")} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">Start review</button>}
               {["submitted", "under_review", "needs_info"].includes(current.status) && <button type="button" disabled={busy} onClick={() => handleStatus("needs_info")} className="min-h-10 rounded border border-sand px-3 text-sm font-semibold text-ink disabled:opacity-50">Request more information</button>}
-              {["under_review", "accepted_for_processing", "failed"].includes(current.status) && <button type="button" disabled={busy} onClick={handleProcess} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">{current.status === "failed" ? "Retry AI processing" : "Process with AI"}</button>}
+              {!isCreator && ["under_review", "accepted_for_processing", "failed"].includes(current.status) && <button type="button" disabled={busy} onClick={handleProcess} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">{current.status === "failed" ? "Retry AI processing" : "Process with AI"}</button>}
               {["submitted", "under_review", "needs_info", "admin_review"].includes(current.status) && <button type="button" disabled={busy} onClick={() => handleStatus("duplicate")} className="min-h-10 rounded border border-sand px-3 text-sm font-semibold text-ink disabled:opacity-50">Mark as duplicate</button>}
               {["submitted", "under_review", "needs_info", "admin_review"].includes(current.status) && <button type="button" disabled={busy} onClick={() => handleStatus("rejected")} className="min-h-10 rounded border border-red-200 px-3 text-sm font-semibold text-red-700 disabled:opacity-50">Reject</button>}
-              {current.status === "draft_created" && <button type="button" disabled={busy} onClick={handlePublish} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">Publish vendor</button>}
+              {isCreator && ["submitted", "under_review"].includes(current.status) && <button type="button" disabled={busy} onClick={handlePublish} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">Publish suggestion</button>}
+              {!isCreator && current.status === "draft_created" && <button type="button" disabled={busy} onClick={handlePublish} className="min-h-10 rounded bg-forest px-3 text-sm font-semibold text-white disabled:opacity-50">Publish vendor</button>}
               {current.vendor_id && <a href="/admin/vendors2" className="mt-1 text-center text-xs font-semibold text-forest underline underline-offset-2">Open vendor management</a>}
             </section>
           </aside>
@@ -179,14 +190,14 @@ export default function SuggestionDetailModal({ suggestion, onClose, onChanged }
           <section className="min-w-0">
             {stage === "details" && (
               <div className="grid min-h-80 place-items-center border border-dashed border-sand bg-white p-8 text-center">
-                <div><div className="mb-3 text-4xl">✦</div><h3 className="m-0 font-display text-2xl font-medium">Ready for review</h3><p className="mx-auto mb-0 mt-2 max-w-md text-sm leading-6 text-muted">Accept this suggestion for processing when the source and Malacca location look credible.</p></div>
+                <div><div className="mb-3 text-4xl">✦</div><h3 className="m-0 font-display text-2xl font-medium">Ready for review</h3><p className="mx-auto mb-0 mt-2 max-w-md text-sm leading-6 text-muted">{isCreator ? "Review the profile and focus before publishing this suggestion." : "Accept this suggestion for processing when the source and Malacca location look credible."}</p></div>
               </div>
             )}
             {stage === "transcript" && <TranscriptStep jobData={jobData} onTranscriptReady={() => setStage("summary")} onRetry={handleProcess} />}
             {stage === "summary" && <SummaryStep jobData={jobData} summaryValue={reviewSummary} onSummaryChange={setReviewSummary} onNext={() => setStage("extraction")} onBack={() => setStage("transcript")} />}
             {stage === "extraction" && <ExtractionStep jobData={jobData} reviewSummary={reviewSummary || jobData.summary || ""} onBack={() => setStage("summary")} onReset={() => setStage("details")} onCreateDraft={handleCreateDraft} />}
             {current.status === "draft_created" && stage === "details" && <div className="border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800">Draft vendor created. Complete any missing vendor fields, then publish it when it is ready.</div>}
-            {current.status === "published" && <div className="border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800">Published. This vendor is now eligible to appear on the public Malacca discovery map.</div>}
+            {current.status === "published" && <div className="border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-800">Published. {isCreator ? "This influencer/channel suggestion is now accepted by the TrueBites team." : "This vendor is now eligible to appear on the public Malacca discovery map."}</div>}
           </section>
         </div>
       </div>

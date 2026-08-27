@@ -255,17 +255,17 @@ export default function EngagementPage() {
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
                     placeholder="Folder name"
-                    className="min-h-11 min-w-0 flex-1 rounded-full border border-sand px-3 text-[12.5px] outline-none focus:border-forest"
+                    className="min-h-11 min-w-0 flex-1 rounded-md border border-sand px-3 text-[12.5px] outline-none focus:border-forest"
                   />
                   <button
                     onClick={handleCancelCreateFolder}
-                    className="min-h-11 shrink-0 rounded-full border border-muted bg-white px-4 text-[12.5px] font-semibold text-muted"
+                    className="min-h-11 shrink-0 rounded-md border border-muted bg-white px-4 text-[12.5px] font-semibold text-muted"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleCreateFolder}
-                    className="min-h-11 shrink-0 rounded-full bg-terracotta px-4 text-[12.5px] font-semibold text-white"
+                    className="min-h-11 shrink-0 rounded-md bg-terracotta px-4 text-[12.5px] font-semibold text-white"
                   >
                     Create
                   </button>
@@ -273,7 +273,7 @@ export default function EngagementPage() {
               ) : (
                 <button
                   onClick={() => setCreatingFolder(true)}
-                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-dashed border-sand px-3 text-[12.5px] text-muted"
+                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-md border border-dashed border-sand px-3 text-[12.5px] text-muted"
                 >
                   <Plus size={13} /> New folder
                 </button>
@@ -328,14 +328,14 @@ export default function EngagementPage() {
                     value={reviewSearch}
                     onChange={(e) => setReviewSearch(e.target.value)}
                     placeholder="Search by place or review text"
-                    className="min-h-11 w-full rounded-full border border-sand bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-forest"
+                    className="min-h-11 w-full rounded-md border border-sand bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-forest"
                   />
                 </div>
                 <select
                   value={reviewRating}
                   onChange={(e) => setReviewRating(e.target.value)}
                   aria-label="Filter by rating"
-                  className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
+                  className="min-h-11 shrink-0 rounded-md border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
                 >
                   <option value="all">All ratings</option>
                   {[5, 4, 3, 2, 1].map((n) => (
@@ -346,7 +346,7 @@ export default function EngagementPage() {
                   value={reviewSort}
                   onChange={(e) => setReviewSort(e.target.value)}
                   aria-label="Sort reviews"
-                  className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
+                  className="min-h-11 shrink-0 rounded-md border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest"
                 >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
@@ -475,12 +475,12 @@ export default function EngagementPage() {
   );
 }
 
-const PILL = "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px]";
+const PILL = "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px]";
 
 function FolderPill({ label, count, active, onClick, onDelete }) {
   return (
     <div className={active ? `${PILL} border-forest bg-forest text-white` : `${PILL} border-sand bg-white text-forest`}>
-      <button type="button" onClick={onClick} className={active ? "flex min-h-11 min-w-11 items-center justify-center font-semibold" : "flex min-h-11 min-w-11 items-center justify-center"}>
+      <button type="button" onClick={onClick} className={active ? "flex min-h-11 min-w-11 items-center justify-center gap-1.5 font-semibold" : "flex min-h-11 min-w-11 items-center justify-center gap-1.5"}>
         {label} <span className="text-[11px] opacity-75">{count}</span>
       </button>
       {onDelete && (
@@ -579,7 +579,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(1)}
         disabled={page === 1}
         aria-label="First page"
-        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-md text-forest disabled:opacity-30"
       >
         <ChevronsLeft size={16} />
       </button>
@@ -588,7 +588,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(page - 1)}
         disabled={page === 1}
         aria-label="Previous page"
-        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-md text-forest disabled:opacity-30"
       >
         <ChevronLeft size={16} />
       </button>
@@ -602,8 +602,8 @@ function Pagination({ page, totalPages, onChange }) {
             onClick={() => onChange(p)}
             aria-current={p === page ? "page" : undefined}
             className={p === page
-              ? "grid min-h-11 min-w-11 place-items-center rounded-full bg-forest text-[13px] font-semibold text-white"
-              : "grid min-h-11 min-w-11 place-items-center rounded-full text-[13px] text-ink hover:bg-sand/60"}
+              ? "grid min-h-11 min-w-11 place-items-center rounded-md bg-forest text-[13px] font-semibold text-white"
+              : "grid min-h-11 min-w-11 place-items-center rounded-md text-[13px] text-ink hover:bg-sand/60"}
           >
             {p}
           </button>
@@ -614,7 +614,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(page + 1)}
         disabled={page === totalPages}
         aria-label="Next page"
-        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-md text-forest disabled:opacity-30"
       >
         <ChevronRight size={16} />
       </button>
@@ -623,7 +623,7 @@ function Pagination({ page, totalPages, onChange }) {
         onClick={() => onChange(totalPages)}
         disabled={page === totalPages}
         aria-label="Last page"
-        className="grid min-h-11 min-w-11 place-items-center rounded-full text-forest disabled:opacity-30"
+        className="grid min-h-11 min-w-11 place-items-center rounded-md text-forest disabled:opacity-30"
       >
         <ChevronsRight size={16} />
       </button>

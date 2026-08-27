@@ -15,7 +15,7 @@ const LINKS = [
 // lighter reuse of the same visual language for the rest of the app.
 export default function Footer() {
   return (
-    <footer className="bg-forest px-5 py-12 md:px-12 md:py-16">
+    <footer className="bg-forest px-4 py-12 md:px-6 md:py-16 xl:px-10">
       <div className="mx-auto flex max-w-[1360px] flex-col gap-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div>

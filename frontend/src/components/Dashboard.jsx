@@ -80,6 +80,10 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
     if (page > pageData.totalPages) setPage(pageData.totalPages);
   }, [page, pageData.totalPages]);
   const isInTrip = (id) => tripVendorIds?.has(id) ?? false;
+  const changePage = (nextPage) => {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
 
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
@@ -199,7 +203,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
                   page={pageData.page}
                   totalPages={pageData.totalPages}
                   total={pageData.total}
-                  onChange={setPage}
+                  onChange={changePage}
                 />
               </>
             )}

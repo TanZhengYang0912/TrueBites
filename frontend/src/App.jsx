@@ -31,7 +31,6 @@ import AdminSuggestionsPage            from "./pages/admin/AdminSuggestionsPage"
 import AdminUserModerationPage         from "./pages/admin/AdminUserModerationPage";
 import AdminUserActivityPage           from "./pages/admin/AdminUserActivityPage";
 import AdminMyAuditLogPage             from "./pages/admin/AdminMyAuditLogPage";
-import AdminNotificationsPage          from "./pages/admin/AdminNotificationsPage";
 import AdminAccountPage                from "./pages/admin/AdminAccountPage";
 import AdminViewingBar                 from "./components/AdminViewingBar";
 import TripFab                         from "./components/TripFab";
@@ -45,6 +44,16 @@ const AUTH_PUBLIC_PATHS = [
   "/", "/map", "/login", "/onboarding", "/wsdasabi123&admin-login", "/admin-set-password", "/reset-password",
   "/about", "/terms", "/guidelines", "/contact", "/careers",
 ];
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
+  return null;
+}
 
 function AuthGate({ children }) {
   const location = useLocation();
@@ -104,6 +113,7 @@ function AuthGate({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <SessionProvider>
       <AdminViewingBar />
       <TripFab />
@@ -147,7 +157,8 @@ export default function App() {
             <Route path="users" element={<AdminUserModerationPage />} />
             <Route path="users/:id" element={<AdminUserActivityPage />} />
             <Route path="audit-log" element={<AdminMyAuditLogPage />} />
-            <Route path="notifications" element={<AdminNotificationsPage />} />
+            {/* Legacy notification URL now returns to the bell-based popover. */}
+            <Route path="notifications" element={<Navigate to="/admin" replace />} />
             <Route path="account" element={<AdminAccountPage />} />
           </Route>
 

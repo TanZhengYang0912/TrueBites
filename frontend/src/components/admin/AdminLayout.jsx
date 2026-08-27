@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../lib/SessionContext";
 import {
   Bell,
+  ArrowRight,
   BrainCircuit,
   History,
   Lightbulb,
@@ -17,11 +18,10 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
-import { getAppealsPendingCount } from "../../api/admin";
+import { getAdminDashboard, getAppealsPendingCount } from "../../api/admin";
 
 const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/admin/notifications", label: "Notifications", icon: Bell },
   { to: "/admin/vendors2", label: "Vendors", icon: Store },
   { to: "/admin/ai", label: "AI Content Queue", icon: BrainCircuit },
   { to: "/admin/suggestions", label: "Community Suggestions", icon: Lightbulb },
@@ -36,6 +36,10 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [topbarAction, setTopbarAction] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationItems, setNotificationItems] = useState([]);
+  const [notificationLoading, setNotificationLoading] = useState(true);
+  const notificationRef = useRef(null);
   const { session } = useSession();
   const adminEmail = session?.user?.email || "";
   const [pendingAppeals, setPendingAppeals] = useState(0);
@@ -53,6 +57,40 @@ export default function AdminLayout() {
   // to a different tab, without needing the two pages to talk to each other.
   useEffect(() => { refreshAppealBadge(); }, [location.pathname]);
 
+  useEffect(() => {
+    let active = true;
+    getAdminDashboard()
+      .then((payload) => {
+        if (active) setNotificationItems(payload.attentionItems || []);
+      })
+      .catch(() => {
+        if (active) setNotificationItems([]);
+      })
+      .finally(() => {
+        if (active) setNotificationLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!notificationOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!notificationRef.current?.contains(event.target)) setNotificationOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") setNotificationOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [notificationOpen]);
+
   async function handleSignOut() {
     // Navigate to the (public) admin login route before clearing the
     // session — AuthGate reacts to session becoming null and redirects
@@ -63,10 +101,8 @@ export default function AdminLayout() {
     await supabase.auth.signOut();
   }
   // Account is reachable via the user card, not a sidebar tab. Notifications
-  // has a sidebar tab and is checked by NAV_ITEMS below.
-  const pageName = location.pathname.startsWith("/admin/notifications")
-    ? "Notifications"
-    : location.pathname.startsWith("/admin/account")
+  // lives in the topbar bell popover rather than a duplicate page.
+  const pageName = location.pathname.startsWith("/admin/account")
     ? "Account"
     : NAV_ITEMS.find((item) =>
         item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
@@ -81,7 +117,6 @@ export default function AdminLayout() {
     "User Moderation": "View customer accounts and their activity history",
     "My Audit Log": "Everything you've personally done in the admin console",
     "Platform Settings": "Platform configuration and preferences",
-    Notifications: "Items that need an admin decision",
     Account: "Your account details and password",
   };
 
@@ -164,14 +199,55 @@ export default function AdminLayout() {
           </div>
           <div className="admin-topbar-actions">
             {topbarAction}
-            <button
-              className="admin-icon-btn"
-              aria-label="Notifications"
-              onClick={() => navigate("/admin/notifications")}
-            >
-              <Bell size={16} />
-              <span className="admin-notification-dot" />
-            </button>
+            <div className="admin-notification-control" ref={notificationRef}>
+              <button
+                className="admin-icon-btn"
+                aria-label="Notifications"
+                aria-expanded={notificationOpen}
+                aria-controls="admin-notification-popover"
+                onClick={() => setNotificationOpen((open) => !open)}
+              >
+                <Bell size={16} />
+                {notificationItems.length > 0 && <span className="admin-notification-dot" />}
+              </button>
+              {notificationOpen && (
+                <section
+                  id="admin-notification-popover"
+                  className="admin-notification-popover"
+                  role="dialog"
+                  aria-label="Admin notifications"
+                >
+                  <div className="admin-notification-popover-header">
+                    <div>
+                      <h2>Notifications</h2>
+                      <p>Items that need an admin decision</p>
+                    </div>
+                    <Bell size={17} />
+                  </div>
+                  <div className="admin-notification-list">
+                    {notificationLoading ? (
+                      <div className="admin-notification-feedback">Loading notifications…</div>
+                    ) : notificationItems.length ? (
+                      notificationItems.map((item) => (
+                        <Link
+                          className="admin-notification-row"
+                          to={item.href || "/admin"}
+                          key={item.id}
+                          onClick={() => setNotificationOpen(false)}
+                        >
+                          <span className={`admin-attention-dot ${item.tone || "neutral"}`} />
+                          <span className="admin-notification-copy">{item.label}</span>
+                          <strong>{item.value}</strong>
+                          <ArrowRight size={15} />
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="admin-notification-feedback">No pending notifications.</div>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
             <Link className="admin-view-site" to="/">
               <SquareArrowOutUpRight size={15} />
               <span>View Site</span>

@@ -26,6 +26,41 @@ test("customer suggestion pages do not call the AI service directly", () => {
   assert.match(api, /\/api\/suggestions/);
 });
 
+test("the new suggestion form offers a real back action", () => {
+  const formPage = read("pages/SuggestionFormPage.jsx");
+
+  assert.match(formPage, /ArrowLeft/);
+  assert.match(formPage, /location\.key === "default"/);
+  assert.match(formPage, /navigate\(-1\)/);
+  assert.match(formPage, /navigate\("\/suggestions"\)/);
+  assert.doesNotMatch(formPage, />My suggestions</);
+});
+
+test("suggestion flow supports vendor and creator types in one admin publication flow", () => {
+  const form = read("components/suggestions/SuggestionForm.jsx");
+  const adminDetail = read("components/admin/SuggestionDetailModal.jsx");
+  const adminRoute = fs.readFileSync(path.join(here, "..", "..", "..", "backend", "routes", "adminSuggestions.js"), "utf8");
+  const adminApi = read("api/admin.js");
+  const app = read("App.jsx");
+  const suggestions = read("pages/SuggestionsPage.jsx");
+  const footer = read("components/Footer.jsx");
+  const migration = fs.readFileSync(path.join(here, "..", "..", "..", "supabase", "migrations", "202608270001_generalize_community_suggestions.sql"), "utf8");
+
+  assert.match(form, /suggestion_type/);
+  assert.match(form, /active \? "border-forest bg-forest\/8 text-forest translate-y-1"/);
+  assert.match(form, /creator_profile_url/);
+  assert.match(form, /creator_focus/);
+  assert.match(adminDetail, /publishAdminSuggestion/);
+  assert.match(adminDetail, /Publish suggestion/);
+  assert.doesNotMatch(adminDetail, /publish-creator|Publish creator/);
+  assert.doesNotMatch(adminRoute, /publish-creator|from\("creators"\)/);
+  assert.doesNotMatch(adminApi, /publishAdminCreatorSuggestion|publish-creator/);
+  assert.doesNotMatch(app, /CreatorsPage|\/creators/);
+  assert.doesNotMatch(suggestions, /Explore creators|\/creators/);
+  assert.doesNotMatch(footer, /Creators/);
+  assert.doesNotMatch(migration, /create table if not exists public\.creators|creator_id/);
+});
+
 test("AI route is redirected away from customers and admin suggestions has its own route", () => {
   const app = read("App.jsx");
   const admin = read("pages/admin/AdminSuggestionsPage.jsx");

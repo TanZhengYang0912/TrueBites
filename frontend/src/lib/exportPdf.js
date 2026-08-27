@@ -125,12 +125,12 @@ export async function openSuggestionsPdf({ title, subtitle, suggestions }) {
   return buildAndOpenPdf({
     title,
     subtitle,
-    head: ["Vendor", "Category", "Location", "Source", "Status", "Submitted"],
+    head: ["Suggestion", "Type", "Focus / category", "Context", "Status", "Submitted"],
     rows: suggestions.map((suggestion) => [
-      suggestion.vendor_name || "—",
-      suggestion.category || "—",
-      suggestion.location_text || "—",
-      suggestion.source_platform || "—",
+      suggestion.suggestion_type === "creator" ? suggestion.creator_name || "—" : suggestion.vendor_name || "—",
+      suggestion.suggestion_type === "creator" ? "Creator" : "Vendor",
+      suggestion.suggestion_type === "creator" ? suggestion.creator_focus || "—" : suggestion.category || "—",
+      suggestion.suggestion_type === "creator" ? suggestion.creator_audience || "—" : suggestion.location_text || "—",
       String(suggestion.status || "—").replace(/_/g, " "),
       suggestion.created_at ? new Date(suggestion.created_at).toLocaleDateString() : "—",
     ]),

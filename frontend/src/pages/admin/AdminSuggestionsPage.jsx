@@ -5,22 +5,16 @@ import SuggestionDetailModal from "../../components/admin/SuggestionDetailModal"
 import { openSuggestionsPdf } from "../../lib/exportPdf";
 
 const STATUS_OPTIONS = [
-  ["all", "All statuses"],
-  ["submitted", "Submitted"],
-  ["under_review", "Under review"],
-  ["needs_info", "Needs information"],
-  ["processing", "Processing"],
-  ["admin_review", "Admin review"],
-  ["draft_created", "Draft created"],
+  ["all", "All suggestions"],
+  ["needs_review", "Needs review"],
+  ["in_progress", "In progress"],
   ["published", "Published"],
-  ["duplicate", "Duplicate"],
-  ["rejected", "Rejected"],
-  ["failed", "Failed"],
+  ["closed", "Closed"],
 ];
 
 export default function AdminSuggestionsPage() {
   const [data, setData] = useState({ suggestions: [], pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 } });
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState("needs_review");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -43,7 +37,7 @@ export default function AdminSuggestionsPage() {
     }
   }
 
-  useEffect(() => { load(1); /* filters are intentionally applied on submit/change */ }, [status, query]);
+  useEffect(() => { load(1); /* status changes and submitted searches apply immediately */ }, [status, query]);
 
   async function openSuggestion(id) {
     try {
@@ -118,12 +112,12 @@ export default function AdminSuggestionsPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 lg:max-w-2xl">
           <Search size={16} className="text-gray-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setQuery(search.trim()); }} placeholder="Search vendor name" aria-label="Search suggestions" className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setQuery(search.trim()); }} placeholder="Search vendor or influencer/channel" aria-label="Search suggestions" className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400" />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filter suggestion status" className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none transition-colors hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300">
+            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filter suggestion workflow" className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none transition-colors hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300">
               {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
@@ -131,7 +125,6 @@ export default function AdminSuggestionsPage() {
             </div>
           </div>
           <button type="button" onClick={() => load(data.pagination.page)} className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"><RefreshCw size={15} /> Refresh</button>
-          <button type="button" onClick={() => setQuery(search.trim())} className="inline-flex h-10 items-center justify-center rounded-full bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">Apply filters</button>
         </div>
       </div>
 
@@ -157,8 +150,8 @@ export default function AdminSuggestionsPage() {
                 <th className="px-6 py-4 w-12 text-center">
                   <input type="checkbox" checked={allSelected} onChange={handleSelectAll} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
                 </th>
-                <th className="px-6 py-4">Vendor</th>
-                <th className="px-6 py-4">Location</th>
+                <th className="px-6 py-4">Suggestion</th>
+                <th className="px-6 py-4">Context</th>
                 <th className="px-6 py-4">Source</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Submitted</th>
@@ -171,9 +164,16 @@ export default function AdminSuggestionsPage() {
                   <td className="px-6 py-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedIds.includes(suggestion.id)} onChange={(e) => handleSelectOne(e, suggestion.id)} className="size-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
                   </td>
-                  <td className="px-6 py-4"><strong className="block font-bold text-gray-900">{suggestion.vendor_name}</strong><span className="text-xs text-gray-500">{suggestion.category || "Category not provided"}</span></td>
-                  <td className="px-6 py-4 text-gray-500">{suggestion.location_text}</td>
-                  <td className="px-6 py-4 text-gray-500">{suggestion.source_platform}</td>
+                  <td className="px-6 py-4"><span className="mb-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">{suggestion.suggestion_type === "creator" ? "Influencer / channel" : "Vendor"}</span><strong className="block font-bold text-gray-900">{suggestion.suggestion_type === "creator" ? suggestion.creator_name : suggestion.vendor_name}</strong><span className="text-xs text-gray-500">{suggestion.suggestion_type === "creator" ? (suggestion.creator_focus || "Focus not provided") : (suggestion.category || "Category not provided")}</span></td>
+                  <td className="px-6 py-4 text-gray-500">
+                    <div
+                      className="max-w-[28rem] truncate"
+                      title={suggestion.suggestion_type === "creator" ? (suggestion.creator_audience || "Audience not provided") : suggestion.location_text}
+                    >
+                      {suggestion.suggestion_type === "creator" ? (suggestion.creator_audience || "Audience not provided") : suggestion.location_text}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">{suggestion.source_platform}<span className="block text-xs text-gray-400">{suggestion.source_kind === "profile" ? "Profile" : "Video"}</span></td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${["rejected", "duplicate", "failed"].includes(suggestion.status) ? "bg-red-100 text-red-700" :
                         ["published", "draft_created"].includes(suggestion.status) ? "bg-emerald-100 text-emerald-700" :

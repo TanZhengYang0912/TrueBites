@@ -16,6 +16,7 @@ import { isSuspended } from "../lib/suspension.js";
 import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
 import { resolvePublicBaseUrl } from "../lib/publicBaseUrl.js";
+import { requireDashboardData } from "../lib/adminDashboardData.js";
 
 const router = Router();
 
@@ -194,7 +195,7 @@ router.get("/dashboard", async (_req, res) => {
         countQuery(supabase.from("suspension_appeals").select("id", { count: "exact", head: true }).eq("status", "pending")),
         supabase
           .from("vendors")
-          .select("id,vendor_name,cuisine_types,address,state,status,created_at,last_updated")
+          .select("id,vendor_name,cuisine_types,address,city,state,status,created_at,last_updated")
           .order("last_updated", { ascending: false, nullsFirst: false })
           .limit(5),
         supabase
@@ -217,8 +218,8 @@ router.get("/dashboard", async (_req, res) => {
     if (recentLogRes.error) throw recentLogRes.error;
 
     const analytics = buildDashboardAnalytics(
-      analyticsVendorsRes.error ? [] : (analyticsVendorsRes.data || []),
-      analyticsReviewsRes.error ? [] : (analyticsReviewsRes.data || []),
+      requireDashboardData(analyticsVendorsRes, "vendors"),
+      requireDashboardData(analyticsReviewsRes, "reviews"),
     );
     if (pendingAppeals > 0) {
       analytics.attentionItems.unshift({

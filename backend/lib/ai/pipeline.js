@@ -84,6 +84,22 @@ export async function retryJob(jobId) {
 
 // ── Batch ────────────────────────────────────────────────────────────────
 
+const BATCH_CONCURRENCY = 2;
+
+export async function runBatchPipelines(entries, { concurrency = BATCH_CONCURRENCY, runner = runPipeline } = {}) {
+  const workerCount = Math.min(Math.max(1, concurrency), entries.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < entries.length) {
+      const entry = entries[nextIndex++];
+      await runner(entry.jobId, entry.url);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, worker));
+}
+
 export async function startBatch(urls, profileUrl = "") {
   if (!urls?.length) { const e = new Error("No URLs provided"); e.status = 400; throw e; }
   if (urls.length > 1000) { const e = new Error("Maximum 1000 videos per batch"); e.status = 400; throw e; }
@@ -99,14 +115,10 @@ export async function startBatch(urls, profileUrl = "") {
   }
 
   const batch = createBatch({ jobIds, profileUrl });
-  // Sequential, same as run_batch_pipeline — keeps Groq rate limits and CPU
-  // load sane rather than firing every video's pipeline at once.
-  fireAndForget(
-    (async () => {
-      for (const { jobId, url } of validUrls) await runPipeline(jobId, url);
-    })(),
-    "batch-pipeline"
-  );
+  // Keep a small concurrency cap so one slow TikTok download cannot block
+  // every later video, while avoiding a burst of CPU/Groq work for large
+  // batches.
+  fireAndForget(runBatchPipelines(validUrls), "batch-pipeline");
 
   return { batch_id: batch.batch_id, job_ids: jobIds, total: jobIds.length };
 }

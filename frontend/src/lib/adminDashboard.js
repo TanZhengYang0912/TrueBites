@@ -18,6 +18,13 @@ export function normalizeDashboardPayload(payload = {}) {
   return normalized;
 }
 
+export function statusToneFor(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'draft') return 'draft';
+  if (normalized === 'suspended' || normalized === 'hidden' || normalized === 'rejected') return 'suspended';
+  return 'active';
+}
+
 export function formatMetricDelta(current, previous) {
   const next = Number(current) || 0;
   const prior = Number(previous) || 0;
