@@ -69,6 +69,13 @@ export async function findVideoFrameCandidates(vendor) {
       },
       previewUrl: url,
       photoRef: url,
+      // frame.filename ("frame_03.jpg") is stable across re-extractions of
+      // the SAME video — candidateTimestamps() is a pure function of video
+      // duration, so index 3 lands on the same timestamp every run. photoRef
+      // itself isn't reusable for "was this already committed?" checks: its
+      // jobId prefix is a fresh randomUUID() every single search (see
+      // above), so the exact same frame gets a different URL each time.
+      dedupeKey: frame.filename,
     };
   });
 

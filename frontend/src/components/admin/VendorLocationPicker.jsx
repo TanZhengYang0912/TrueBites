@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { AdvancedMarker, APIProvider, Map as GMap, Pin, useMap } from "@vis.gl/react-google-maps";
+import { useEffect, useRef } from "react";
+import { AdvancedMarker, Map as GMap, Pin, useMap } from "@vis.gl/react-google-maps";
 import { MAP_COLORS } from "../../lib/mapColors";
 
 // Same default centre/keys as AdminVendorMap.jsx and MapPage.jsx — every map
@@ -41,8 +41,7 @@ function RecenterOnPosition({ position, hasCoords }) {
 // the same `{ target: { name, value } }` shape as every other field in
 // VendorFormFields (see AddressAutocomplete's pick()), so it drops straight
 // into the existing handleChange/setForm wiring with no extra plumbing.
-export default function VendorLocationPicker({ latitude, longitude, onChange, disabled }) {
-  const [mapError, setMapError] = useState("");
+export default function VendorLocationPicker({ latitude, longitude, onChange, disabled, loadError }) {
   const lat = parseCoord(latitude, -90, 90);
   const lng = parseCoord(longitude, -180, 180);
   const hasCoords = lat != null && lng != null;
@@ -56,49 +55,47 @@ export default function VendorLocationPicker({ latitude, longitude, onChange, di
     );
   }
 
-  if (mapError) {
+  if (loadError) {
     return (
       <div className="admin-field-hint">
-        Map preview failed to load ({mapError}) — latitude/longitude can still be entered manually above.
+        Map preview failed to load ({loadError}) — latitude/longitude can still be entered manually above.
       </div>
     );
   }
 
+  // Shares one <APIProvider> with AddressAutocomplete above (see
+  // VendorFormFields in AdminVendorManagementPage.jsx) rather than creating
+  // its own — Google Maps JS can only be loaded once per page with one
+  // fixed `libraries` list.
   return (
     <label>
       <span>Vendor Location</span>
       <div className="relative h-64 w-full overflow-hidden rounded-xl border border-gray-200 bg-slate-100">
-        <APIProvider
-          apiKey={API_KEY}
-          libraries={["marker"]}
-          onError={(error) => setMapError(error?.message || "authorization or billing error")}
+        <GMap
+          defaultCenter={position}
+          defaultZoom={hasCoords ? 19 : 15}
+          mapId={MAP_ID}
+          gestureHandling="greedy"
+          keyboardShortcuts={false}
+          className="size-full"
         >
-          <GMap
-            defaultCenter={position}
-            defaultZoom={hasCoords ? 19 : 15}
-            mapId={MAP_ID}
-            gestureHandling="greedy"
-            keyboardShortcuts={false}
-            className="size-full"
+          <RecenterOnPosition position={position} hasCoords={hasCoords} />
+          <AdvancedMarker
+            position={position}
+            draggable={!disabled}
+            onDragEnd={(event) => {
+              const latLng = event.latLng;
+              if (!latLng) return;
+              const nextLat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat;
+              const nextLng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng;
+              if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
+              onChange({ target: { name: "latitude", value: String(nextLat) } });
+              onChange({ target: { name: "longitude", value: String(nextLng) } });
+            }}
           >
-            <RecenterOnPosition position={position} hasCoords={hasCoords} />
-            <AdvancedMarker
-              position={position}
-              draggable={!disabled}
-              onDragEnd={(event) => {
-                const latLng = event.latLng;
-                if (!latLng) return;
-                const nextLat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat;
-                const nextLng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng;
-                if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
-                onChange({ target: { name: "latitude", value: String(nextLat) } });
-                onChange({ target: { name: "longitude", value: String(nextLng) } });
-              }}
-            >
-              <Pin background={hasCoords ? MAP_COLORS.success : MAP_COLORS.warning} glyphColor="#fff" borderColor="#fff" />
-            </AdvancedMarker>
-          </GMap>
-        </APIProvider>
+            <Pin background={hasCoords ? MAP_COLORS.success : MAP_COLORS.warning} glyphColor="#fff" borderColor="#fff" />
+          </AdvancedMarker>
+        </GMap>
         {!disabled && (
           <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-white/80 bg-white/95 px-3 py-1.5 text-xs text-gray-700 shadow-md">
             Drag the marker to the exact vendor location.

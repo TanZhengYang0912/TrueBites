@@ -235,6 +235,11 @@ export function vendorActivationIssues(vendor = {}) {
   if (blank(vendor.phone)) issues.push("phone number");
   if (blank(vendor.price_range)) issues.push("price range");
   if (blank(vendor.signature_dishes)) issues.push("signature dishes");
+  // A vendor with no cover photo reads as a broken/empty listing on the
+  // public site — block activation the same as a missing name/address,
+  // rather than letting an admin publish a blank card and forget to circle
+  // back. Use "Find Photos Automatically" or a manual upload to clear this.
+  if (blank(vendor.storefront_image_url)) issues.push("cover photo");
 
   return issues;
 }

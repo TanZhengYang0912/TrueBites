@@ -396,7 +396,7 @@ router.patch("/vendors/:id", async (req, res) => {
   if (clean.status === "active") {
     const { data: current, error: findErr } = await supabase
       .from("vendors")
-      .select("vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+      .select("vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
       .eq("id", id)
       .maybeSingle();
     if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
@@ -607,6 +607,18 @@ router.post("/vendors", async (req, res) => {
     const now = new Date().toISOString();
     const record = {
       ...clean,
+      // Every new vendor starts as "draft" regardless of what the Add
+      // Vendor form's Status field requested — a brand-new row can never
+      // have a cover photo yet (uploading one needs a vendorId, which
+      // doesn't exist until after this insert), so it can never pass the
+      // same completeness bar (vendorActivationIssues) every other
+      // "make it active" path already enforces. Rejecting the create
+      // outright when Active was requested would be worse UX (the admin
+      // may be about to add a photo in the very next step), so this stays
+      // silent here — AddVendorModal's follow-up photo step promotes to
+      // Active afterward via the normal PATCH /vendors/:id route, which
+      // does check for a cover photo by then.
+      status: "draft",
       // GET prefers operating_hours; keep it in sync with the raw value.
       operating_hours: clean.operating_hours_raw,
       created_at: now,
