@@ -265,22 +265,6 @@ export default function AdminAIProcessingConsolePage() {
   return (
     <div style={{ display: "grid", gap: 16 }}>
 
-      {/* ── Hero banner ── */}
-      <section className="admin-hero-banner">
-        <div className="admin-hero-icon">
-          <Database size={22} />
-        </div>
-        <div className="admin-hero-copy">
-          <div className="admin-hero-label">AI content queue</div>
-          <h2>Food Influencer Content Analyzer</h2>
-        </div>
-        <div className="admin-model-strip">
-          <div><strong>whisper-large-v3</strong><span>Groq</span></div>
-          <div><strong>openai/gpt-oss-20b</strong><span>Groq</span></div>
-          <div><strong>Live</strong><span>Supabase</span></div>
-        </div>
-      </section>
-
       {/* ── AI Workflow (embedded full module) ── */}
       <section className="admin-panel" style={{ padding: "20px" }}>
         <AIWorkflowPanel />

@@ -12,7 +12,7 @@ import { MAP_COLORS } from "../lib/mapColors";
 // Keep clustered vendors visually consistent with the rest of TrueBites.
 // Google Maps' built-in renderer switches between blue and red based on local
 // density, which implies a distinction we do not make in the product.
-function createBrandClusterRenderer() {
+export function createBrandClusterRenderer() {
   return {
     render({ count, position }) {
       const scale = count >= 100 ? 25 : count >= 10 ? 22 : 19;

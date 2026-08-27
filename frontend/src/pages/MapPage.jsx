@@ -592,7 +592,7 @@ export default function MapPage() {
               savedCount={bookmarks.size}
               onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
               onSignUp={() => navigate("/login")}
-              activeSection="discover"
+              activeSection={null}
               mapActive
               onOpenDiscover={backToDashboard}
               onOpenSaved={() => navigate("/engagement")}

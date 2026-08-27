@@ -1258,8 +1258,9 @@ export default function AdminVendorManagementPage() {
   // permanently evaluate to false. Every edit through that shortcut looked
   // unchanged no matter what was actually typed, always blocked with "No
   // changes to save" — confirmed live via the debug logging in handleSave.
-  const openVendorForEdit = (vendor) => {
+  const openVendorForEdit = (vendor, baselineVendor = vendor) => {
     const freshForm = makeForm(vendor);
+    const baselineForm = makeForm(baselineVendor);
     setSelectedVendor(vendor);
     setError("");
     setErrors({});
@@ -1268,14 +1269,22 @@ export default function AdminVendorManagementPage() {
     // PhotoDiscoveryPanel's "Set as Cover" commits to the server immediately
     // (unlike the dropzone, which stays local until Save), so Cancel needs
     // to know what to restore it to.
-    setEditSnapshot({ form: freshForm, coverUrl: vendor.imageUrl ?? null, coverLocked: vendor.coverLocked ?? false });
+    setEditSnapshot({ form: baselineForm, coverUrl: baselineVendor.imageUrl ?? null, coverLocked: baselineVendor.coverLocked ?? false });
     setPendingGalleryDeletes(new Set());
     setPendingGalleryAdds(new Set());
     setEditing(true);
   };
 
   const handleMapDragEnd = (vendor, position) => {
-    openVendorForEdit({ ...vendor, latitude: position.lat, longitude: position.lng });
+    const coordinates = {
+      latitude: String(position.lat),
+      longitude: String(position.lng),
+    };
+    openVendorForEdit({ ...vendor, ...coordinates }, vendor);
+    // Keep the coordinate update explicit so the dragged values win even if a
+    // marker click and dragend arrive in the same render batch. This only
+    // changes the controlled form; handleSave remains the persistence gate.
+    setForm((current) => ({ ...current, ...coordinates }));
     notify("Pin moved. Save Changes to keep the new location.");
   };
 

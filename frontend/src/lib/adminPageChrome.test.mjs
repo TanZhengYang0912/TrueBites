@@ -15,6 +15,15 @@ test("admin suggestions uses the shared layout title and keeps refresh in the fi
   assert.match(source, /onClick=\{\(\) => load\(data\.pagination\.page\)\}/);
 });
 
+test("admin suggestions uses concise workflow filters and one search flow", () => {
+  const source = read("pages/admin/AdminSuggestionsPage.jsx");
+  assert.match(source, /Needs review/);
+  assert.match(source, /In progress/);
+  assert.match(source, /All suggestions/);
+  assert.doesNotMatch(source, /Apply filters/);
+  assert.doesNotMatch(source, /All statuses/);
+});
+
 test("my audit log has no duplicate page header", () => {
   const source = read("pages/admin/AdminMyAuditLogPage.jsx");
   assert.doesNotMatch(source, /admin-panel-header/);

@@ -3,12 +3,14 @@ import { supabase } from "../supabase.js";
 import { logActivity } from "../lib/auditLog.js";
 import { requireUser } from "../middleware/requireUser.js";
 import { validateSuggestionInput } from "../lib/suggestionValidation.js";
+import { applySuggestionListFilters, parseSuggestionListQuery, summarizeSuggestionCounts } from "../lib/suggestionPagination.js";
 
 const router = Router();
 
 const CUSTOMER_SELECT = `
-  id, vendor_name, influencer_name, source_url, source_platform, location_text, category,
-  reason, signature_dish, price_range, additional_note, status,
+  id, suggestion_type, source_kind, vendor_name, influencer_name, source_url, source_platform, location_text, category,
+  reason, signature_dish, price_range, additional_note, creator_name, creator_profile_url,
+  creator_sample_video_url, creator_focus, creator_audience, creator_social_url, status,
   rejection_reason, admin_note, vendor_id, created_at, updated_at, reviewed_at, published_at,
   vendor:vendors(id, vendor_name, status, address, latitude, longitude)
 `;
@@ -23,7 +25,7 @@ router.post("/suggestions", requireUser, async (req, res) => {
     .from("vendor_suggestions")
     .select("id,status")
     .eq("user_id", req.callerUser.id)
-    .eq("vendor_name", clean.vendor_name)
+    .eq("suggestion_type", clean.suggestion_type)
     .eq("source_url", clean.source_url)
     .in("status", ["submitted", "under_review", "needs_info", "accepted_for_processing", "processing", "admin_review", "draft_created"])
     .limit(1);
@@ -51,14 +53,37 @@ router.post("/suggestions", requireUser, async (req, res) => {
 });
 
 router.get("/suggestions/mine", requireUser, async (req, res) => {
-  const { data, error } = await supabase
+  const query = parseSuggestionListQuery(new URLSearchParams(req.query));
+  let request = supabase
     .from("vendor_suggestions")
-    .select(CUSTOMER_SELECT)
+    .select(CUSTOMER_SELECT, { count: "exact" })
     .eq("user_id", req.callerUser.id)
     .order("created_at", { ascending: false });
+  request = applySuggestionListFilters(request, query);
+  const countsRequest = supabase
+    .from("vendor_suggestions")
+    .select("suggestion_type,status")
+    .eq("user_id", req.callerUser.id);
+  const [listResult, countsResult] = await Promise.all([
+    request.range(query.from, query.to),
+    countsRequest,
+  ]);
+  const { data, error, count } = listResult;
+  const { data: countRows, error: countsError } = countsResult;
   if (error) return res.status(500).json({ error: "database query failed", details: error.message });
+  if (countsError) return res.status(500).json({ error: "database count query failed", details: countsError.message });
 
-  res.json({ suggestions: data || [] });
+  const total = count || 0;
+  res.json({
+    suggestions: data || [],
+    counts: summarizeSuggestionCounts(countRows || []),
+    pagination: {
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+    },
+  });
 });
 
 router.get("/suggestions/:id", requireUser, async (req, res) => {
@@ -98,7 +123,7 @@ router.put("/suggestions/:id", requireUser, async (req, res) => {
     .from("vendor_suggestions")
     .select("id,status")
     .eq("user_id", req.callerUser.id)
-    .eq("vendor_name", clean.vendor_name)
+    .eq("suggestion_type", clean.suggestion_type)
     .eq("source_url", clean.source_url)
     .neq("id", req.params.id) // exclude current
     .in("status", ["submitted", "under_review", "needs_info", "accepted_for_processing", "processing", "admin_review", "draft_created"])

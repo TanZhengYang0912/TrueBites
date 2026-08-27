@@ -1,15 +1,16 @@
 import { Router } from "express";
 import { supabase } from "../supabase.js";
 import { logActivity } from "../lib/auditLog.js";
-import { assertTransition, SUGGESTION_STATUSES } from "../lib/suggestionValidation.js";
+import { assertTransition, statusesForSuggestionFilter, SUGGESTION_STATUSES } from "../lib/suggestionValidation.js";
 import { startProcessingJob, retryJob, createDraftFromJob } from "../lib/ai/pipeline.js";
 import { loadJob } from "../lib/ai/jobStore.js";
 
 const router = Router();
 
 const ADMIN_SELECT = `
-  id, user_id, vendor_name, influencer_name, source_url, source_platform, location_text, category,
-  reason, signature_dish, price_range, additional_note, status, admin_note,
+  id, user_id, suggestion_type, source_kind, vendor_name, influencer_name, source_url, source_platform, location_text, category,
+  reason, signature_dish, price_range, additional_note, creator_name, creator_profile_url,
+  creator_sample_video_url, creator_focus, creator_audience, creator_social_url, status, admin_note,
   rejection_reason, ai_job_id, vendor_id, reviewed_by, reviewed_at,
   published_at, created_at, updated_at,
   vendor:vendors(id, vendor_name, status, address, latitude, longitude, source_video_url)
@@ -71,8 +72,12 @@ router.get("/suggestions", async (req, res) => {
     .select(ADMIN_SELECT, { count: "exact" })
     .order("created_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
-  if (status !== "all" && SUGGESTION_STATUSES.includes(status)) query = query.eq("status", status);
-  if (q) query = query.ilike("vendor_name", `%${q.replaceAll("%", "").replaceAll("_", " ")}%`);
+  const statuses = statusesForSuggestionFilter(status);
+  if (statuses) query = query.in("status", statuses);
+  if (q) {
+    const safeQuery = q.replaceAll("%", "").replaceAll("_", " ").replace(/[(),]/g, " ");
+    query = query.or(`vendor_name.ilike.%${safeQuery}%,creator_name.ilike.%${safeQuery}%`);
+  }
 
   const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: "database query failed", details: error.message });
@@ -124,6 +129,7 @@ router.post("/suggestions/:id/process", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
+    if (suggestion.suggestion_type === "creator") return res.status(409).json({ error: "Creator suggestions use the creator review path, not vendor AI processing." });
     if (!["under_review", "accepted_for_processing", "failed"].includes(suggestion.status)) {
       return res.status(409).json({ error: `Suggestion is ${suggestion.status}; accept it before processing.` });
     }
@@ -183,6 +189,7 @@ router.post("/suggestions/:id/create-draft", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
+    if (suggestion.suggestion_type === "creator") return res.status(409).json({ error: "Creator suggestions do not create vendor drafts." });
     if (!suggestion.ai_job_id) return res.status(409).json({ error: "Process this suggestion before creating a draft." });
 
     const result = await createDraftFromJob(suggestion.ai_job_id, {
@@ -207,6 +214,24 @@ router.post("/suggestions/:id/publish", async (req, res) => {
   try {
     const suggestion = await getSuggestion(req.params.id);
     if (!suggestion) return res.status(404).json({ error: "Suggestion not found" });
+
+    if (suggestion.suggestion_type === "creator") {
+      if (!["submitted", "under_review"].includes(suggestion.status)) {
+        return res.status(409).json({ error: `Creator suggestion is ${suggestion.status}; review it before publishing.` });
+      }
+
+      const reviewedAt = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("vendor_suggestions")
+        .update({ status: "published", published_at: reviewedAt, reviewed_by: req.callerUser.id === "dev" ? null : req.callerUser.id, reviewed_at: reviewedAt })
+        .eq("id", suggestion.id)
+        .select(ADMIN_SELECT)
+        .single();
+      if (error) throw error;
+      await logActivity({ actor: req.callerUser, action: "creator_suggestion.publish", entityType: "vendor_suggestion", entityId: suggestion.id, metadata: { source_platform: suggestion.source_platform } });
+      return res.json({ suggestion: data });
+    }
+
     if (suggestion.status !== "draft_created" || !suggestion.vendor_id) return res.status(409).json({ error: "Create a draft vendor before publishing." });
 
     const { data: vendor, error: vendorError } = await supabase.from("vendors").update({ status: "active" }).eq("id", suggestion.vendor_id).select("id,status").single();

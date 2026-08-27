@@ -31,8 +31,14 @@ export function createSuggestion(payload) {
   });
 }
 
-export function getMySuggestions() {
-  return requestJson("/api/suggestions/mine");
+export function getMySuggestions({ page = 1, pageSize = 6, type = "all", status = "all" } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+    type,
+    status,
+  });
+  return requestJson(`/api/suggestions/mine?${params.toString()}`);
 }
 
 export function getMySuggestion(id) {
@@ -46,4 +52,3 @@ export function updateSuggestion(id, payload) {
     body: JSON.stringify(payload),
   });
 }
-

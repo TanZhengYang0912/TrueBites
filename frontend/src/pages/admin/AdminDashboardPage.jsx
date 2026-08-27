@@ -13,7 +13,7 @@ import {
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { getAdminDashboard } from "../../api/admin";
-import { normalizeDashboardPayload } from "../../lib/adminDashboard";
+import { normalizeDashboardPayload, statusToneFor } from "../../lib/adminDashboard";
 import { BarChart, KpiCard, LineChart, PipelineChart } from "../../components/admin/AdminCharts";
 import { openOverviewPdf } from "../../lib/exportPdf";
 
@@ -117,7 +117,7 @@ function ActivityPanel({ vendors = [], processing = [] }) {
           <Link className="admin-activity-row" to={row.href} key={row.id}>
             <span className="admin-activity-type">{row.type}</span>
             <span><strong>{row.title || "Untitled"}</strong><small>{row.meta}</small></span>
-            <span className="admin-status-pill active">{row.status || "Updated"}</span>
+            <span className={`admin-status-pill ${statusToneFor(row.status)}`}>{row.status || "Updated"}</span>
             <ArrowRight size={15} />
           </Link>
         )) : <div className="admin-empty-state">No recent activity yet.</div>}
