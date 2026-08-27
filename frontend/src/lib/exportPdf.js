@@ -108,11 +108,16 @@ export async function openVendorsPdf({ title, subtitle, vendors }) {
     title,
     subtitle,
     head: ["Name", "Category", "Status", "Location", "Price Range", "Joined"],
+    // `location` (from firstLocation() in admin.js) is deliberately just the
+    // first comma-delimited fragment of the address — short enough for the
+    // admin table's narrow column. The PDF has no such width constraint, so
+    // it uses the vendor's full address instead; `location` is only a
+    // fallback for the rare row where fullAddress itself is empty.
     rows: vendors.map((v) => [
       v.name || "—",
       v.category || "—",
       v.status || "—",
-      v.location || "—",
+      v.fullAddress || v.location || "—",
       v.priceRange || "—",
       v.joined ? new Date(v.joined).toLocaleDateString() : "—",
     ]),
