@@ -56,6 +56,7 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
         role,
         confidence: candidate.confidence,
         matchMeta: candidate.breakdown,
+        dedupeKey: candidate.dedupeKey,
       });
       notify?.(`Photo added as ${role === "cover" ? "the cover photo" : "a gallery photo"}.`);
       onPhotoCommitted?.(role, result.url);
@@ -84,11 +85,13 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
         </button>
       </div>
 
-      <p className="admin-field-hint">
-        Searches this vendor's own source video first (if it has one), then falls back to free
-        public sources near its coordinates — Mapillary street-level imagery, OpenStreetMap-tagged
-        photos, and a Wikimedia Commons name search. Never another vendor's photos.
-      </p>
+      {visibleCandidates.length === 0 && (
+        <p className="admin-field-hint">
+          Searches this vendor's own source video first (if it has one), then falls back to
+          Google Places photos near its coordinates and a Wikimedia Commons name search.
+          Never another vendor's photos.
+        </p>
+      )}
 
       {coordsProvided && !coordsInRange && (
         <p className="admin-field-hint">Please enter a valid latitude and longitude.</p>

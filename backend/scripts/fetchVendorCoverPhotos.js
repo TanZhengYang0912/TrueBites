@@ -1,8 +1,13 @@
 /**
  * Batch-fill COVER photos for vendors that currently have none —
- * storefront_image_url IS NULL — using Mapillary (street-level, free),
- * Overpass/OpenStreetMap (free, keyless), and Wikimedia Commons (free,
- * keyless) only. Free, no API key requirement, no Google Places.
+ * storefront_image_url IS NULL — using Google Places Photos and Wikimedia
+ * Commons (free, keyless), matching the providers the interactive "Find
+ * Photos Automatically" admin panel now uses (see photoProviders/index.js).
+ * Mapillary (street-level) and Overpass/OpenStreetMap are no longer used by
+ * this script either — same project decision as the panel: Google Places'
+ * verified name+location match beats a street-level pass-by or an OSM node
+ * tag for coverage/accuracy, and this script is unsupervised so accuracy
+ * matters even more here than in the admin-confirmed panel.
  *
  * SCOPE — deliberately does NOT touch the video-frame or TikTok-oEmbed
  * providers, even though they're registered in photoProviders/index.js for
@@ -12,31 +17,25 @@
  * confidently attributed to one specific shop, and cleared storefront_image_url
  * for exactly that reason (see scripts/vendor_photo_audit.json). Running
  * video-frame extraction here would just reintroduce that same misattribution
- * — so this script only ever calls findMapillaryCandidates/findOverpassCandidates/
- * findWikimediaCandidates directly, not the full discoverVendorPhotos() pipeline.
+ * — so this script only ever calls findGooglePlacesCandidates/findWikimediaCandidates
+ * directly, not the full discoverVendorPhotos() pipeline.
  *
  * AUTO-COMMIT SAFETY — this bypasses the normal admin manual-confirm step
  * (PhotoDiscoveryPanel), so it applies a stricter bar than the UI's own
  * NEEDS_CONFIRMATION_THRESHOLD (60):
  *
- *   - Mapillary candidates are NEVER auto-committed. Mapillary images carry
- *     no place name at all — confidence there is pure GPS proximity, and
- *     Melaka's old-town shoplots sit metres apart, so a "close" match can
- *     easily be the NEXT-DOOR business's storefront, not this vendor's.
- *     Auto-committing that would directly violate the project's own "never
- *     show an unrelated vendor's photo" requirement. Mapillary results are
- *     written to the needs-review report instead, for a human to check.
- *
- *   - Wikimedia AND Overpass candidates need confidence >= AUTO_SUGGEST_THRESHOLD
- *     (85) AND at least 2 distinctive tokens in the vendor's own name. Found by
- *     live-testing this exact pipeline: a vendor named just "Nyonya" hit
- *     Wikimedia's exact-substring-match branch (100% confidence) against an
- *     unrelated "Baba Nyonya Museum" photo, because the single word appears
- *     verbatim in both. A vendor name with only one distinctive word can't
- *     be trusted to identify one specific business without a human look —
- *     those go to the needs-review report too, regardless of confidence.
- *     Overpass gets the same bar for the same reason: an OSM node's `name`
- *     tag is just as capable of that same single-word false match.
+ *   - Google Places AND Wikimedia candidates need confidence >=
+ *     AUTO_SUGGEST_THRESHOLD (85) AND at least 2 distinctive tokens in the
+ *     vendor's own name. The distinctive-token bar was found by live-testing
+ *     this exact pipeline: a vendor named just "Nyonya" hit Wikimedia's
+ *     exact-substring-match branch (100% confidence) against an unrelated
+ *     "Baba Nyonya Museum" photo, because the single word appears verbatim
+ *     in both. A vendor name with only one distinctive word can't be trusted
+ *     to identify one specific business without a human look — those go to
+ *     the needs-review report too, regardless of confidence. Google Places
+ *     gets the same bar for the same reason: "Find Place From Text" matches
+ *     on name too, and a one-word vendor name is just as capable of latching
+ *     onto the wrong nearby business as a Wikimedia title is.
  *
  * Everything that IS auto-committed still goes through the same storage +
  * DB write path as a manual admin commit (cover_photo_locked stays false,
@@ -47,19 +46,19 @@
  *   node scripts/fetchVendorCoverPhotos.js --yes --limit=10
  *   node scripts/fetchVendorCoverPhotos.js --yes --vendor-id=<id>
  *   node scripts/fetchVendorCoverPhotos.js --yes --force   # re-check vendors
- *     already marked "done" in a previous run too — e.g. after adding a new
- *     provider (like Overpass) that a past run never got to try.
+ *     already marked "done" in a previous run too — e.g. after switching
+ *     providers, so a past run's misses get a fresh try.
  *
  * Requirements: backend/.env must have SUPABASE_URL, SUPABASE_SERVICE_KEY,
- * and ideally MAPILLARY_ACCESS_TOKEN (Wikimedia and Overpass need no key at all).
+ * and GOOGLE_API_KEY (Wikimedia needs no key at all; vendors are skipped —
+ * not flagged — if GOOGLE_API_KEY is unset, same as the interactive panel).
  */
 
 import path from "path";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
-import { findMapillaryCandidates } from "../lib/photoProviders/mapillaryProvider.js";
-import { findOverpassCandidates } from "../lib/photoProviders/overpassProvider.js";
+import { findGooglePlacesCandidates } from "../lib/photoProviders/googlePlacesPhotoProvider.js";
 import { findWikimediaCandidates } from "../lib/photoProviders/wikimediaProvider.js";
 import { downloadAndStorePhoto } from "../lib/photoProviders/photoStorage.js";
 import { captionMatchConfidence, AUTO_SUGGEST_THRESHOLD } from "../lib/photoMatching.js";
@@ -85,7 +84,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 if (!CONFIRMED) {
   console.log(
-    "This picks the best Mapillary/Overpass/Wikimedia candidate for each cover-less\n" +
+    "This picks the best Google Places/Wikimedia candidate for each cover-less\n" +
     "vendor and, for candidates that clear a strict auto-commit bar, writes\n" +
     "it as the cover photo automatically (no admin click) — real writes to\n" +
     "the shared vendor-images bucket + vendors table. Anything that doesn't\n" +
@@ -136,24 +135,31 @@ async function main() {
     const vendor = pending[i];
     process.stdout.write(`[${i + 1}/${pending.length}] ${vendor.vendor_name} ... `);
 
-    const [mapillaryResult, overpassResult, wikimediaResult] = await Promise.allSettled([
-      findMapillaryCandidates(vendor),
-      findOverpassCandidates(vendor),
+    const [googleResult, wikimediaResult] = await Promise.allSettled([
+      findGooglePlacesCandidates(vendor),
       findWikimediaCandidates(vendor),
     ]);
-    const mapillaryCandidates = mapillaryResult.status === "fulfilled" ? mapillaryResult.value : [];
-    const overpassCandidates = overpassResult.status === "fulfilled" ? overpassResult.value : [];
+    const googleCandidates = googleResult.status === "fulfilled" ? googleResult.value : [];
     const wikimediaCandidates = wikimediaResult.status === "fulfilled" ? wikimediaResult.value : [];
-    const allCandidates = [...mapillaryCandidates, ...overpassCandidates, ...wikimediaCandidates].sort((a, b) => b.confidence - a.confidence);
+    const allCandidates = [...googleCandidates, ...wikimediaCandidates].sort((a, b) => b.confidence - a.confidence);
 
     const nameTokenCount = distinctiveTokenCount(vendor.vendor_name);
-    const autoEligible = [...overpassCandidates, ...wikimediaCandidates]
+    const autoEligible = [...googleCandidates, ...wikimediaCandidates]
       .filter((c) => c.confidence >= AUTO_SUGGEST_THRESHOLD && nameTokenCount >= MIN_DISTINCTIVE_TOKENS)
       .sort((a, b) => b.confidence - a.confidence)[0];
 
     if (autoEligible) {
       try {
-        const stored = await downloadAndStorePhoto(vendor.id, autoEligible.photoRef, "storefront");
+        // Same reasoning as routes/vendors.js's /photos/commit: Google
+        // Places candidates carry a bare photo_reference (not a directly
+        // fetchable URL) so the server-side key never reaches a candidate
+        // sent to a browser — this script IS the server, so it rebuilds the
+        // real URL here itself. Every other provider's photoRef is already
+        // a direct URL.
+        const downloadUrl = autoEligible.provider === "google_places_photo"
+          ? `https://maps.googleapis.com/maps/api/place/photo?${new URLSearchParams({ maxwidth: "1600", photo_reference: autoEligible.photoRef, key: process.env.GOOGLE_API_KEY || "" })}`
+          : autoEligible.photoRef;
+        const stored = await downloadAndStorePhoto(vendor.id, downloadUrl, "storefront");
         const { error: updateErr } = await supabase
           .from("vendors")
           .update({
@@ -169,7 +175,7 @@ async function main() {
         autoCommitted++;
         // Resolved — drop any stale needs-review entry from an earlier run
         // (matters under --force, where a vendor can go from "flagged" to
-        // "auto-committed" once a new provider like Overpass finds a match).
+        // "auto-committed" once a re-run finds a stronger match).
         for (let j = needsReview.length - 1; j >= 0; j--) {
           if (needsReview[j].vendorId === vendor.id) needsReview.splice(j, 1);
         }

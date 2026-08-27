@@ -112,6 +112,9 @@ export async function findWikimediaCandidates(vendor) {
         },
         previewUrl: info.thumburl,
         photoRef: info.thumburl,
+        // Commons file URLs are stable (no expiry/rotation), so this
+        // doubles as the dedupe key directly.
+        dedupeKey: info.thumburl,
       };
     })
     .filter(Boolean)

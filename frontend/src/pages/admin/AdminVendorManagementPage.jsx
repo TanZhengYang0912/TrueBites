@@ -1,6 +1,7 @@
 import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, List, MapPinned, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import {
   createAdminVendor, deleteAdminVendor, deleteVendorGalleryImage, getAdminVendorDuplicates,
   getAdminVendors, updateAdminVendor, uploadVendorGalleryImage, uploadVendorImage,
@@ -53,6 +54,10 @@ for (let h = 0; h < 24; h++) {
 }
 
 const MELAKA_BOUNDS = { latMin: 1.8, latMax: 2.6, lngMin: 101.8, lngMax: 102.8 };
+// Same key/provider as VendorLocationPicker.jsx (the map) and
+// LocationInput.jsx (the customer trip-planner's location search) — one
+// shared Google Maps browser key across the whole app.
+const API_KEY = import.meta.env.VITE_MAPS_BROWSER_KEY;
 const PHONE_RE = /^(\+?60|0)\d{8,10}$/;
 
 const emptyForm = {
@@ -474,179 +479,136 @@ function GalleryManager({ vendorId, images, disabled, pendingDeletes, onChange, 
   );
 }
 
-// Free address autocomplete on the Address field, restricted to Melaka —
-// backed by Photon (https://photon.komoot.io), a keyless public search API
-// over OpenStreetMap data. No billing account, no API key, cannot incur cost
-// (unlike the Google Places Autocomplete this replaces, which stopped working
-// once this project's Google Cloud billing got disabled). Picking a
-// suggestion fires the standard form `onChange` three times (address,
-// latitude, longitude), so lat/lng auto-fill through the exact same plumbing
-// every other field uses — no extra prop wiring. Degrades gracefully to a
-// plain text input if Photon is unreachable (offline, etc).
-// If the admin is mid-typing the start of the vendor's own name (e.g. vendor
-// "Jonker 88", typed "Jonker"), search on the fuller vendor name instead —
-// Photon indexes business names as POIs, so the complete name is a much
-// stronger query than a truncated prefix of it. Leaves the query alone for
-// anything else (a street name, an unrelated landmark, etc).
-function locationSearchQuery(typed, vendorName) {
-  const name = (vendorName || "").trim();
-  const query = typed.trim();
-  if (name && name.length > query.length && name.toLowerCase().startsWith(query.toLowerCase())) {
-    return name;
-  }
-  return query;
-}
-
-function AddressAutocomplete({ form, error, onChange, disabled, notify }) {
-  const [suggestions, setSuggestions] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [geocoding, setGeocoding] = useState(false);
-  const boxRef = useRef(null);
-  const debounceRef = useRef(null);
-  const requestSeq = useRef(0);
-  // Always holds the latest `form`, for the delayed blur check below — a
-  // plain closure over `form` would still see the pre-blur value even after
-  // a suggestion click has since updated it.
-  const formRef = useRef(form);
-  useEffect(() => { formRef.current = form; }, [form]);
+// Google Places Autocomplete on the Address field — the same API
+// LocationInput.jsx uses for the customer-facing trip planner's location
+// search, sharing the same VITE_MAPS_BROWSER_KEY, so both surfaces behave
+// (and fail) identically instead of drifting apart. Replaces the previous
+// Photon (OpenStreetMap) implementation that lived here specifically
+// because this project's Google Cloud billing was disabled at the time —
+// if that's stable now, this depends on the same Maps availability the
+// location picker map already requires, for both the map and the address
+// search together. Picking a suggestion fires the standard form `onChange`
+// three times (address, latitude, longitude), the same plumbing every
+// other field uses.
+function AddressAutocompleteField({ form, error, onChange, disabled, notify }) {
+  const placesLib = useMapsLibrary("places");
+  const inputRef = useRef(null);
+  // The place_changed listener below is attached once, when the library
+  // first loads — keep it reading the LATEST onChange via a ref so it
+  // never closes over a stale one from a prior render (e.g. switching which
+  // vendor is being edited without unmounting this field).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   useEffect(() => {
-    function onClickOutside(e) {
-      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
+    if (!placesLib || !inputRef.current || disabled) return;
 
-  // Photon has patchy coverage of small Melaka streets — when it has no
-  // matching suggestion, an admin can type/paste a full address and never
-  // get the chance to click one, leaving latitude/longitude blank (the
-  // actual cause behind "why didn't this fill in the coordinates"). Falls
-  // back to a plain, unbounded Photon search once the field is left — same
-  // query shape as handleInput below, just without requiring the dropdown
-  // to have shown a match, and taking its top result outright instead of
-  // waiting for a click. (This used to call Google Geocoding instead, but
-  // that account's billing is disabled — confirmed live, every call came
-  // back REQUEST_DENIED — so it silently failed every single time. Photon
-  // is free and already proven working for the live-suggestions dropdown
-  // right below, so there's nothing Google was doing that this can't.)
-  // Only runs if a suggestion pick (or a manual edit) hasn't already filled
-  // coordinates in the meantime — the short delay gives a suggestion
-  // click's mousedown -> blur -> click sequence time to land first, so this
-  // never races pick().
-  function handleBlur() {
-    setTimeout(async () => {
-      const current = formRef.current;
-      const address = current.address.trim();
-      if (disabled || address.length < 5) return;
-      if (current.latitude !== "" || current.longitude !== "") return;
-      setGeocoding(true);
-      try {
-        const params = new URLSearchParams({
-          q: locationSearchQuery(address, current.vendor_name),
-          limit: "1",
-          lat: "2.1896",
-          lon: "102.2501",
-          bbox: `${MELAKA_BOUNDS.lngMin},${MELAKA_BOUNDS.latMin},${MELAKA_BOUNDS.lngMax},${MELAKA_BOUNDS.latMax}`,
-        });
-        const res = await fetch(`https://photon.komoot.io/api/?${params}`);
-        const data = await res.json();
-        const top = data.features?.[0];
-        if (!top) throw new Error("no match");
-        const [lng, lat] = top.geometry.coordinates;
-        onChange({ target: { name: "latitude", value: String(lat) } });
-        onChange({ target: { name: "longitude", value: String(lng) } });
-      } catch {
-        notify?.("Couldn't auto-fill coordinates for that address — enter them manually.", true);
-      } finally {
-        setGeocoding(false);
+    const autocomplete = new placesLib.Autocomplete(inputRef.current, {
+      fields: ["formatted_address", "name", "geometry"],
+      componentRestrictions: { country: "my" },
+      // Soft bias toward Melaka (not a hard restriction) — matches the
+      // Photon version's bbox-as-hint behaviour rather than blocking valid
+      // addresses just outside these bounds.
+      bounds: {
+        south: MELAKA_BOUNDS.latMin, north: MELAKA_BOUNDS.latMax,
+        west: MELAKA_BOUNDS.lngMin, east: MELAKA_BOUNDS.lngMax,
+      },
+    });
+
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      const loc = place.geometry?.location;
+      if (!loc) {
+        notify?.("Couldn't find coordinates for that place — enter them manually.", true);
+        return;
       }
-    }, 200);
-  }
+      const label = place.formatted_address || place.name || inputRef.current.value;
+      onChangeRef.current({ target: { name: "address", value: label } });
+      onChangeRef.current({ target: { name: "latitude", value: String(loc.lat()) } });
+      onChangeRef.current({ target: { name: "longitude", value: String(loc.lng()) } });
+    });
 
-  function handleInput(e) {
-    onChange(e);
-    const value = e.target.value;
-    clearTimeout(debounceRef.current);
-    if (value.trim().length < 3) { setSuggestions([]); setOpen(false); return; }
-
-    debounceRef.current = setTimeout(async () => {
-      const seq = ++requestSeq.current;
-      try {
-        const params = new URLSearchParams({
-          q: locationSearchQuery(value, formRef.current.vendor_name),
-          limit: "5",
-          lat: "2.1896",
-          lon: "102.2501",
-          bbox: `${MELAKA_BOUNDS.lngMin},${MELAKA_BOUNDS.latMin},${MELAKA_BOUNDS.lngMax},${MELAKA_BOUNDS.latMax}`,
-        });
-        const res = await fetch(`https://photon.komoot.io/api/?${params}`);
-        const data = await res.json();
-        if (seq !== requestSeq.current) return; // a newer keystroke already superseded this request
-        setSuggestions(data.features || []);
-        setOpen(true);
-      } catch {
-        if (seq === requestSeq.current) setSuggestions([]);
-      }
-    }, 350);
-  }
-
-  function pick(feature) {
-    const p = feature.properties;
-    const label = [p.name, p.street, p.city, p.state, p.country].filter(Boolean).join(", ");
-    const [lng, lat] = feature.geometry.coordinates;
-    setOpen(false);
-    setSuggestions([]);
-    onChange({ target: { name: "address", value: label } });
-    onChange({ target: { name: "latitude", value: String(lat) } });
-    onChange({ target: { name: "longitude", value: String(lng) } });
-  }
+    return () => listener.remove();
+  }, [placesLib, disabled, notify]);
 
   return (
-    <label ref={boxRef} className="admin-address-field">
+    <label className="admin-address-field">
       <span>Address</span>
       <input
+        ref={inputRef}
         name="address"
         value={form.address}
-        onChange={handleInput}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
-        onBlur={handleBlur}
-        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        onChange={onChange}
         disabled={disabled}
         placeholder="Start typing a Melaka address…"
         autoComplete="off"
       />
       {!disabled && (
-        <span className="admin-field-hint">
-          {geocoding
-            ? "Finding coordinates…"
-            : open && suggestions.length === 0
-              ? "No matching location found. You can enter the location manually."
-              : "Pick a suggestion to auto-fill the map coordinates."}
-        </span>
-      )}
-      {open && suggestions.length > 0 && (
-        <ul className="admin-address-suggestions">
-          {suggestions.map((feature, i) => {
-            const p = feature.properties;
-            const label = [p.name, p.street, p.city, p.state].filter(Boolean).join(", ");
-            return (
-              <li key={`${p.osm_type}-${p.osm_id}-${i}`}>
-                <button type="button" onClick={() => pick(feature)}>{label}</button>
-              </li>
-            );
-          })}
-        </ul>
+        <span className="admin-field-hint">Pick a suggestion to auto-fill the map coordinates.</span>
       )}
       <FieldError message={error} />
     </label>
   );
 }
 
+// Plain fallback when Google Maps isn't available at all (no key configured,
+// or the API failed to load) — mirrors VendorLocationPicker.jsx's own
+// fallback so the form stays usable either way.
+function PlainAddressField({ form, error, onChange, disabled, hint }) {
+  return (
+    <label className="admin-address-field">
+      <span>Address</span>
+      <input
+        name="address"
+        value={form.address}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder="Address"
+        autoComplete="off"
+      />
+      {hint && <span className="admin-field-hint">{hint}</span>}
+      <FieldError message={error} />
+    </label>
+  );
+}
+
+function AddressAutocomplete({ form, error, onChange, disabled, notify, loadError }) {
+  // Shares one <APIProvider> with VendorLocationPicker below (see
+  // VendorFormFields) rather than creating its own — Google Maps JS can only
+  // be loaded once per page with one fixed `libraries` list.
+  if (!API_KEY) {
+    return (
+      <PlainAddressField
+        form={form} error={error} onChange={onChange} disabled={disabled}
+        hint="Address search unavailable — Google Maps browser key not configured."
+      />
+    );
+  }
+
+  if (loadError) {
+    return (
+      <PlainAddressField
+        form={form} error={error} onChange={onChange} disabled={disabled}
+        hint={`Address search failed to load (${loadError}) — enter the address manually.`}
+      />
+    );
+  }
+
+  return <AddressAutocompleteField form={form} error={error} onChange={onChange} disabled={disabled} notify={notify} />;
+}
+
 // Shared by the Add Vendor modal, the Edit form, AND the read-only View —
 // `disabled` greys every control out for View, without duplicating markup.
 function VendorFormFields({ form, errors, onChange, onFileChange, disabled, notify }) {
-  return (
+  // AddressAutocomplete (Places) and VendorLocationPicker (the map + marker)
+  // both need the Google Maps JS API, and it can only be loaded ONCE per
+  // page with ONE fixed `libraries` list — a second <APIProvider> with a
+  // different list is silently ignored ("already been loaded with different
+  // parameters" in the console), which is exactly what happened when each
+  // had its own provider. One shared provider here, passed down, is the fix.
+  const [mapsError, setMapsError] = useState("");
+
+  const fields = (
     <>
       <label>
         <span>Name</span>
@@ -654,7 +616,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         <FieldError message={errors?.vendor_name} />
       </label>
 
-      <AddressAutocomplete form={form} error={errors?.address} onChange={onChange} disabled={disabled} notify={notify} />
+      <AddressAutocomplete form={form} error={errors?.address} onChange={onChange} disabled={disabled} notify={notify} loadError={mapsError} />
 
       <div className="admin-modal-grid">
         <label>
@@ -669,7 +631,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         </label>
       </div>
 
-      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} />
+      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} loadError={mapsError} />
 
       <div className="admin-modal-grid admin-modal-grid-3">
         <label>
@@ -736,6 +698,18 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
           never sees or edits the URL itself. */}
       <ImageDropzone form={form} onFileChange={onFileChange} disabled={disabled} />
     </>
+  );
+
+  if (!API_KEY) return fields;
+
+  return (
+    <APIProvider
+      apiKey={API_KEY}
+      libraries={["marker", "places"]}
+      onError={(err) => setMapsError(err?.message || "authorization or billing error")}
+    >
+      {fields}
+    </APIProvider>
   );
 }
 
@@ -923,6 +897,7 @@ function AddVendorModal({ onClose, onCreated, notify }) {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [promoting, setPromoting] = useState(false);
   // Set when the server flags a fuzzy name/address match (409
   // possible_duplicate) — shown as a warning with an "Add anyway" override
   // instead of silently blocking, since same-named vendors do legitimately exist.
@@ -992,6 +967,28 @@ function AddVendorModal({ onClose, onCreated, notify }) {
     doSave(false);
   };
 
+  // The vendor was inserted as "draft" no matter what Status the form had
+  // selected (see the comment on POST /api/admin/vendors) — a fresh row
+  // can never have a cover photo yet. If the admin picked Active, this is
+  // the point to actually try promoting it: the photo step above (manual
+  // upload or Find Photos Automatically) has now had its chance to run, so
+  // a cover photo may genuinely exist in the DB by now. Same partial-patch
+  // call handleQuickStatus uses elsewhere — the backend re-checks
+  // completeness against the vendor's current DB row, not this payload.
+  const handleDone = async () => {
+    if (form.status !== "active") { onClose(); return; }
+    setPromoting(true);
+    try {
+      await updateAdminVendor(createdVendor.id, { status: "active" });
+      onCreated();
+    } catch (err) {
+      notify(err.message || "Could not activate — this vendor was saved as a Draft instead. Finish it from Edit Vendor.", true);
+    } finally {
+      setPromoting(false);
+      onClose();
+    }
+  };
+
   if (createdVendor) {
     return (
       <div className="admin-modal-backdrop" onClick={onClose}>
@@ -1038,7 +1035,9 @@ function AddVendorModal({ onClose, onCreated, notify }) {
               notify={notify}
             />
             <div className="admin-modal-actions">
-              <button type="button" className="admin-primary-btn compact" onClick={onClose}>Done</button>
+              <button type="button" className="admin-primary-btn compact" onClick={handleDone} disabled={promoting}>
+                {promoting ? "Finishing…" : "Done"}
+              </button>
             </div>
           </div>
         </div>

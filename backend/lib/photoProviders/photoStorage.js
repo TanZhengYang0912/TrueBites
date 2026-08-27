@@ -1,5 +1,5 @@
 // Shared "persist this candidate photo" step for every photo provider
-// (TikTok oEmbed, Mapillary, ...) plus the AI frame-extraction pipeline.
+// (TikTok oEmbed, Google Places, Wikimedia, ...) plus the AI frame-extraction pipeline.
 // Deliberately provider-agnostic — extracted here so the commit endpoint
 // (routes/vendors.js) and the batch scripts share one implementation
 // instead of each re-implementing fetch+upload.

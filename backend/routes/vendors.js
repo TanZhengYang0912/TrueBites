@@ -212,7 +212,7 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
   // original publish date, so it does not resurface as "new" in the bell.
   const { data: current } = await supabase
     .from("vendors")
-    .select("published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+    .select("published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
     .eq("id", req.params.id)
     .maybeSingle();
 
@@ -447,16 +447,66 @@ router.post("/vendors/:id/photos/discover", adminOnly, async (req, res) => {
 
   photoDebugLog("route", vendor.id, `search coords lat=${lat} lng=${lng} (${hasOverride ? "unsaved form value" : "saved DB value"})`);
 
-  const candidates = await discoverVendorPhotos(hasOverride ? { ...vendor, latitude: lat, longitude: lng } : vendor);
-  photoDebugLog("route", vendor.id, `returning ${candidates.length} candidate(s) to the admin panel`);
+  // Every photo already committed for this vendor (as cover OR gallery, ever
+  // — not just this session) must never resurface on a later search. Each
+  // committed row's provider + the dedupeKey stashed in match_meta at commit
+  // time (see /photos/commit below) together form the same
+  // "provider::dedupeKey" shape discoverVendorPhotos filters candidates by.
+  const { data: usedRows, error: usedErr } = await supabase
+    .from("vendor_photos")
+    .select("provider, match_meta")
+    .eq("vendor_id", vendor.id);
+  if (usedErr) {
+    console.error("vendor_photos lookup for dedup failed:", usedErr.message);
+  }
+  const usedKeys = new Set(
+    (usedRows || [])
+      .filter((row) => row.match_meta?.dedupeKey)
+      .map((row) => `${row.provider}::${row.match_meta.dedupeKey}`)
+  );
+
+  const candidates = await discoverVendorPhotos(hasOverride ? { ...vendor, latitude: lat, longitude: lng } : vendor, usedKeys);
+  photoDebugLog("route", vendor.id, `returning ${candidates.length} candidate(s) to the admin panel (${usedKeys.size} previously-committed key(s) excluded)`);
   res.json({ candidates });
+});
+
+// Proxies a Google Places photo through this server so the browser never
+// sees a raw Google Photo URL — that endpoint requires GOOGLE_API_KEY as a
+// query param, and putting a server-side key directly on an <img src> would
+// leak it into the page's DOM/network tab for anyone to copy and reuse
+// against this project's quota. Only this route (and /photos/commit, for
+// the one candidate actually chosen) ever attaches the real key to a
+// request to Google; googlePlacesPhotoProvider.js's candidates only ever
+// carry a link back to here.
+//
+// Deliberately unauthenticated, same reasoning as the /outputs static mount
+// in server.js: a plain <img> tag can't attach an Authorization header, and
+// `ref` is an opaque Google-issued token, not independently sensitive.
+router.get("/vendors/:id/photos/google-preview", async (req, res) => {
+  const ref = String(req.query.ref || "");
+  if (!ref) return res.status(400).json({ error: "ref is required" });
+  if (!process.env.GOOGLE_API_KEY) return res.status(503).json({ error: "Google Places photos are not configured" });
+
+  const params = new URLSearchParams({ maxwidth: "1024", photo_reference: ref, key: process.env.GOOGLE_API_KEY });
+
+  try {
+    const googleRes = await fetch(`https://maps.googleapis.com/maps/api/place/photo?${params}`);
+    if (!googleRes.ok) {
+      return res.status(502).json({ error: "photo fetch failed", details: `Google returned HTTP ${googleRes.status}` });
+    }
+    res.set("Content-Type", googleRes.headers.get("content-type") || "image/jpeg");
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(Buffer.from(await googleRes.arrayBuffer()));
+  } catch (err) {
+    res.status(502).json({ error: "photo fetch failed", details: err.message });
+  }
 });
 
 // Commits ONE chosen candidate: downloads its bytes (deferred until now —
 // never for candidates the admin didn't pick), uploads via the same storage
 // convention as manual uploads, records vendor_photos metadata.
 router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
-  const { provider, photoRef, role, confidence, matchMeta } = req.body || {};
+  const { provider, photoRef, role, confidence, matchMeta, dedupeKey } = req.body || {};
   if (!photoRef || !["cover", "gallery"].includes(role)) {
     return res.status(400).json({ error: "provider, photoRef and a role of 'cover' or 'gallery' are required" });
   }
@@ -478,16 +528,24 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
     }
   }
 
-  const KNOWN_PROVIDERS = ["tiktok_oembed", "mapillary", "overpass", "video_frame", "wikimedia"];
+  const KNOWN_PROVIDERS = ["tiktok_oembed", "google_places_photo", "video_frame", "wikimedia"];
   if (!KNOWN_PROVIDERS.includes(provider)) {
     return res.status(400).json({ error: `unknown or unavailable photo provider: ${provider}` });
   }
 
   let stored;
   try {
-    // Every provider's candidate.photoRef is just a fetchable image URL, so
-    // downloading and storing it is identical regardless of source.
-    stored = await downloadAndStorePhoto(vendor.id, photoRef, role === "cover" ? "storefront" : "gallery");
+    // Every provider's candidate.photoRef is a directly-fetchable image URL
+    // EXCEPT google_places_photo, whose photoRef is a bare Google
+    // photo_reference (see googlePlacesPhotoProvider.js for why: the real
+    // Google Photo URL needs GOOGLE_API_KEY as a query param, which must
+    // never reach the browser — the candidate JSON sent to the admin panel
+    // only ever carries the bare reference). Rebuild the real URL
+    // server-side, here, right before the one fetch that actually needs it.
+    const downloadUrl = provider === "google_places_photo"
+      ? `https://maps.googleapis.com/maps/api/place/photo?${new URLSearchParams({ maxwidth: "1600", photo_reference: photoRef, key: process.env.GOOGLE_API_KEY || "" })}`
+      : photoRef;
+    stored = await downloadAndStorePhoto(vendor.id, downloadUrl, role === "cover" ? "storefront" : "gallery");
   } catch (err) {
     return res.status(502).json({ error: "could not retrieve that photo — it may have expired, try Search Again", details: err.message });
   }
@@ -524,9 +582,15 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
     if (updateErr) return res.status(500).json({ error: "database update failed", details: updateErr.message });
   }
 
+  // dedupeKey rides inside match_meta (rather than its own column) so the
+  // /photos/discover lookup above can read it back with the same query that
+  // already fetches match_meta for every other purpose — no schema change
+  // needed. See index.js's runTier comment for why this can't just be
+  // photoRef for every provider.
+  const matchMetaWithDedupeKey = dedupeKey ? { ...(matchMeta || {}), dedupeKey } : (matchMeta ?? null);
   await recordVendorPhoto({
     vendorId: vendor.id, url: stored.url, storagePath: stored.storagePath, role,
-    source: "external_api", provider, confidence: confidence ?? null, matchMeta: matchMeta ?? null,
+    source: "external_api", provider, confidence: confidence ?? null, matchMeta: matchMetaWithDedupeKey,
   });
   await logActivity({ actor: req.callerUser, action: "vendor.photo_discover_commit", entityType: "vendor", entityId: vendor.id, metadata: { provider, role, confidence } });
 

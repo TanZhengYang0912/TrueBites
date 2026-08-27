@@ -6,7 +6,7 @@ import { HERO_SLIDES } from "../../lib/landingImages";
 // - Per-slide: terracotta eyebrow caption + short description
 // - Persistent "600 Years of Culture, Heritage & Flavour" italic tagline
 // - "SCROLL TO EXPLORE" label + "01/4" counter + dot pagination
-// - Auto-advance every 5 s; dots are manual override
+// - Auto-advance every 3.5 s; dots are manual override
 // - Crossfade transition; respects prefers-reduced-motion
 //
 // Uses dvh rather than vh so mobile browser chrome cannot clip the bottom row.
@@ -35,7 +35,7 @@ export default function HeroCarousel() {
   useEffect(() => {
     timerRef.current = setInterval(() => {
       goTo((current + 1) % HERO_SLIDES.length);
-    }, 5000);
+    }, 3500);
     return () => clearInterval(timerRef.current);
   }, [current, goTo]);
 

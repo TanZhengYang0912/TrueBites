@@ -193,11 +193,11 @@ export async function discoverVendorPhotos(id, coords) {
   });
 }
 
-export async function commitVendorPhoto(id, { provider, photoRef, role, confidence, matchMeta }) {
+export async function commitVendorPhoto(id, { provider, photoRef, role, confidence, matchMeta, dedupeKey }) {
   return requestJson(`/api/vendors/${id}/photos/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider, photoRef, role, confidence, matchMeta }),
+    body: JSON.stringify({ provider, photoRef, role, confidence, matchMeta, dedupeKey }),
   });
 }
 

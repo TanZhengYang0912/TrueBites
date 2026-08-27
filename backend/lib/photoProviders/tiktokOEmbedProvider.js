@@ -63,5 +63,11 @@ export async function findTikTokCandidates(vendor) {
     },
     previewUrl: oembed.thumbnailUrl,
     photoRef: oembed.thumbnailUrl,
+    // thumbnailUrl is a short-lived SIGNED CDN link (expires in ~2 days,
+    // re-signed differently on every oEmbed call) — not reusable for "was
+    // this already committed?" checks. The vendor's own source_video_url is
+    // stable and this provider only ever returns the one thumbnail tied to
+    // it, so it's a correct dedupe key on its own.
+    dedupeKey: vendor.source_video_url,
   }];
 }
