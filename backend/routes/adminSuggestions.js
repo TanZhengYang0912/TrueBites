@@ -4,6 +4,7 @@ import { logActivity } from "../lib/auditLog.js";
 import { assertTransition, statusesForSuggestionFilter, SUGGESTION_STATUSES } from "../lib/suggestionValidation.js";
 import { startProcessingJob, retryJob, createDraftFromJob } from "../lib/ai/pipeline.js";
 import { loadJob } from "../lib/ai/jobStore.js";
+import { vendorActivationIssues } from "../lib/vendorValidation.js";
 
 const router = Router();
 
@@ -233,6 +234,26 @@ router.post("/suggestions/:id/publish", async (req, res) => {
     }
 
     if (suggestion.status !== "draft_created" || !suggestion.vendor_id) return res.status(409).json({ error: "Create a draft vendor before publishing." });
+
+    // The AI extraction fills in what it could from the video; fields it
+    // couldn't (phone, price range, precise hours, ...) are commonly still
+    // blank at this point. Publishing sets the vendor live on the public
+    // site, so the same completeness bar as every other "make it active"
+    // action applies here — an admin should complete these in Edit Vendor
+    // before Publish, not discover the listing is half-empty after the fact.
+    const { data: vendorRow, error: findErr } = await supabase
+      .from("vendors")
+      .select("vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+      .eq("id", suggestion.vendor_id)
+      .maybeSingle();
+    if (findErr) throw findErr;
+    if (!vendorRow) return res.status(404).json({ error: "Draft vendor not found" });
+    const issues = vendorActivationIssues(vendorRow);
+    if (issues.length) {
+      return res.status(400).json({
+        error: `Cannot publish — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
+      });
+    }
 
     const { data: vendor, error: vendorError } = await supabase.from("vendors").update({ status: "active" }).eq("id", suggestion.vendor_id).select("id,status").single();
     if (vendorError) throw vendorError;

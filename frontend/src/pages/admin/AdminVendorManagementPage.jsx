@@ -1477,13 +1477,17 @@ export default function AdminVendorManagementPage() {
   // One-click status change straight from a table row (Approve / Suspend) —
   // reuses the partial-PATCH endpoint, no full edit needed.
   const handleQuickStatus = async (id, newStatus) => {
+    // The toast alone carries this — `error`/setError below renders a
+    // persistent banner whose only action is "reload the vendor list"
+    // (see loadVendors's own catch), which doesn't apply to a single row
+    // action failing and would just duplicate this same message on screen
+    // twice for no benefit.
     setError("");
     try {
       await updateAdminVendor(id, { status: newStatus });
       await refreshList();
       notify(`Vendor ${newStatus === "active" ? "approved" : newStatus}.`);
     } catch (err) {
-      setError(err.message);
       notify(err.message, true);
     }
   };
@@ -1512,7 +1516,6 @@ export default function AdminVendorManagementPage() {
       await refreshList();
       notify(`${ids.length} vendor${ids.length === 1 ? "" : "s"} updated.`);
     } catch (err) {
-      setError(err.message);
       notify(err.message, true);
     } finally {
       setBulkBusy(false);
@@ -1531,7 +1534,6 @@ export default function AdminVendorManagementPage() {
       await refreshList();
       notify(`${ids.length} vendor${ids.length === 1 ? "" : "s"} deleted.`);
     } catch (err) {
-      setError(err.message);
       notify(err.message, true);
     } finally {
       setBulkBusy(false);

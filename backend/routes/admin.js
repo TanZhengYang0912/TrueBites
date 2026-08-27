@@ -8,6 +8,7 @@ import {
   VENDOR_STATUSES,
   validateVendor,
   validateVendorPatch,
+  vendorActivationIssues,
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
@@ -382,6 +383,30 @@ router.patch("/vendors/:id", async (req, res) => {
   const { errors, clean } = validateVendorPatch(req.body || {});
   if (Object.keys(errors).length) {
     return res.status(400).json({ error: "Validation failed", fields: errors });
+  }
+
+  // Activating a vendor makes it publicly visible — an incomplete one (no
+  // coordinates, no phone, no hours, ...) could read "Active" in this list
+  // forever while never actually being a usable listing (or, for missing
+  // coordinates specifically, never even reaching GET /restaurants/nearby,
+  // which silently drops null-coordinate rows). Check the row that would
+  // actually result from this patch — existing fields overridden by
+  // whatever this request also changes — so a save that fixes the gap in
+  // the same request is never falsely blocked.
+  if (clean.status === "active") {
+    const { data: current, error: findErr } = await supabase
+      .from("vendors")
+      .select("vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+      .eq("id", id)
+      .maybeSingle();
+    if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
+    if (!current) return res.status(404).json({ error: "Vendor not found" });
+    const issues = vendorActivationIssues({ ...current, ...clean });
+    if (issues.length) {
+      return res.status(400).json({
+        error: `Cannot activate — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
+      });
+    }
   }
 
   const patch = { ...clean, last_updated: new Date().toISOString() };

@@ -8,6 +8,7 @@ import {
   VENDOR_STATUSES,
   MAX_GALLERY_IMAGES,
   validateVendor,
+  vendorActivationIssues,
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
 import { discoverVendorPhotos, describeManualUpload, downloadAndStorePhoto } from "../lib/photoProviders/index.js";
@@ -211,9 +212,22 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
   // original publish date, so it does not resurface as "new" in the bell.
   const { data: current } = await supabase
     .from("vendors")
-    .select("published_at")
+    .select("published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
     .eq("id", req.params.id)
     .maybeSingle();
+
+  // Same completeness bar as every other "make it active" action — see
+  // PATCH /api/admin/vendors/:id (routes/admin.js) for why: an incomplete
+  // vendor could read "Active" here while GET /restaurants/nearby silently
+  // drops it (no coordinates) or it's simply not a usable listing yet.
+  if (status === "active") {
+    const issues = vendorActivationIssues(current || {});
+    if (issues.length) {
+      return res.status(400).json({
+        error: `Cannot activate — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
+      });
+    }
+  }
 
   const patch = { status };
   if (status === "active" && !current?.published_at) {

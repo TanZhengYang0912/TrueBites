@@ -201,6 +201,44 @@ export function validateVendorPatch(body = {}) {
   return { errors, clean };
 }
 
+// Fields required for a vendor to be genuinely useful/complete once public —
+// used to gate status -> "active" from every code path that can set it
+// (admin quick-approve, bulk-approve, full Edit Vendor save, and the AI
+// suggestion "Publish" action). Without this, a vendor missing e.g.
+// coordinates could read "Active" in the admin console forever while
+// GET /restaurants/nearby (map.js) silently drops it from the public map —
+// an "active" that lies about actually being visible. Takes a DB-shaped
+// vendor row (numbers already numbers, not the raw string form
+// validateVendor takes from a request body) and returns a list of
+// human-readable missing/invalid field names, empty when the vendor is
+// ready to publish.
+export function vendorActivationIssues(vendor = {}) {
+  const issues = [];
+  const blank = (v) => v == null || String(v).trim() === "";
+
+  if (blank(vendor.vendor_name)) issues.push("business name");
+  if (blank(vendor.address)) issues.push("address");
+
+  // Number(null) is 0 (a "finite" number) — check for null/"" explicitly
+  // first so a genuinely missing coordinate is reported as missing, not
+  // misreported as "0,0, which happens to be outside Melaka".
+  const lat = blank(vendor.latitude) ? NaN : Number(vendor.latitude);
+  const lng = blank(vendor.longitude) ? NaN : Number(vendor.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    issues.push("map coordinates");
+  } else if (lat < MELAKA_BOUNDS.latMin || lat > MELAKA_BOUNDS.latMax || lng < MELAKA_BOUNDS.lngMin || lng > MELAKA_BOUNDS.lngMax) {
+    issues.push("map coordinates (outside Melaka)");
+  }
+
+  if (blank(vendor.cuisine_types)) issues.push("category");
+  if (blank(vendor.operating_hours_raw) && blank(vendor.operating_hours)) issues.push("operating hours");
+  if (blank(vendor.phone)) issues.push("phone number");
+  if (blank(vendor.price_range)) issues.push("price range");
+  if (blank(vendor.signature_dishes)) issues.push("signature dishes");
+
+  return issues;
+}
+
 // Turns a public storage URL back into the object path inside STORAGE_BUCKET
 // (so it can be passed to storage.remove). Returns null when the URL isn't a
 // public object URL for this bucket.
