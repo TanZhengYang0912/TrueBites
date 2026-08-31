@@ -519,18 +519,20 @@ function FolderMoveSelect({ row, folders, onMove }) {
   const current = folders.find((f) => f.id === row.folder_id) || folders[0];
 
   return (
-    <div ref={wrapRef} className={`relative ${CARD_FOOTER}`}>
-      <FolderInput size={13} color={MUTED} className="shrink-0" />
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 text-[11.5px] font-medium text-ink outline-none"
-      >
-        <span className="min-w-0 truncate">{current?.name}</span>
-        <ChevronDown size={13} color={MUTED} className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"} />
-      </button>
+    <div ref={wrapRef} className="relative">
+      <div className={CARD_FOOTER}>
+        <FolderInput size={13} color={MUTED} className="shrink-0" />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 text-[11.5px] font-medium text-ink outline-none"
+        >
+          <span className="min-w-0 truncate">{current?.name}</span>
+          <ChevronDown size={13} color={MUTED} className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"} />
+        </button>
+      </div>
       {open && (
         <div
           role="listbox"
