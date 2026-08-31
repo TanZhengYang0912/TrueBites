@@ -585,23 +585,33 @@ router.post("/vendors", async (req, res) => {
   }
 
   try {
-    // Fuzzy name+address match against existing vendors — warn, don't block.
-    // `force: true` (the admin clicked "Add anyway") skips straight past this.
-    if (req.body?.force !== true) {
-      const { data: candidates, error: candErr } = await supabase
-        .from("vendors")
-        .select("id, vendor_name, address, status")
-        .ilike("vendor_name", `%${clean.vendor_name.replace(/[%(),]/g, " ")}%`)
-        .limit(200);
-      if (candErr) throw candErr;
+    // Fuzzy name+location match against existing vendors. Always runs, even
+    // when the admin clicked "Add anyway" (force: true) — what `force` is
+    // allowed to override differs by match_type: a "possible" match is a
+    // genuine judgment call (e.g. two unrelated vendors that happen to share
+    // a similar name), so force skips past those. An "exact" match — near-
+    // identical name AND within DUPLICATE_DISTANCE_METERS of each other, see
+    // vendorDuplicates.js — is, for all practical purposes, the same
+    // physical vendor already in the system; force is never allowed to
+    // create a second row for that (the admin console's own "Add anyway"
+    // button already hides itself in this case — this is the backstop for
+    // any other caller of this endpoint).
+    const { data: candidates, error: candErr } = await supabase
+      .from("vendors")
+      .select("id, vendor_name, address, status, latitude, longitude")
+      .ilike("vendor_name", `%${clean.vendor_name.replace(/[%(),]/g, " ")}%`)
+      .limit(200);
+    if (candErr) throw candErr;
 
-      const duplicates = findDuplicatesFor(
-        { vendor_name: clean.vendor_name, address: clean.address },
-        candidates || [],
-      );
-      if (duplicates.length) {
-        return res.status(409).json({ error: "possible_duplicate", duplicates });
-      }
+    let duplicates = findDuplicatesFor(
+      { vendor_name: clean.vendor_name, address: clean.address, latitude: clean.latitude, longitude: clean.longitude },
+      candidates || [],
+    );
+    if (req.body?.force === true) {
+      duplicates = duplicates.filter((d) => d.match_type === "exact");
+    }
+    if (duplicates.length) {
+      return res.status(409).json({ error: "possible_duplicate", duplicates });
     }
 
     const now = new Date().toISOString();

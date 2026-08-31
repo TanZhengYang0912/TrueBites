@@ -2,6 +2,14 @@
 // the AI pipeline's /create-draft review gate (backend/services/supabase_client.py
 // find_duplicate_vendors, lines 14-72), so Node and Python agree on what counts
 // as "the same vendor" no matter which code path is creating one.
+//
+// NOTE: the distance-based scoring added below (see DUPLICATE_DISTANCE_METERS)
+// is NOT yet mirrored in that Python version — it only affects the admin
+// console's own duplicate check (POST /api/admin/vendors and the "possible
+// duplicates" panel), not the AI pipeline's /create-draft gate. Worth
+// porting there too if the same false-positive (a chain's own branches
+// flagged as duplicates of each other) shows up on that path.
+import { haversine } from "../haversine.js";
 
 // Mirrors _normalize_match_text: lowercase, collapse everything that isn't
 // a-z0-9 into single spaces.
@@ -60,27 +68,70 @@ function locationMatchScore(left, right) {
   return overlap / Math.max(leftTokens.size, rightTokens.size);
 }
 
+// A chain's own branches (e.g. "SecretRecipe @ Melaka Raya" and "SecretRecipe
+// @ Ayer Keroh") legitimately share the same or a near-identical name, so
+// name similarity alone can never be the deciding signal — two vendors that
+// are actually far apart are different outlets, not a duplicate row for the
+// same physical shop, no matter how well their names match. Same scale as
+// photoMatching.js's own DISTANCE_DECAY_METERS ("Melaka's old-town shoplots
+// sit a few metres apart... a match 500m away is very unlikely to be the
+// same small stall") — that reasoning applies just as well here. Not
+// imported from there directly: photoMatching.js already imports FROM this
+// file, and importing back would create a cycle.
+const DUPLICATE_DISTANCE_METERS = 500;
+
 // Same weights/thresholds as the Python version: name*0.7 + location*0.3 when
 // there's a location to compare, name alone otherwise; reject below 0.55;
-// label >= 0.9 as "exact", else "possible".
-function scoreCandidate(name, location, candidateName, candidateLocation) {
+// label >= 0.9 as "exact", else "possible". `coords`, when both sides have
+// valid latitude/longitude, swaps the location component from fuzzy
+// address-text overlap to real geographic distance — Malaysian addresses
+// share so much boilerplate ("Jalan", "No", "Melaka") that two branches on
+// opposite sides of town can still score a nonzero token overlap, whereas
+// actual distance is what genuinely distinguishes "the same shop, entered
+// twice" from "a different outlet of the same chain". Beyond
+// DUPLICATE_DISTANCE_METERS, this returns null outright — no name match is
+// close enough to override two vendors that are simply nowhere near each
+// other.
+function scoreCandidate(name, location, candidateName, candidateLocation, coords) {
   const nameScore = sequenceRatio(normalizeMatchText(name), normalizeMatchText(candidateName));
-  const locationScore = locationMatchScore(location, candidateLocation);
-  const combined = location ? nameScore * 0.7 + locationScore * 0.3 : nameScore;
-  if (nameScore < 0.55 || combined < 0.55) return null;
+  if (nameScore < 0.55) return null;
+
+  const hasCoords = coords
+    && [coords.aLat, coords.aLng, coords.bLat, coords.bLng].every((v) => v != null && Number.isFinite(Number(v)));
+
+  let locationScore;
+  let hasLocation;
+  if (hasCoords) {
+    const distanceMeters = haversine(coords.aLat, coords.aLng, coords.bLat, coords.bLng) * 1000;
+    if (distanceMeters > DUPLICATE_DISTANCE_METERS) return null;
+    locationScore = Math.max(0, 1 - distanceMeters / DUPLICATE_DISTANCE_METERS);
+    hasLocation = true;
+  } else {
+    // No usable coordinates on one or both sides — fall back to the
+    // original address-text heuristic (a weaker signal, but better than
+    // ignoring location entirely).
+    locationScore = locationMatchScore(location, candidateLocation);
+    hasLocation = Boolean(location);
+  }
+
+  const combined = hasLocation ? nameScore * 0.7 + locationScore * 0.3 : nameScore;
+  if (combined < 0.55) return null;
   return { match_score: Math.round(combined * 1000) / 1000, match_type: combined >= 0.9 ? "exact" : "possible" };
 }
 
 // Scores one candidate vendor_name/address against a list of existing rows
-// (each needs at least id, vendor_name, address). `excludeId` skips a vendor
-// against itself (for the "does this edit now collide with someone else"
-// case — not currently wired up, but kept for future reuse).
-function findDuplicatesFor({ vendor_name, address }, existingVendors, { excludeId } = {}) {
+// (each needs at least id, vendor_name, address; latitude/longitude are used
+// when present on both sides — see scoreCandidate). `excludeId` skips a
+// vendor against itself (for the "does this edit now collide with someone
+// else" case — not currently wired up, but kept for future reuse).
+function findDuplicatesFor({ vendor_name, address, latitude, longitude }, existingVendors, { excludeId } = {}) {
   const location = address || "";
   const results = [];
   for (const candidate of existingVendors) {
     if (excludeId && candidate.id === excludeId) continue;
-    const scored = scoreCandidate(vendor_name, location, candidate.vendor_name, candidate.address);
+    const scored = scoreCandidate(vendor_name, location, candidate.vendor_name, candidate.address, {
+      aLat: latitude, aLng: longitude, bLat: candidate.latitude, bLng: candidate.longitude,
+    });
     if (scored) results.push({ ...candidate, ...scored });
   }
   return results.sort((a, b) => b.match_score - a.match_score).slice(0, 10);
@@ -94,7 +145,9 @@ function findAllDuplicateGroups(vendors) {
   for (let i = 0; i < vendors.length; i++) {
     for (let j = i + 1; j < vendors.length; j++) {
       const a = vendors[i], b = vendors[j];
-      const scored = scoreCandidate(a.vendor_name, a.address || "", b.vendor_name, b.address || "");
+      const scored = scoreCandidate(a.vendor_name, a.address || "", b.vendor_name, b.address || "", {
+        aLat: a.latitude, aLng: a.longitude, bLat: b.latitude, bLng: b.longitude,
+      });
       if (scored) groups.push({ a, b, ...scored });
     }
   }

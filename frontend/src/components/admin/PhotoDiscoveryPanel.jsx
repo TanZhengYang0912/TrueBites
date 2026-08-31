@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Sparkles, ImagePlus, X, Loader2 } from "lucide-react";
-import { discoverVendorPhotos, commitVendorPhoto } from "../../api/admin";
+import { discoverVendorPhotos, discoverVendorPhotosPreview, commitVendorPhoto } from "../../api/admin";
 
 // "Find Photos Automatically" — admin-triggered only (never on page load, never
 // per-vendor-per-render): calls POST /photos/discover once per click, shows
@@ -9,12 +9,30 @@ import { discoverVendorPhotos, commitVendorPhoto } from "../../api/admin";
 // and lets the admin commit exactly one at a time to Cover or Gallery. A
 // manually-set cover is hard-locked server-side; this panel just reflects
 // that by disabling "Set as Cover" rather than letting a click fail silently.
-export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, coverLocked, onPhotoCommitted, notify }) {
+//
+// `vendorId` is nullable — the Add Vendor form's first step renders this
+// panel before the vendor row exists. In that mode (`vendorId == null`),
+// search hits the id-less /photos/discover-preview endpoint (via
+// `vendorFields`) instead, and "committing" a candidate calls `onStage`
+// (synchronous, no network) instead of the real commit endpoint — the actual
+// server-side commit happens once, right after the vendor is created, using
+// whatever got staged. Every other usage (Edit Vendor, Add Vendor step 2)
+// always passes a real vendorId and is unaffected by this branch.
+export default function PhotoDiscoveryPanel({ vendorId, vendorFields, latitude, longitude, coverLocked, galleryFull, excludeKeys, onPhotoCommitted, onStage, notify }) {
   const [candidates, setCandidates] = useState(null); // null = not searched yet
   const [searching, setSearching] = useState(false);
   const [committingRef, setCommittingRef] = useState(null);
   const [dismissed, setDismissed] = useState(() => new Set());
   const [searchError, setSearchError] = useState("");
+  // Candidates actually committed (real mode) or staged (vendorId==null
+  // mode) THIS session — unlike `dismissed` (a plain "X" ignore, reset on
+  // every new search since the admin might reconsider), this is never reset,
+  // so a used photo can't resurface on "Search Again" even if the server's
+  // own vendor_photos-backed dedup fails (e.g. that table's one-time setup
+  // was never run — see recordVendorPhoto's comment in routes/vendors.js).
+  // That server-side path is still the one that survives closing and
+  // reopening Edit Vendor; this is purely a same-session backstop.
+  const [usedKeysThisSession, setUsedKeysThisSession] = useState(() => new Set());
 
   // Mapillary/Overpass need coordinates and the video-frame/TikTok-oEmbed
   // providers need the vendor's source video, but Wikimedia only needs the
@@ -25,6 +43,9 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
   const coordsProvided = latitude !== "" && latitude != null && longitude !== "" && longitude != null;
   const coordsAreNumbers = Number.isFinite(latNum) && Number.isFinite(lngNum);
   const coordsInRange = coordsAreNumbers && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180;
+  // Every provider needs a name; in preview mode (no vendorId yet) that only
+  // comes from the in-progress form, so it can genuinely still be empty.
+  const nameMissing = !vendorId && !vendorFields?.vendor_name?.trim();
 
   const runSearch = async () => {
     setSearching(true);
@@ -34,10 +55,15 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
       // Send the coordinates currently in the form — including an unsaved
       // marker drag or manual edit — so the search reflects where the pin
       // is right now, not just what's already persisted for this vendor.
-      const { candidates: found } = await discoverVendorPhotos(
-        vendorId,
-        coordsInRange ? { latitude: latNum, longitude: lngNum } : null
-      );
+      const { candidates: found } = vendorId
+        ? await discoverVendorPhotos(vendorId, coordsInRange ? { latitude: latNum, longitude: lngNum } : null)
+        : await discoverVendorPhotosPreview({
+            vendor_name: vendorFields?.vendor_name,
+            address: vendorFields?.address,
+            cuisine_types: vendorFields?.cuisine_types,
+            latitude: coordsInRange ? latNum : null,
+            longitude: coordsInRange ? lngNum : null,
+          });
       setCandidates(found);
     } catch (err) {
       setSearchError(err.message || "Search failed — please try again.");
@@ -50,17 +76,42 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
   const commit = async (candidate, role) => {
     setCommittingRef(candidate.photoRef + role);
     try {
-      const result = await commitVendorPhoto(vendorId, {
-        provider: candidate.provider,
-        photoRef: candidate.photoRef,
-        role,
-        confidence: candidate.confidence,
-        matchMeta: candidate.breakdown,
-        dedupeKey: candidate.dedupeKey,
-      });
-      notify?.(`Photo added as ${role === "cover" ? "the cover photo" : "a gallery photo"}.`);
-      onPhotoCommitted?.(role, result.url);
+      if (vendorId) {
+        const result = await commitVendorPhoto(vendorId, {
+          provider: candidate.provider,
+          photoRef: candidate.photoRef,
+          role,
+          confidence: candidate.confidence,
+          matchMeta: candidate.breakdown,
+          dedupeKey: candidate.dedupeKey,
+        });
+        // The photo itself is saved either way — historyRecorded:false just
+        // means the server couldn't record this pick's dedupe entry (see the
+        // matching comment on recordVendorPhoto in routes/vendors.js), so it
+        // can quietly resurface on a later "Search Again" instead of staying
+        // excluded. Worth telling the admin now rather than leaving them to
+        // wonder why an already-used photo came back.
+        if (result.historyRecorded === false) {
+          notify?.(
+            `Photo added as ${role === "cover" ? "the cover photo" : "a gallery photo"}, but its search history couldn't be recorded — it may show up again on a later search.`,
+            true
+          );
+        } else {
+          notify?.(`Photo added as ${role === "cover" ? "the cover photo" : "a gallery photo"}.`);
+        }
+        onPhotoCommitted?.(role, result.url);
+      } else {
+        // No vendor row yet — stage locally. The candidate's own previewUrl
+        // stands in for the real (not-yet-uploaded) storage URL so callers
+        // get the same onPhotoCommitted(role, url) shape either way; the
+        // parent commits this candidate for real right after the vendor is
+        // created.
+        onStage?.(candidate, role);
+        notify?.(`Photo selected as ${role === "cover" ? "the cover photo" : "a gallery photo"} — it'll be saved once you create this vendor.`);
+        onPhotoCommitted?.(role, candidate.previewUrl);
+      }
       setDismissed((cur) => new Set(cur).add(candidate.photoRef));
+      setUsedKeysThisSession((cur) => new Set(cur).add(`${candidate.provider}::${candidate.dedupeKey}`));
     } catch (err) {
       notify?.(err.message || "Could not save that photo.", true);
     } finally {
@@ -68,7 +119,22 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
     }
   };
 
-  const visibleCandidates = (candidates || []).filter((c) => !dismissed.has(c.photoRef));
+  // In real (vendorId) mode, an already-committed photo is SUPPOSED to never
+  // come back from the server at all — /photos/discover excludes it via
+  // vendor_photos — but that only works when that table's one-time setup was
+  // actually run (see recordVendorPhoto's comment in routes/vendors.js);
+  // usedKeysThisSession is the guaranteed same-session backstop regardless.
+  // `excludeKeys`, when supplied, is the caller's own record of what's
+  // already been staged in vendorId==null mode (the Add Vendor form's step
+  // 1, which has no vendor_photos row to check at all yet) — functionally
+  // the same idea, just tracked one level up since staged picks live in the
+  // parent's state, not this component's.
+  const visibleCandidates = (candidates || []).filter(
+    (c) =>
+      !dismissed.has(c.photoRef) &&
+      !usedKeysThisSession.has(`${c.provider}::${c.dedupeKey}`) &&
+      !excludeKeys?.has(`${c.provider}::${c.dedupeKey}`)
+  );
 
   return (
     <div className="admin-photo-discovery">
@@ -78,7 +144,8 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
           type="button"
           className="admin-secondary-btn compact"
           onClick={runSearch}
-          disabled={searching}
+          disabled={searching || nameMissing}
+          title={nameMissing ? "Enter a vendor name first" : undefined}
         >
           {searching ? <Loader2 size={14} className="admin-spin" /> : <Sparkles size={14} />}
           <span>{searching ? "Searching…" : candidates ? "Search Again" : "Find Photos Automatically"}</span>
@@ -91,6 +158,10 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
           Google Places photos near its coordinates and a Wikimedia Commons name search.
           Never another vendor's photos.
         </p>
+      )}
+
+      {nameMissing && (
+        <p className="admin-field-hint">Enter a vendor name above before searching for photos.</p>
       )}
 
       {coordsProvided && !coordsInRange && (
@@ -150,7 +221,8 @@ export default function PhotoDiscoveryPanel({ vendorId, latitude, longitude, cov
                     type="button"
                     className="admin-secondary-btn compact"
                     onClick={() => commit(candidate, "gallery")}
-                    disabled={busy}
+                    disabled={busy || galleryFull}
+                    title={galleryFull ? "Gallery is full — remove a selected photo first" : undefined}
                   >
                     <ImagePlus size={12} /> Add to Gallery
                   </button>

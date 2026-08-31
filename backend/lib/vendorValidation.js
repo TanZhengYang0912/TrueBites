@@ -4,6 +4,8 @@
 // the public vendor routes validate identically instead of drifting apart.
 // Kept dependency-free (no supabase import) — every export here is pure.
 
+import { isMalaccaLocation } from "./suggestionValidation.js";
+
 export const STORAGE_BUCKET = "vendor-images";
 
 // Gallery photos (food/interior shots shown after the storefront cover in the
@@ -33,9 +35,13 @@ export function validateVendor(body = {}) {
   else if (name.length < 2 || name.length > 120) errors.vendor_name = "Business name must be 2–120 characters";
   else clean.vendor_name = name;
 
-  // Address
+  // Address — the whole platform is Melaka-only (see MELAKA_BOUNDS below,
+  // and the "Melaka Tourism" tagline in admin settings), so an address that
+  // doesn't even mention Melaka/Malacca is almost certainly the wrong place,
+  // regardless of what coordinates end up picked for it.
   const address = str(body.address);
   if (!address) errors.address = "Address is required";
+  else if (!isMalaccaLocation(address)) errors.address = "Address must be in Melaka (Malacca)";
   else clean.address = address;
 
   // Coordinates
@@ -135,6 +141,7 @@ export function validateVendorPatch(body = {}) {
   if (has("address")) {
     const address = str(body.address);
     if (!address) errors.address = "Address is required";
+    else if (!isMalaccaLocation(address)) errors.address = "Address must be in Melaka (Malacca)";
     else clean.address = address;
   }
 

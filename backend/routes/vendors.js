@@ -20,14 +20,34 @@ const router = Router();
 // describes, so failures are logged and swallowed, same convention as
 // lib/auditLog.js. `ignoreDuplicates` makes this idempotent against the
 // (vendor_id, url) unique constraint.
+//
+// IMPORTANT: `supabase.from(...).upsert(...)` does NOT throw on a query-level
+// failure (missing table, RLS denial, stale PostgREST schema cache after a
+// DDL change) — it resolves normally with `{ data: null, error: {...} }`.
+// This function used to await the call without ever reading `.error`, so a
+// missing vendor_photos table failed 100% silently: not even a console.error,
+// nowhere. The practical symptom was "Find Photos Automatically" candidates
+// the admin had already picked resurfacing on every later search, forever —
+// because nothing was ever actually recorded to dedupe against, and there
+// was no signal anywhere that the write was failing. Returns whether the
+// write actually succeeded so callers (see /photos/commit) can tell the
+// admin when it didn't, instead of leaving this to silently rot again.
 async function recordVendorPhoto({ vendorId, url, storagePath, role, source, provider, confidence = null, matchMeta = null }) {
   try {
-    await supabase.from("vendor_photos").upsert(
+    const { error } = await supabase.from("vendor_photos").upsert(
       { vendor_id: vendorId, url, storage_path: storagePath || null, role, source, provider, confidence, match_meta: matchMeta },
       { onConflict: "vendor_id,url", ignoreDuplicates: true }
     );
+    if (error) throw error;
+    return true;
   } catch (err) {
     console.error("vendor_photos insert failed:", err.message);
+    photoDebugLog(
+      "vendor_photos", vendorId,
+      "metadata insert failed — this photo won't be excluded from future searches until this is fixed. Has the one-time vendor_photos table setup (top of this file) actually been run in Supabase?",
+      err.message
+    );
+    return false;
   }
 }
 
@@ -409,6 +429,55 @@ router.delete("/vendors/:id/gallery", adminOnly, async (req, res) => {
   res.json({ gallery_image_urls });
 });
 
+// Same search as /vendors/:id/photos/discover below, but for the Add Vendor
+// form's first step — before the vendor row exists, so there's no :id to key
+// off yet. discoverVendorPhotos() itself doesn't actually need a persisted
+// vendor: every provider only reads plain vendor_name/address/coordinates/
+// cuisine_types/source_video_url values, and only uses vendor.id for logging
+// and (googlePlacesPhotoProvider) building the /photos/google-preview proxy
+// URL — a route that ignores :id entirely, so any placeholder id is fine
+// there. `usedKeys` is always empty here since nothing can have been
+// committed yet for a vendor that doesn't exist. The admin's actual pick
+// still can't be *committed* until AFTER the vendor is created (that needs a
+// real vendor_id to attach storage/DB rows to) — the Add Vendor modal stages
+// the chosen candidate(s) locally and commits them via the normal
+// /vendors/:id/photos/commit route right after creation succeeds.
+router.post("/vendors/photos/discover-preview", adminOnly, async (req, res) => {
+  const vendor_name = String(req.body?.vendor_name || "").trim();
+  if (!vendor_name) {
+    return res.status(400).json({ error: "vendor name is required before searching for photos" });
+  }
+
+  const { latitude: rawLat, longitude: rawLng } = req.body || {};
+  const hasCoords = rawLat !== undefined && rawLat !== "" && rawLat != null && rawLng !== undefined && rawLng !== "" && rawLng != null;
+  let latitude = null;
+  let longitude = null;
+  if (hasCoords) {
+    latitude = Number(rawLat);
+    longitude = Number(rawLng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ error: "Please enter a valid latitude and longitude." });
+    }
+  }
+
+  const vendorLike = {
+    id: "preview",
+    vendor_name,
+    address: String(req.body?.address || "").trim() || null,
+    cuisine_types: String(req.body?.cuisine_types || "").trim() || null,
+    latitude,
+    longitude,
+    // A vendor being added by hand never has one at this stage — see the
+    // comment on the (deliberately absent) TikTok field in VendorFormFields.
+    source_video_url: null,
+  };
+
+  photoDebugLog("route", vendorLike.id, `preview search for "${vendor_name}" lat=${latitude} lng=${longitude}`);
+  const candidates = await discoverVendorPhotos(vendorLike, new Set());
+  photoDebugLog("route", vendorLike.id, `returning ${candidates.length} candidate(s) to the admin panel`);
+  res.json({ candidates });
+});
+
 // Automatic photo discovery — never called except by an explicit admin
 // click (see PhotoDiscoveryPanel.jsx). Preview-only: no photo bytes are
 // downloaded here, only enough metadata for the admin to see and judge each
@@ -588,13 +657,19 @@ router.post("/vendors/:id/photos/commit", adminOnly, async (req, res) => {
   // needed. See index.js's runTier comment for why this can't just be
   // photoRef for every provider.
   const matchMetaWithDedupeKey = dedupeKey ? { ...(matchMeta || {}), dedupeKey } : (matchMeta ?? null);
-  await recordVendorPhoto({
+  const historyRecorded = await recordVendorPhoto({
     vendorId: vendor.id, url: stored.url, storagePath: stored.storagePath, role,
     source: "external_api", provider, confidence: confidence ?? null, matchMeta: matchMetaWithDedupeKey,
   });
   await logActivity({ actor: req.callerUser, action: "vendor.photo_discover_commit", entityType: "vendor", entityId: vendor.id, metadata: { provider, role, confidence } });
 
-  res.status(201).json({ url: stored.url, role });
+  // The cover/gallery change itself is already committed and safe either
+  // way — `historyRecorded: false` only means the vendor_photos row that
+  // future /photos/discover calls dedupe against didn't get written, so this
+  // exact candidate can resurface on a later search. Surfaced here (rather
+  // than staying a server-console-only console.error) so the admin actually
+  // finds out, instead of just being confused when it happens again.
+  res.status(201).json({ url: stored.url, role, historyRecorded });
 });
 
 const REVIEW_PHOTO_BUCKET = "review-photos";

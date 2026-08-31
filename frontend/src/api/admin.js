@@ -193,6 +193,17 @@ export async function discoverVendorPhotos(id, coords) {
   });
 }
 
+// Same search, but for the Add Vendor form's first step — before a vendor
+// row (and so a vendorId) exists yet. See the matching comment on
+// POST /vendors/photos/discover-preview for why this doesn't need one.
+export async function discoverVendorPhotosPreview({ vendor_name, address, cuisine_types, latitude, longitude }) {
+  return requestJson("/api/vendors/photos/discover-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vendor_name, address, cuisine_types, latitude, longitude }),
+  });
+}
+
 export async function commitVendorPhoto(id, { provider, photoRef, role, confidence, matchMeta, dedupeKey }) {
   return requestJson(`/api/vendors/${id}/photos/commit`, {
     method: "POST",

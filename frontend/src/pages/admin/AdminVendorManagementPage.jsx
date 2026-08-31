@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import {
-  createAdminVendor, deleteAdminVendor, deleteVendorGalleryImage, getAdminVendorDuplicates,
+  commitVendorPhoto, createAdminVendor, deleteAdminVendor, deleteVendorGalleryImage, getAdminVendorDuplicates,
   getAdminVendors, updateAdminVendor, uploadVendorGalleryImage, uploadVendorImage,
 } from "../../api/admin";
 import Toast from "../../components/engagement/Toast";
@@ -54,6 +54,10 @@ for (let h = 0; h < 24; h++) {
 }
 
 const MELAKA_BOUNDS = { latMin: 1.8, latMax: 2.6, lngMin: 101.8, lngMax: 102.8 };
+// Mirrors backend/lib/suggestionValidation.js's isMalaccaLocation — same
+// word-boundary match, both English spellings, kept as a plain regex here
+// since the frontend can't import backend code.
+const MELAKA_ADDRESS_RE = /\b(?:malacca|melaka)\b/i;
 // Same key/provider as VendorLocationPicker.jsx (the map) and
 // LocationInput.jsx (the customer trip-planner's location search) — one
 // shared Google Maps browser key across the whole app.
@@ -153,7 +157,9 @@ function validateForm(form) {
   if (!name) errors.vendor_name = "Vendor name is required.";
   else if (name.length < 2 || name.length > 120) errors.vendor_name = "Must be 2–120 characters.";
 
-  if (!form.address.trim()) errors.address = "Address is required.";
+  const address = form.address.trim();
+  if (!address) errors.address = "Address is required.";
+  else if (!MELAKA_ADDRESS_RE.test(address)) errors.address = "Address must be in Melaka (Malacca).";
 
   const lat = Number.parseFloat(form.latitude);
   if (form.latitude === "" || Number.isNaN(lat)) errors.latitude = "Latitude is required.";
@@ -506,13 +512,17 @@ function AddressAutocompleteField({ form, error, onChange, disabled, notify }) {
     const autocomplete = new placesLib.Autocomplete(inputRef.current, {
       fields: ["formatted_address", "name", "geometry"],
       componentRestrictions: { country: "my" },
-      // Soft bias toward Melaka (not a hard restriction) — matches the
-      // Photon version's bbox-as-hint behaviour rather than blocking valid
-      // addresses just outside these bounds.
+      // Hard-restricted to Melaka (strictBounds) — the whole platform is
+      // Melaka-only (see MELAKA_ADDRESS_RE/validateForm below and
+      // vendorActivationIssues on the backend), so the suggestion dropdown
+      // should never even offer a place outside it. A typed address that
+      // bypasses the dropdown entirely is still caught by validateForm's own
+      // Melaka/Malacca text check on save.
       bounds: {
         south: MELAKA_BOUNDS.latMin, north: MELAKA_BOUNDS.latMax,
         west: MELAKA_BOUNDS.lngMin, east: MELAKA_BOUNDS.lngMax,
       },
+      strictBounds: true,
     });
 
     const listener = autocomplete.addListener("place_changed", () => {
@@ -912,6 +922,12 @@ function AddVendorModal({ onClose, onCreated, notify }) {
   // discovery) — manual always wins, matching the /photos/commit route's own
   // cover_photo_locked guard on the backend.
   const [coverLocked, setCoverLocked] = useState(false);
+  // "Find Photos Automatically" candidates the admin picked before the
+  // vendor row exists — there's no vendorId yet to commit them to (see
+  // PhotoDiscoveryPanel's vendorId==null mode), so they're held here and
+  // actually committed in doSave, right after creation succeeds.
+  const [stagedCover, setStagedCover] = useState(null);
+  const [stagedGallery, setStagedGallery] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -939,13 +955,65 @@ function AddVendorModal({ onClose, onCreated, notify }) {
     setError("");
     try {
       const created = await createAdminVendor({ ...buildPayload(), force });
+      // Tracks whether a cover ended up set during THIS create — if so, the
+      // photo step below (Cover Photo / Find Photos Automatically / Gallery)
+      // has nothing left to do that step 1 didn't already cover, so it's
+      // skipped in favour of finishing immediately. Left false (falls
+      // through to the photo step as a safety net) when nothing was staged
+      // in step 1, or a staged cover's commit below actually fails.
+      let coverSet = false;
       if (form.imageFile && created?.id) {
         const { storefront_image_url } = await uploadVendorImage(created.id, form.imageFile);
         setCoverUrl(storefront_image_url);
         setCoverLocked(true); // manual upload — the server just locked the cover to match
+        coverSet = true;
+      } else if (stagedCover && created?.id) {
+        // A cover picked via "Find Photos Automatically" in step 1 — commit
+        // it for real now that a vendorId finally exists. Manual upload
+        // above still wins if the admin somehow did both.
+        try {
+          const result = await commitVendorPhoto(created.id, {
+            provider: stagedCover.provider,
+            photoRef: stagedCover.photoRef,
+            role: "cover",
+            confidence: stagedCover.confidence,
+            matchMeta: stagedCover.breakdown,
+            dedupeKey: stagedCover.dedupeKey,
+          });
+          setCoverUrl(result.url);
+          coverSet = true;
+        } catch (err) {
+          notify(`Vendor created, but the selected cover photo couldn't be saved: ${err.message}`, true);
+        }
+      }
+      if (stagedGallery.length && created?.id) {
+        const urls = [];
+        for (const candidate of stagedGallery) {
+          try {
+            const result = await commitVendorPhoto(created.id, {
+              provider: candidate.provider,
+              photoRef: candidate.photoRef,
+              role: "gallery",
+              confidence: candidate.confidence,
+              matchMeta: candidate.breakdown,
+              dedupeKey: candidate.dedupeKey,
+            });
+            urls.push(result.url);
+          } catch (err) {
+            notify(`One of the selected gallery photos couldn't be saved: ${err.message}`, true);
+          }
+        }
+        setGalleryUrls(urls);
       }
       onCreated();
-      setCreatedVendor(created);
+      if (coverSet) {
+        await finishAfterCreate(created);
+      } else {
+        // Nothing was staged in step 1 (or the staged cover's commit just
+        // failed) — fall back to the photo step so the admin still gets a
+        // chance to add a cover before Active promotion needs one.
+        setCreatedVendor(created);
+      }
     } catch (err) {
       if (err.status === 409 && err.payload?.error === "possible_duplicate") {
         setDuplicates(err.payload.duplicates || []);
@@ -970,24 +1038,30 @@ function AddVendorModal({ onClose, onCreated, notify }) {
   // The vendor was inserted as "draft" no matter what Status the form had
   // selected (see the comment on POST /api/admin/vendors) — a fresh row
   // can never have a cover photo yet. If the admin picked Active, this is
-  // the point to actually try promoting it: the photo step above (manual
-  // upload or Find Photos Automatically) has now had its chance to run, so
-  // a cover photo may genuinely exist in the DB by now. Same partial-patch
-  // call handleQuickStatus uses elsewhere — the backend re-checks
-  // completeness against the vendor's current DB row, not this payload.
-  const handleDone = async () => {
-    if (form.status !== "active") { onClose(); return; }
-    setPromoting(true);
-    try {
-      await updateAdminVendor(createdVendor.id, { status: "active" });
-      onCreated();
-    } catch (err) {
-      notify(err.message || "Could not activate — this vendor was saved as a Draft instead. Finish it from Edit Vendor.", true);
-    } finally {
-      setPromoting(false);
-      onClose();
+  // the point to actually try promoting it: the photo step (manual upload,
+  // or "Find Photos Automatically" from either step 1 or step 2) has now
+  // had its chance to run, so a cover photo may genuinely exist in the DB by
+  // now. Same partial-patch call handleQuickStatus uses elsewhere — the
+  // backend re-checks completeness against the vendor's current DB row, not
+  // this payload. Shared by the step-2 "Done" button AND doSave's own
+  // auto-finish (when a cover was already staged/uploaded in step 1, there's
+  // nothing left for step 2 to do, so it's skipped straight to this).
+  const finishAfterCreate = async (vendor) => {
+    if (form.status === "active") {
+      setPromoting(true);
+      try {
+        await updateAdminVendor(vendor.id, { status: "active" });
+        onCreated();
+      } catch (err) {
+        notify(err.message || "Could not activate — this vendor was saved as a Draft instead. Finish it from Edit Vendor.", true);
+      } finally {
+        setPromoting(false);
+      }
     }
+    onClose();
   };
+
+  const handleDone = () => finishAfterCreate(createdVendor);
 
   if (createdVendor) {
     return (
@@ -1057,23 +1131,102 @@ function AddVendorModal({ onClose, onCreated, notify }) {
         </div>
         <div className="admin-modal-form">
           <VendorFormFields form={form} errors={errors} onChange={handleChange} onFileChange={handleFileChange} disabled={false} notify={notify} />
-          {error && <div className="admin-feedback error">{error}</div>}
-          {duplicates && (
-            <div className="admin-feedback warning">
-              <strong>⚠ Possible duplicate{duplicates.length > 1 ? "s" : ""} found:</strong>
-              <ul className="admin-duplicate-list">
-                {duplicates.map((d) => (
-                  <li key={d.id}>
-                    {d.vendor_name}{d.address ? ` — ${d.address}` : ""}
-                    <span className="admin-duplicate-score"> ({Math.round(d.match_score * 100)}% match)</span>
-                  </li>
+
+          <PhotoDiscoveryPanel
+            vendorId={null}
+            vendorFields={{ vendor_name: form.vendor_name, address: form.address, cuisine_types: form.cuisine_types }}
+            latitude={form.latitude}
+            longitude={form.longitude}
+            coverLocked={!!form.imageFile || !!stagedCover}
+            galleryFull={stagedGallery.length >= MAX_GALLERY_IMAGES}
+            // Nothing staged here is in vendor_photos yet (no vendor row
+            // exists), so the server can't exclude it on "Search Again" the
+            // way it does for a real vendorId — this is the client-side
+            // equivalent, keyed the same "provider::dedupeKey" way.
+            excludeKeys={new Set([
+              ...(stagedCover ? [`${stagedCover.provider}::${stagedCover.dedupeKey}`] : []),
+              ...stagedGallery.map((c) => `${c.provider}::${c.dedupeKey}`),
+            ])}
+            onStage={(candidate, role) => {
+              if (role === "cover") setStagedCover(candidate);
+              else setStagedGallery((cur) => [...cur, candidate]);
+            }}
+            notify={notify}
+          />
+
+          {(stagedCover || stagedGallery.length > 0) && (
+            <label>
+              <span>Selected via Find Photos Automatically ({(stagedCover ? 1 : 0) + stagedGallery.length})</span>
+              <div className="admin-gallery-grid">
+                {stagedCover && (
+                  <div className="admin-gallery-thumb">
+                    <img src={stagedCover.previewUrl} alt="" />
+                    <button
+                      type="button"
+                      className="admin-gallery-thumb-remove"
+                      onClick={() => setStagedCover(null)}
+                      aria-label="Remove selected cover photo"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                )}
+                {stagedGallery.map((candidate, i) => (
+                  <div className="admin-gallery-thumb" key={`${candidate.photoRef}-${i}`}>
+                    <img src={candidate.previewUrl} alt="" />
+                    <button
+                      type="button"
+                      className="admin-gallery-thumb-remove"
+                      onClick={() => setStagedGallery((cur) => cur.filter((c) => c !== candidate))}
+                      aria-label="Remove selected gallery photo"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 ))}
-              </ul>
-              <button type="button" className="admin-secondary-btn compact" onClick={() => doSave(true)} disabled={saving}>
-                {saving ? "Adding…" : "Add anyway"}
-              </button>
-            </div>
+              </div>
+              <span className="admin-field-hint">These are saved once you click Create Vendor.</span>
+            </label>
           )}
+
+          {error && <div className="admin-feedback error">{error}</div>}
+          {duplicates && (() => {
+            // "exact" (>=90% combined name+location match — see
+            // vendorDuplicates.js) is, for all practical purposes, the same
+            // physical vendor already in the system: same name at the same
+            // spot, not a coincidence and not a judgment call. "Add anyway"
+            // only makes sense for a "possible" match (ambiguous enough that
+            // a human might reasonably decide it's a different vendor);
+            // exact matches can't be overridden here, and the backend
+            // enforces the same rule even if this button were bypassed.
+            const hasExact = duplicates.some((d) => d.match_type === "exact");
+            return (
+              <div className={`admin-feedback ${hasExact ? "error" : "warning"}`}>
+                <strong>
+                  {hasExact
+                    ? `⚠ This vendor already exists:`
+                    : `⚠ Possible duplicate${duplicates.length > 1 ? "s" : ""} found:`}
+                </strong>
+                <ul className="admin-duplicate-list">
+                  {duplicates.map((d) => (
+                    <li key={d.id}>
+                      {d.vendor_name}{d.address ? ` — ${d.address}` : ""}
+                      <span className="admin-duplicate-score"> ({Math.round(d.match_score * 100)}% match)</span>
+                    </li>
+                  ))}
+                </ul>
+                {hasExact ? (
+                  <p className="admin-field-hint">
+                    Same name at the same location — this can't be added as a new vendor. Edit the name/address above if this is actually a different branch, or Cancel.
+                  </p>
+                ) : (
+                  <button type="button" className="admin-secondary-btn compact" onClick={() => doSave(true)} disabled={saving}>
+                    {saving ? "Adding…" : "Add anyway"}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           <div className="admin-modal-actions">
             <button type="button" className="admin-secondary-btn compact" onClick={onClose}>Cancel</button>
             <button type="button" className="admin-primary-btn compact" onClick={handleSave} disabled={saving}>
@@ -1305,9 +1458,20 @@ export default function AdminVendorManagementPage() {
 
     const fieldsChanged = editSnapshot ? !formFieldsEqual(form, editSnapshot.form) : false;
     const coverChanged = !!form.imageFile;
+    // "Set as Cover" from Find Photos Automatically commits straight to the
+    // server the moment it's clicked (same as a manual gallery add) — it
+    // never touches form.imageFile, so `coverChanged` above stays false even
+    // though the vendor's actual cover already changed this session. Missing
+    // this made a discovery-only edit (no other field touched) look like a
+    // no-op and block on "No changes to save", even though the cover really
+    // had changed and was already saved. Same comparison
+    // handleCancelEdit's own coverChangedByDiscovery already uses below.
+    const coverChangedByDiscovery = !!(
+      selectedVendor && editSnapshot && (selectedVendor.imageUrl ?? null) !== editSnapshot.coverUrl
+    );
     const galleryChanged = pendingGalleryDeletes.size > 0 || pendingGalleryAdds.size > 0;
 
-    if (!fieldsChanged && !coverChanged && !galleryChanged) {
+    if (!fieldsChanged && !coverChanged && !coverChangedByDiscovery && !galleryChanged) {
       notify("No changes to save.");
       return;
     }
@@ -1331,7 +1495,13 @@ export default function AdminVendorManagementPage() {
         });
         // Persisted — if a gallery-delete failure below keeps the modal
         // open for a retry, a second Save click must not resend this.
-        setEditSnapshot({ form });
+        // Preserve coverUrl/coverLocked from the original snapshot (not part
+        // of this partial save) — overwriting the whole object here used to
+        // drop them, which made handleCancelEdit's coverChangedByDiscovery
+        // check compare against `undefined` and misfire a spurious cover
+        // "restore" (a harmless no-op PATCH, but still wrong) on a Cancel
+        // that comes after a field-only save with no cover change at all.
+        setEditSnapshot((cur) => ({ ...cur, form }));
       }
       if (coverChanged) {
         await uploadVendorImage(selectedVendor.id, form.imageFile);
@@ -1504,18 +1674,33 @@ export default function AdminVendorManagementPage() {
     return new Set(data.items.map((v) => v.id));
   });
 
+  // Promise.all previously meant one rejection (e.g. one vendor failing
+  // "activate" completeness validation) discarded the whole batch: no
+  // refresh, no selection change, and no indication that the *other* rows
+  // in the batch had actually already gone through server-side — the table
+  // silently kept showing their old status until the next unrelated reload.
+  // allSettled runs every request independently, refreshes once regardless,
+  // and leaves only the ones that actually failed selected for a retry.
   const bulkSetStatus = async (newStatus) => {
     const ids = [...selectedIds];
     if (!ids.length) return;
     setBulkBusy(true);
     setError("");
     try {
-      await Promise.all(ids.map((id) => updateAdminVendor(id, { status: newStatus })));
-      setSelectedIds(new Set());
+      const results = await Promise.allSettled(ids.map((id) => updateAdminVendor(id, { status: newStatus })));
+      const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+      setSelectedIds(new Set(failedIds));
       await refreshList();
-      notify(`${ids.length} vendor${ids.length === 1 ? "" : "s"} updated.`);
-    } catch (err) {
-      notify(err.message, true);
+      const okCount = ids.length - failedIds.length;
+      if (failedIds.length === 0) {
+        notify(`${okCount} vendor${okCount === 1 ? "" : "s"} updated.`);
+      } else {
+        const firstError = results.find((r) => r.status === "rejected")?.reason?.message;
+        notify(
+          `${okCount} of ${ids.length} vendor${ids.length === 1 ? "" : "s"} updated — ${failedIds.length} failed${firstError ? ` (${firstError})` : ""}.`,
+          true
+        );
+      }
     } finally {
       setBulkBusy(false);
     }
@@ -1527,13 +1712,21 @@ export default function AdminVendorManagementPage() {
     setBulkBusy(true);
     setError("");
     try {
-      await Promise.all(ids.map((id) => deleteAdminVendor(id)));
-      setSelectedIds(new Set());
+      const results = await Promise.allSettled(ids.map((id) => deleteAdminVendor(id)));
+      const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+      setSelectedIds(new Set(failedIds));
       setConfirmBulkDelete(false);
       await refreshList();
-      notify(`${ids.length} vendor${ids.length === 1 ? "" : "s"} deleted.`);
-    } catch (err) {
-      notify(err.message, true);
+      const okCount = ids.length - failedIds.length;
+      if (failedIds.length === 0) {
+        notify(`${okCount} vendor${okCount === 1 ? "" : "s"} deleted.`);
+      } else {
+        const firstError = results.find((r) => r.status === "rejected")?.reason?.message;
+        notify(
+          `${okCount} of ${ids.length} vendor${ids.length === 1 ? "" : "s"} deleted — ${failedIds.length} failed${firstError ? ` (${firstError})` : ""}.`,
+          true
+        );
+      }
     } finally {
       setBulkBusy(false);
     }
