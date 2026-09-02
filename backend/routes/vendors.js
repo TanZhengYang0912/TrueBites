@@ -8,6 +8,7 @@ import {
   VENDOR_STATUSES,
   MAX_GALLERY_IMAGES,
   validateVendor,
+  normaliseVendorHoursFields,
   vendorActivationIssues,
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
@@ -187,9 +188,10 @@ router.post("/vendors", adminOnly, async (req, res) => {
     return res.status(400).json({ error: "validation failed", fields: errors });
   }
 
+  const row = normaliseVendorHoursFields(clean);
   const { data, error } = await supabase
     .from("vendors")
-    .insert(clean)
+    .insert(row)
     .select()
     .single();
 
@@ -207,9 +209,10 @@ router.put("/vendors/:id", adminOnly, async (req, res) => {
     return res.status(400).json({ error: "validation failed", fields: errors });
   }
 
+  const patch = normaliseVendorHoursFields(clean);
   const { data, error } = await supabase
     .from("vendors")
-    .update(clean)
+    .update(patch)
     .eq("id", req.params.id)
     .select()
     .single();

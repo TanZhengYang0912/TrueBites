@@ -12,6 +12,7 @@ import { summarizeTranscript } from "./summarizer.js";
 import { extractInfo, backfillFromSummary } from "./extractor.js";
 import { createJob, updateJob, loadJob, createBatch, getBatchStatus, createScrapeJob, updateScrapeJob, getScrapeJob } from "./jobStore.js";
 import { findDuplicateVendors, buildDraftVendorRow, attachAiThumbnail, upsertAiVendor, geocodeVendorAddress } from "./vendorPersistence.js";
+import { normaliseOperatingHours } from "../vendorValidation.js";
 
 // Node kills the whole process on an unhandled promise rejection — Python's
 // BackgroundTasks only failed the one job. Every fire-and-forget pipeline
@@ -269,6 +270,7 @@ export async function saveVendorsToDatabase(entries) {
     const geo = await geocodeVendorAddress(vendorName, address || "", city || "", state || "");
     const platform = /tiktok/i.test(job.url || "") ? "TikTok" : "YouTube";
 
+    const operatingHours = normaliseOperatingHours(entry.operating_hours_raw || ext.operating_hours_raw);
     const row = {
       vendor_name: vendorName,
       address: geo ? geo.formatted_address : address,
@@ -282,7 +284,8 @@ export async function saveVendorsToDatabase(entries) {
       price_range: entry.price_range || ext.price_range || null,
       sentiment_score: ext.sentiment_score ?? null,
       ai_review_summary: job.summary,
-      operating_hours_raw: entry.operating_hours_raw || ext.operating_hours_raw || null,
+      operating_hours_raw: operatingHours,
+      operating_hours: operatingHours,
       source_video_url: job.url,
       source_platform: platform,
       status: "draft",
