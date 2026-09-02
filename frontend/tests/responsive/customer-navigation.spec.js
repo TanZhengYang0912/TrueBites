@@ -47,6 +47,10 @@ test("primary customer navigation uses dedicated page links", async ({ page }) =
   const savedLink = primary.getByRole("link", { name: /Saved/ });
   const reviewsLink = primary.getByRole("link", { name: "My reviews" });
   const suggestionsLink = primary.getByRole("link", { name: /Suggest/ });
+  await expect(primary).not.toHaveAttribute("role", "tablist");
+  await expect(savedLink).not.toHaveAttribute("role", "tab");
+  await expect(reviewsLink).not.toHaveAttribute("role", "tab");
+  await expect(suggestionsLink).not.toHaveAttribute("role", "tab");
   await expect(savedLink).toHaveAttribute("href", "/saved");
   await expect(reviewsLink).toHaveAttribute("href", "/reviews");
   await expect(suggestionsLink).toHaveAttribute("href", "/suggestions");
