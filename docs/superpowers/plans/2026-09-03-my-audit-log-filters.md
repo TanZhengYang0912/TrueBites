@@ -36,7 +36,7 @@
 - Produce `queryMyAuditLog(supabase, actorId, parsed)` returning the existing `{items,pagination}` response; only display fields are projected.
 - Route validates even in dev bypass, then returns empty for synthetic actor `dev` or queries real caller. Safe 400/500 errors contain no backend details.
 
-- [ ] Write failing node tests importing the module optionally so missing exports fail assertions. Cover defaults, cap, filter validation, query sequence/projection, punctuation injection, UUID q, date bounds and actor isolation. Use real Supabase client with a captured fetch URL (no network) to inspect generated PostgREST parameters.
+- [x] Write failing node tests importing the module optionally so missing exports fail assertions. Cover defaults, cap, filter validation, query sequence/projection, punctuation injection, UUID q, date bounds and actor isolation. Use real Supabase client with a captured fetch URL (no network) to inspect generated PostgREST parameters.
 
 ```js
 assert.equal(typeof query.parseMyAuditLogQuery, 'function');
@@ -47,8 +47,8 @@ assert.throws(() => query.parseMyAuditLogQuery({q:'x'.repeat(101)}), /search/i);
 // entity_type=eq.vendor, created_at=gte.from AND lt.to, and exclude metadata.
 ```
 
-- [ ] Run `cd backend && node --test lib/myAuditLogQuery.test.mjs`, confirm missing functionality failures.
-- [ ] Implement validation and query, with the key query order:
+- [x] Run `cd backend && node --test lib/myAuditLogQuery.test.mjs`, confirm missing functionality failures.
+- [x] Implement validation and query, with the key query order:
 
 ```js
 let request = supabase.from('audit_log')
@@ -64,8 +64,8 @@ request = request.order('created_at', {ascending: sort === 'oldest'})
 ```
 
 Map only `{id,action,entityType,entityId,createdAt}` from the response, with pagination based on filtered exact count. Route uses parsed values and verified caller, never a query actor.
-- [ ] Run focused tests, `npm test`, `node --check routes/admin.js`, `git diff --check`; report pre-existing failures separately, never hide them.
-- [ ] Commit only Task 1 files. Report RED/GREEN commands and results, review permissions and SQL filter safety. Independent reviewer checks spec + quality before proceeding.
+- [x] Run focused tests, `npm test`, `node --check routes/admin.js`, `git diff --check`; report pre-existing failures separately, never hide them.
+- [x] Commit only Task 1 files. Report RED/GREEN commands and results, review permissions and SQL filter safety. Independent reviewer checks spec + quality before proceeding.
 
 ### Task 2: Applied filter UI and matching PDF
 
@@ -84,7 +84,7 @@ Map only `{id,action,entityType,entityId,createdAt}` from the response, with pag
 - `openMyAuditLogPdf(fetchPage,{signal,query}={})` snapshots query on entry and passes it to every fetched page and report builder.
 - `buildAuditLogReport(entries,now=new Date(),query)` keeps prior call compatibility, adds the described `filters` string. Renderer wraps filters below generated/count, computes table top dynamically, repeats summary on each page.
 
-- [ ] Add failing unit tests for calendar boundaries, snapshot copying, filter summary, multi-page PDF summary layout and no metadata leakage. Add browser tests before modifying UI, run one and see missing controls fail.
+- [x] Add failing unit tests for calendar boundaries, snapshot copying, filter summary, multi-page PDF summary layout and no metadata leakage. Add browser tests before modifying UI, run one and see missing controls fail.
 
 ```js
 const q = createAuditLogQuery({period:'today'}, new Date('2026-09-02T16:01:00Z'));
@@ -96,10 +96,10 @@ assert.equal(week.from, '2026-08-27T16:00:00.000Z');
 // every captured page still carries the original q/entity/from/to/sort values.
 ```
 
-- [ ] Implement focused helpers. Malaysia is UTC+8 with no DST in supported current dates: compute the local date via Intl.DateTimeFormat(timeZone), derive midnight UTC once, subtract (N-1) days for presets. All returns empty bounds. Freeze/copy returned scalar fields; never pass raw UI state into export.
-- [ ] Implement list loading with a single applied `{query,page}` state and request identity/AbortController. Search draft debounces 350ms; filters reset page=1. Superseded or wrong-account responses cannot set visible records or loading state. Derive readiness from successful query/page/account identity, not only stale loading boolean. Disable export during debounce, failed/current loading or active export. Clear restores defaults atomically. Loading/error/empty/result count states are accessible. Retry current failed query without losing filters.
-- [ ] Implement toolbar using the Vendors pattern: rounded white controls, blue text, matching shadows/borders/heights; Search label and placeholder clarify supported action/entity/full UUID fields; accessible Entity, Time range and Sort order selects. Export right-aligned; Clear filters only when active, narrow screens wrap. Keep `.admin-audit-log-toolbar` for existing tests.
-- [ ] Forward canonical query through API and export:
+- [x] Implement focused helpers. Malaysia is UTC+8 with no DST in supported current dates: compute the local date via Intl.DateTimeFormat(timeZone), derive midnight UTC once, subtract (N-1) days for presets. All returns empty bounds. Freeze/copy returned scalar fields; never pass raw UI state into export.
+- [x] Implement list loading with a single applied `{query,page}` state and request identity/AbortController. Search draft debounces 350ms; filters reset page=1. Superseded or wrong-account responses cannot set visible records or loading state. Derive readiness from successful query/page/account identity, not only stale loading boolean. Disable export during debounce, failed/current loading or active export. Clear restores defaults atomically. Loading/error/empty/result count states are accessible. Retry current failed query without losing filters.
+- [x] Implement toolbar using the Vendors pattern: rounded white controls, blue text, matching shadows/borders/heights; Search label and placeholder clarify supported action/entity/full UUID fields; accessible Entity, Time range and Sort order selects. Export right-aligned; Clear filters only when active, narrow screens wrap. Keep `.admin-audit-log-toolbar` for existing tests.
+- [x] Forward canonical query through API and export:
 
 ```js
 const snapshot = {...query};
@@ -109,9 +109,9 @@ const report = buildAuditLogReport(entries, new Date(), snapshot);
 ```
 
 Retain isClosed checks and existing preview wrapper. Query fields must be selected explicitly so page or identity cannot be overridden by arbitrary caller fields.
-- [ ] Add PDF filter summary after generated/count; wrap using createPdfText, reserve dynamic header space before drawing the table. Preserve three columns, all records, local fonts, repeated header, no metadata and no partial PDF on failure.
-- [ ] Browser tests use deterministic backend fixtures and cover combined filters/total count/order, page reset, clear, no results, stale requests, export disabled while query changes, fixed query across >100 matching rows, mid-export filter change, desktop/mobile controls. Use raw query assertions, not just mocked displayed text. Save a synthetic real PDF and screenshots in ignored `frontend/responsive-output/my-audit-log-filters/`.
-- [ ] Run `cd frontend && npm run test:unit`, focused Playwright audit + dashboard regression tests, `npm run build`, `git diff --check`. Only one Playwright server at 5174 at a time. Commit Task 2 files after independent spec/quality review and fixes.
+- [x] Add PDF filter summary after generated/count; wrap using createPdfText, reserve dynamic header space before drawing the table. Preserve three columns, all records, local fonts, repeated header, no metadata and no partial PDF on failure.
+- [x] Browser tests use deterministic backend fixtures and cover combined filters/total count/order, page reset, clear, no results, stale requests, export disabled while query changes, fixed query across >100 matching rows, mid-export filter change, desktop/mobile controls. Use raw query assertions, not just mocked displayed text. Save a synthetic real PDF and screenshots in ignored `frontend/responsive-output/my-audit-log-filters/`.
+- [x] Run `cd frontend && npm run test:unit`, focused Playwright audit + dashboard regression tests, `npm run build`, `git diff --check`. Only one Playwright server at 5174 at a time. Commit Task 2 files after independent spec/quality review and fixes.
 
 ### Task 3: Independent integration and final verification
 
@@ -119,11 +119,18 @@ Retain isClosed checks and existing preview wrapper. Query fields must be select
 - Update this plan and approved spec status after verified completion.
 - Synthetic QA output only in ignored responsive-output or existing output/pdf; do not commit generated artifacts.
 
-- [ ] Request luna_worker read-only permission and export-consistency review; resolve findings through implementer and scoped re-review.
-- [ ] Main independently runs `cd backend && npm test`, `cd frontend && npm run test:unit`, `npm run test:responsive -- tests/responsive/my-audit-log-filters.spec.js tests/responsive/my-audit-log-pdf.spec.js tests/responsive/dashboard-pdf.spec.js tests/responsive/dashboard-model-ui.spec.js tests/responsive/admin-notification-popover.spec.js`, `npm run build`, and `git diff --check`.
-- [ ] Render the synthetic exported PDF with Poppler and inspect all pages for summary/table overlap, missing final records, fonts and page order. Extract text to verify filtering/sort labels and record order; do not use production private logs for fixtures.
-- [ ] Show the user the updated UI screenshot, report actual verification and any limitations, keep branch locally without push.
+- [x] Request luna_worker read-only permission and export-consistency review; resolve findings through implementer and scoped re-review.
+- [x] Main independently runs `cd backend && npm test`, `cd frontend && npm run test:unit`, `npm run test:responsive -- tests/responsive/my-audit-log-filters.spec.js tests/responsive/my-audit-log-pdf.spec.js tests/responsive/dashboard-pdf.spec.js tests/responsive/dashboard-model-ui.spec.js tests/responsive/admin-notification-popover.spec.js`, `npm run build`, and `git diff --check`.
+- [x] Render the synthetic exported PDF with Poppler and inspect all pages for summary/table overlap, missing final records, fonts and page order. Extract text to verify filtering/sort labels and record order; do not use production private logs for fixtures.
+- [x] Show the user the updated UI screenshot, report actual verification and any limitations, keep branch locally without push.
 
 ## Plan self-review
 
 All approved requirements are assigned to Tasks 1–3. Wire keys are identical across layers; filters are server-side and snapshots are immutable. No database migration, shared admin refactor, external upload, or live private-data export is planned.
+
+## Completion record
+
+- Task 1: 1091606; backend 88 tests passed, independent luna_worker spec/quality review passed.
+- Task 2: 8e1f0e9 and final fix df231b1; frontend 158 unit tests passed. Final reviewer confirmed all four findings addressed: single-page count, visible search cap, white/blue Export style, and error/empty distinction.
+- Task 3: main independently verified all 32 focused browser regressions, production build, syntax and whitespace checks. 13-page PDF text extraction confirmed exact 130-row order and exclusions, and every page was visually inspected. Separate luna_worker privacy/permission review passed.
+- Existing Vite large-chunk advisory remains; no new dependencies, external uploads, live private-data exports, push or branch switch.
