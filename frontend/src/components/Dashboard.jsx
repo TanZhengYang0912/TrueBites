@@ -3,13 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
-import FilterChips from "./discovery/FilterChips";
+import AdvancedFilters from "./discovery/AdvancedFilters";
 import VendorCard from "./discovery/VendorCard";
 import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
 import Footer from "./Footer";
-import { matchesFilters } from "../lib/vendorFilters";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
@@ -20,12 +19,29 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
-export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated, focusVendorId, onFocusVendorHandled }) {
+export default function Dashboard({
+  vendors,
+  filteredVendors,
+  filters,
+  sort,
+  onFilters,
+  onSort,
+  onClearFilters,
+  hasLocation,
+  loading,
+  loadError,
+  onRetryLoad,
+  bookmarks,
+  onToggleBookmark,
+  onOpenMap,
+  tripVendorIds,
+  onAddStop,
+  onVendorUpdated,
+  focusVendorId,
+  onFocusVendorHandled,
+}) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [creator, setCreator] = useState("all");
   const [page, setPage] = useState(1);
   const [detailVendor, setDetailVendor] = useState(null);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
@@ -55,7 +71,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
 
   useEffect(() => {
     setPage(1);
-  }, [search, category, creator]);
+  }, [filters, sort]);
 
   // Arrived from a notification: open that vendor's detail once the list has
   // loaded, then clear the param so it doesn't reopen on refresh.
@@ -74,8 +90,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
-  const displayed = vendors.filter((v) => matchesFilters(v, { search, category, creator }));
-  const pageData = paginate(displayed, page, PAGE_SIZE);
+  const pageData = paginate(filteredVendors, page, PAGE_SIZE);
   useEffect(() => {
     if (page > pageData.totalPages) setPage(pageData.totalPages);
   }, [page, pageData.totalPages]);
@@ -160,24 +175,27 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
               </button>
             </div>
 
-            <label data-testid="discovery-search" className="relative mb-8 flex w-full items-center">
+            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center">
               <Search size={18} className="absolute left-3.5 text-muted" />
               <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                value={filters.search}
+                onChange={(event) => onFilters({ search: event.target.value })}
                 placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
                 aria-label="Search places"
                 className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
               />
             </label>
 
-            <div className="mb-6">
-              <FilterChips
-                active={category}
-                onSelect={setCategory}
-                creator={creator}
-                onCreatorSelect={setCreator}
+            <div className="mb-8">
+              <AdvancedFilters
+                filters={filters}
+                sort={sort}
+                onChange={onFilters}
+                onSortChange={onSort}
+                onClear={onClearFilters}
                 vendors={vendors}
+                resultCount={filteredVendors.length}
+                hasLocation={hasLocation}
               />
             </div>
 
@@ -187,8 +205,8 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
               </div>
             ) : loadError && vendors.length === 0 ? (
               <LoadError message={loadError} onRetry={onRetryLoad} />
-            ) : displayed.length === 0 ? (
-              <Empty onClear={() => { setSearch(""); setCategory("all"); setCreator("all"); }} />
+            ) : filteredVendors.length === 0 ? (
+              <Empty onClear={onClearFilters} />
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -259,7 +277,7 @@ function Empty({ onClear }) {
   return (
     <div className="mt-6 border border-sand bg-white px-6 py-12 text-center md:py-16">
       <h2 className="mb-2 mt-0 font-display text-2xl text-ink">No places found</h2>
-      <p className="mb-5 mt-0 text-[13px] text-muted">Try a different category, creator, or search term.</p>
+      <p className="mb-5 mt-0 text-[13px] text-muted">Try changing or clearing your filters.</p>
       <button
         type="button"
         onClick={onClear}

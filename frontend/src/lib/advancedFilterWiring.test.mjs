@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const mapPage = read("../pages/MapPage.jsx");
+const dashboard = read("../components/Dashboard.jsx");
+const vendorPanel = read("../components/VendorPanel.jsx");
 
 test("MapPage owns the complete canonical filter and sort state", () => {
   assert.match(mapPage, /useState\(DEFAULT_VENDOR_FILTERS\)/);
@@ -69,4 +71,21 @@ test("AdvancedFilters disables and explains location-dependent controls", () => 
   assert.match(source, /Set your location/);
   assert.match(source, /disabled=\{!hasLocation\}/);
   assert.match(source, /disabledOption=/);
+});
+
+test("Dashboard renders controlled advanced filters and paginates the shared result", () => {
+  assert.match(dashboard, /<AdvancedFilters/);
+  assert.match(dashboard, /resultCount=\{filteredVendors\.length\}/);
+  assert.match(dashboard, /paginate\(filteredVendors, page, PAGE_SIZE\)/);
+  assert.match(dashboard, /value=\{filters\.search\}/);
+  assert.match(dashboard, /onClear=\{onClearFilters\}/);
+  assert.doesNotMatch(dashboard, /<FilterChips/);
+});
+
+test("VendorPanel uses controlled search and the compact shared panel", () => {
+  assert.match(vendorPanel, /value=\{filters\.search\}/);
+  assert.match(vendorPanel, /<AdvancedFilters/);
+  assert.match(vendorPanel, /resultCount=\{filteredVendors\.length\}/);
+  assert.match(vendorPanel, /compact/);
+  assert.doesNotMatch(vendorPanel, /<FilterChips/);
 });
