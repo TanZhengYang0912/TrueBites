@@ -150,7 +150,6 @@ export default function AdminDashboardPage() {
 
   const kpis = data.kpis.length ? data.kpis : data.stats.map(KpiFallback);
   const trend = visibleTrend.length ? visibleTrend : [{ label: "No data", value: 0, active: 0, draft: 0 }];
-  const sparkline = data.vendorTrend.slice(-12).map((item) => item.value);
 
   async function handleExportOverview() {
     setExportingOverview(true);
@@ -188,7 +187,7 @@ export default function AdminDashboardPage() {
       <section className="admin-kpi-grid">
         {kpis.map((item) => {
           const Icon = KPI_ICONS[item.key] || BarChart3;
-          return <KpiCard key={item.key || item.label} item={item} icon={Icon} sparkline={sparkline} />;
+          return <KpiCard key={item.key || item.label} item={item} icon={Icon} />;
         })}
       </section>
 

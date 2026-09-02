@@ -1,25 +1,7 @@
-import { ArrowDownRight, ArrowUpRight, Minus, MoreHorizontal } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
 function safeMax(values) {
   return Math.max(1, ...values.map((value) => Number(value) || 0));
-}
-
-export function Sparkline({ values = [], tone = "primary" }) {
-  const max = safeMax(values);
-  const points = values.length > 1
-    ? values.map((value, index) => {
-      const x = (index / (values.length - 1)) * 100;
-      const y = 28 - ((Number(value) || 0) / max) * 24;
-      return `${x},${y}`;
-    }).join(" ")
-    : "0,28 50,18 100,22";
-
-  return (
-    <svg className={`admin-sparkline ${tone}`} viewBox="0 0 100 32" role="img" aria-label="Metric trend">
-      <polyline points={points} fill="none" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
 }
 
 export function LineChart({ data = [], rangeLabel = "Last 30 days" }) {
@@ -92,7 +74,7 @@ export function PipelineChart({ data = [] }) {
   );
 }
 
-export function KpiCard({ item, icon: Icon, sparkline = [], onAction }) {
+export function KpiCard({ item, icon: Icon }) {
   return (
     <article className="admin-kpi-card">
       <div className={`admin-kpi-icon ${item.tone || "neutral"}`}><Icon size={17} /></div>
@@ -100,9 +82,7 @@ export function KpiCard({ item, icon: Icon, sparkline = [], onAction }) {
       <div className="admin-kpi-value">{item.value}{item.suffix || ""}</div>
       <div className="admin-kpi-footer">
         <span>{item.note}</span>
-        {onAction ? <button type="button" className="admin-kpi-action" onClick={onAction} aria-label={`Open ${item.label}`}><MoreHorizontal size={16} /></button> : item.href ? <Link className="admin-kpi-action" to={item.href} aria-label={`Open ${item.label}`}><MoreHorizontal size={16} /></Link> : null}
       </div>
-      {sparkline.length ? <Sparkline values={sparkline} tone={item.tone || "primary"} /> : null}
     </article>
   );
 }
