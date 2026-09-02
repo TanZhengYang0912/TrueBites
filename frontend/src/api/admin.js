@@ -229,9 +229,9 @@ export async function setReviewVisibility(id, isHidden) {
   });
 }
 
-export async function getMyActivity({ page = 1, pageSize = 25 } = {}) {
+export async function getMyActivity({ page = 1, pageSize = 25, signal } = {}) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-  return requestJson(`/api/admin/me/activity?${params}`);
+  return requestJson(`/api/admin/me/activity?${params}`, { signal });
 }
 
 export async function getAdminUsers({ page = 1, pageSize = 10, q = "" }) {

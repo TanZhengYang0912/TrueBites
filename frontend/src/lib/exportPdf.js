@@ -1,3 +1,5 @@
+import { openPdfPreview } from './pdfPreview.js';
+
 // "vendor.create" -> "Vendor create"
 function formatAction(action) {
   const spaced = String(action || "").replace(/[._]/g, " ");
@@ -148,30 +150,11 @@ export async function openSuggestionsPdf({ title, subtitle, suggestions }) {
 // can lose the browser's transient user activation. Snapshot before any await.
 export async function openOverviewPdf(report) {
   const snapshot = structuredClone(report);
-  const preview = window.open('', '_blank');
-  if (!preview) throw new Error('Allow pop-ups for TrueBites, then try Export PDF again.');
-  let url;
-  try {
-    preview.opener = null;
-    preview.document.title = 'Preparing TrueBites PDF';
-    preview.document.body.textContent = 'Preparing your dashboard PDF…';
+  return openPdfPreview(async () => {
     const { createDashboardPdf } = await import('./dashboardPdf.js');
-    const doc = await createDashboardPdf(snapshot);
-    if (preview.closed) return;
-    url = URL.createObjectURL(doc.output('blob'));
-    preview.location.replace(url);
-    // Keep the blob alive for the viewer's save/reload action, not an arbitrary
-    // short timeout. Reclaim it once the viewer closes or the owner unloads.
-    const cleanup = () => {
-      URL.revokeObjectURL(url);
-      window.clearInterval(timer);
-      window.removeEventListener('pagehide', cleanup);
-    };
-    const timer = window.setInterval(() => { if (preview.closed) cleanup(); }, 5000);
-    window.addEventListener('pagehide', cleanup, { once: true });
-  } catch (error) {
-    if (url) URL.revokeObjectURL(url);
-    if (!preview.closed) preview.close();
-    throw new Error('Could not prepare the dashboard PDF. Please try again. If it persists, contact support.', { cause: error });
-  }
+    return createDashboardPdf(snapshot);
+  }, {
+    preparing: 'Preparing your dashboard PDF…',
+    errorMessage: 'Could not prepare the dashboard PDF. Please try again. If it persists, contact support.',
+  });
 }

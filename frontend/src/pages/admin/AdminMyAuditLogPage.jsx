@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { FileDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { getMyActivity } from "../../api/admin";
+import { formatAuditEntry } from "../../lib/auditLogReport";
+import { openMyAuditLogPdf } from "../../lib/myAuditLogExport";
+import { useSession } from "../../lib/SessionContext";
 
 const PAGE_SIZE = 25;
-
-function formatAction(action) {
-  return String(action || "").replace(/[._]/g, " ");
-}
 
 function Pagination({ pagination, onPageChange }) {
   const { page, totalPages, total } = pagination;
@@ -27,9 +27,14 @@ function Pagination({ pagination, onPageChange }) {
 // audit_log data and table shape as a customer's activity log on the User
 // Moderation panel, just scoped to "me" instead of a specific account.
 export default function AdminMyAuditLogPage() {
+  const { session } = useSession();
   const [data, setData] = useState({ items: [], pagination: { page: 1, totalPages: 1, total: 0 } });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const exportGuard = useRef(false);
+  const exportController = useRef(null);
 
   const load = (page = 1) => {
     setLoading(true);
@@ -42,11 +47,48 @@ export default function AdminMyAuditLogPage() {
 
   useEffect(() => { load(); }, []);
 
+  // A personal export must not outlive the account that started it. The
+  // cleanup also runs when leaving this route, so a pending export cannot
+  // publish a report after the page has been unmounted.
+  useEffect(() => () => {
+    exportController.current?.abort();
+    exportController.current = null;
+  }, [session?.user?.id]);
+
   const items = data.items || [];
+
+  async function handleExport() {
+    // React state updates after the click handler returns. The ref closes the
+    // smaller race where a second click lands before that re-render disables
+    // the button, while also keeping the preview reservation synchronous.
+    if (exportGuard.current) return;
+    exportGuard.current = true;
+    const controller = new AbortController();
+    exportController.current = controller;
+    setExporting(true);
+    setExportError("");
+    try {
+      await openMyAuditLogPdf(getMyActivity, { signal: controller.signal });
+    } catch (err) {
+      setExportError(err?.message || "Could not prepare your audit log PDF. Please try again.");
+    } finally {
+      if (exportController.current === controller) exportController.current = null;
+      exportGuard.current = false;
+      setExporting(false);
+    }
+  }
 
   return (
     <section className="admin-vendors-page">
       {error ? <div className="admin-feedback error">{error}</div> : null}
+
+      <div className="admin-audit-log-toolbar">
+        <button type="button" className="admin-secondary-btn compact" onClick={handleExport} disabled={exporting}>
+          <FileDown size={14} />
+          {exporting ? "Preparing PDF…" : "Export PDF"}
+        </button>
+      </div>
+      {exportError ? <div className="admin-feedback error admin-audit-log-export-error" role="alert">{exportError}</div> : null}
 
       <section className="admin-panel admin-table-panel">
         <div className="admin-table-scroll">
@@ -62,16 +104,16 @@ export default function AdminMyAuditLogPage() {
               {loading ? (
                 <tr><td colSpan="3"><div className="admin-feedback">Loading your activity…</div></td></tr>
               ) : items.length ? (
-                items.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                    <td style={{ textTransform: "capitalize" }}>{formatAction(entry.action)}</td>
-                    <td>
-                      {entry.entityType || "—"}
-                      {entry.entityId ? <span className="admin-dash"> · {entry.entityId}</span> : null}
-                    </td>
-                  </tr>
-                ))
+                items.map((entry) => {
+                  const row = formatAuditEntry(entry);
+                  return (
+                    <tr key={row.id ?? entry.id}>
+                      <td>{row.when}</td>
+                      <td>{row.action}</td>
+                      <td>{row.entity}</td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr><td colSpan="3"><div className="admin-empty-state">No recorded activity yet.</div></td></tr>
               )}

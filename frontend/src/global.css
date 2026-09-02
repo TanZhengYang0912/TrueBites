@@ -3383,6 +3383,31 @@
    Height alone was not enough: several controls were 44px tall but narrower,
    and the AI mode toggle had no rule at all after ai-module.css was deleted. */
 @layer components {
+  /* My Audit Log keeps its export action in the content column, immediately
+     above the table, so it stays tied to the three-column record view rather
+     than becoming a second page heading. */
+  .admin-audit-log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    margin-bottom: 14px;
+  }
+
+  .admin-audit-log-export-error {
+    margin: -2px 0 14px;
+  }
+
+  @media (max-width: 860px) {
+    .admin-audit-log-toolbar {
+      width: 100%;
+    }
+
+    .admin-audit-log-toolbar .admin-secondary-btn {
+      max-width: 100%;
+    }
+  }
+
   .mode-btn {
     display: inline-flex;
     min-height: 2.75rem;
