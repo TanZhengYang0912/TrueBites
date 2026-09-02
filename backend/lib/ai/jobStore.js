@@ -30,11 +30,13 @@ function statusPath(jobId) {
 }
 
 async function persistJob(job) {
-  await fs.mkdir(jobDir(job.job_id), { recursive: true });
   const prev = writeQueues.get(job.job_id) || Promise.resolve();
   const next = prev
     .catch(() => {})
-    .then(() => fs.writeFile(statusPath(job.job_id), JSON.stringify(job, null, 2)));
+    .then(async () => {
+      await fs.mkdir(jobDir(job.job_id), { recursive: true });
+      await fs.writeFile(statusPath(job.job_id), JSON.stringify(job, null, 2));
+    });
   writeQueues.set(job.job_id, next);
   return next;
 }

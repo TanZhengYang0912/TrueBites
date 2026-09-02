@@ -123,9 +123,9 @@ test("suggestions keeps the make-a-suggestion action in the intro area", async (
   await expect(page.getByTestId("suggestion-filter-rail").getByRole("button", { name: /Make a suggestion/ })).toHaveCount(0);
 
   await page.goto("/suggestions/new", { waitUntil: "networkidle" });
-  const backToSuggestions = page.getByRole("button", { name: "My suggestions", exact: true });
-  await expect(backToSuggestions).toBeVisible();
-  const backActionBox = await backToSuggestions.evaluate((element) => {
+  const backAction = page.getByRole("button", { name: "Back", exact: true });
+  await expect(backAction).toBeVisible();
+  const backActionBox = await backAction.evaluate((element) => {
     const box = element.getBoundingClientRect();
     return { left: box.left, viewportWidth: window.innerWidth };
   });

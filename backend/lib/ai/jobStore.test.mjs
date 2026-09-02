@@ -39,6 +39,30 @@ test("updateJob: persists to outputs/{job_id}/status.json on disk", async () => 
   await fs.rm(path.join(OUTPUTS_DIR, job.job_id), { recursive: true, force: true });
 });
 
+test("createJob initial persistence never overwrites a later update", async (t) => {
+  const jobIds = [];
+  t.after(async () => {
+    await Promise.all(jobIds.map((jobId) => (
+      fs.rm(path.join(OUTPUTS_DIR, jobId), { recursive: true, force: true })
+    )));
+  });
+
+  await Promise.all(Array.from({ length: 128 }, async () => {
+    const job = createJob({ url: "https://tiktok.com/x", platform: "tiktok" });
+    jobIds.push(job.job_id);
+    await updateJob(job.job_id, { status: "completed", progress: 100 });
+  }));
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const persisted = await Promise.all(jobIds.map(async (jobId) => {
+    const raw = await fs.readFile(path.join(OUTPUTS_DIR, jobId, "status.json"), "utf8");
+    return JSON.parse(raw);
+  }));
+
+  assert.equal(persisted.filter((job) => job.status === "completed").length, 128);
+  assert.equal(persisted.filter((job) => job.progress === 100).length, 128);
+});
+
 test("loadJob: returns null for a job that was never created", async () => {
   assert.equal(await loadJob("does-not-exist-" + Date.now()), null);
 });

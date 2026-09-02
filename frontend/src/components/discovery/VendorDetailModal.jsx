@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Heart, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
+import { X, Bookmark, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
   priceLabel, photoAltText, FOOD_PHOTO_POSITION,
@@ -123,7 +123,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
           {/* Action buttons */}
           <div className="absolute right-3 top-3 flex gap-2">
             <IconBtn onClick={() => onToggleBookmark(vendor.id)} label={bookmarked ? "Remove saved place" : "Save place"}>
-              <Heart size={15} color={bookmarked ? "#e84040" : "#fff"} fill={bookmarked ? "#e84040" : "none"} />
+              <Bookmark size={15} color={bookmarked ? TERRACOTTA : "#fff"} fill={bookmarked ? TERRACOTTA : "none"} strokeWidth={1.7} />
             </IconBtn>
             <IconBtn onClick={onClose} label="Close"><X size={16} color="#fff" /></IconBtn>
           </div>
@@ -196,7 +196,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
               {inTrip ? "✓ Already in Your Trip" : "+ Add to Trip"}
             </button>
             <IconBtn onClick={() => onToggleBookmark(vendor.id)} bordered label={bookmarked ? "Remove saved place" : "Save place"}>
-              <Heart size={16} color={bookmarked ? "#e84040" : MUTED} fill={bookmarked ? "#e84040" : "none"} />
+              <Bookmark size={16} color={bookmarked ? TERRACOTTA : MUTED} fill={bookmarked ? TERRACOTTA : "none"} strokeWidth={1.7} />
             </IconBtn>
           </div>
 
