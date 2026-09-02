@@ -18,13 +18,13 @@ test("saved and reviews are owned by separate page components", () => {
   assert.equal(fs.existsSync(path.join(here, "..", "pages", "EngagementPage.jsx")), false);
 });
 
-test("customer page navigation is link-based without a filled active tab", () => {
+test("customer page navigation uses native page loads without tab decoration", () => {
   const header = src("components/discovery/DiscoveryHeader.jsx");
 
-  assert.match(header, /to="\/saved"/);
-  assert.match(header, /to="\/reviews"/);
-  assert.match(header, /to="\/suggestions"/);
+  assert.match(header, /<a\s+href="\/saved"/s);
+  assert.match(header, /<a\s+href="\/reviews"/s);
+  assert.match(header, /<a\s+href="\/suggestions"/s);
+  assert.doesNotMatch(header, /to="\/(?:saved|reviews|suggestions)"/);
   assert.match(header, /aria-current=.*"page"/s);
-  assert.doesNotMatch(header, /const NAV_ACTIVE = `\$\{NAV_LINK\} bg-/);
-  assert.match(header, /after:.*bg-terracotta|border-b-2.*terracotta/);
+  assert.doesNotMatch(header, /const NAV_ACTIVE = `\$\{NAV_LINK\}[^`]*(?:bg-|after:|border-b)/);
 });

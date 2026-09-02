@@ -7,9 +7,9 @@ import NotificationBell from "./NotificationBell";
 // Shared customer header for discovery and map surfaces. Search lives in the
 // discovery hero so the top bar stays quiet and consistent across screens.
 // Below md the primary nav drops to its own scrollable row beneath the brand.
-const NAV_LINK = "relative inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-semibold transition-colors motion-reduce:transition-none";
+const NAV_LINK = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-semibold no-underline transition-colors motion-reduce:transition-none";
 const NAV_IDLE = `${NAV_LINK} text-muted hover:text-forest`;
-const NAV_ACTIVE = `${NAV_LINK} text-forest after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-terracotta`;
+const NAV_ACTIVE = `${NAV_LINK} text-forest`;
 
 const TOGGLE = "inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold";
 const TOGGLE_ACTIVE = `${TOGGLE} bg-white text-forest shadow-sm`;
@@ -60,8 +60,8 @@ export default function DiscoveryHeader({
         >
           Discover
         </button>
-        <Link
-          to="/saved"
+        <a
+          href="/saved"
           className={activeSection === "saved" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "saved" ? "page" : undefined}
         >
@@ -70,22 +70,22 @@ export default function DiscoveryHeader({
           {savedCount > 0 && (
             <span className="rounded-full bg-forest px-1.5 text-[10px] font-bold text-white">{savedCount}</span>
           )}
-        </Link>
-        <Link
-          to="/reviews"
+        </a>
+        <a
+          href="/reviews"
           className={activeSection === "reviews" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
           My reviews
-        </Link>
-        <Link
-          to="/suggestions"
+        </a>
+        <a
+          href="/suggestions"
           className={activeSection === "suggestions" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "suggestions" ? "page" : undefined}
         >
           <Lightbulb size={14} strokeWidth={1.8} />
           <span>Suggest</span>
-        </Link>
+        </a>
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
