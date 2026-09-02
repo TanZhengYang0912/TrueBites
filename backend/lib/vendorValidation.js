@@ -83,14 +83,13 @@ export function validateVendor(body = {}) {
   else if (!HOURS_RE.test(hours)) errors.operating_hours_raw = 'Include a recognisable time, e.g. "Mon–Sun 9:00am – 10:00pm"';
   else clean.operating_hours_raw = hours;
 
-  // Contact number (required, Malaysian format)
+  // Contact number — optional (not every stall has one to publish), but
+  // whatever's entered must actually look like a Malaysian number.
   const phone = str(body.phone);
-  if (!phone) {
-    errors.phone = "Contact number is required";
-  } else if (!/^(\+?60|0)\d{8,10}$/.test(phone.replace(/[\s-]/g, ""))) {
+  if (phone && !/^(\+?60|0)\d{8,10}$/.test(phone.replace(/[\s-]/g, ""))) {
     errors.phone = "Enter a valid Malaysian phone number, e.g. 06-283 1234 or +60 12-345 6789";
   } else {
-    clean.phone = phone;
+    clean.phone = phone || null;
   }
 
   // Visibility status
@@ -239,7 +238,8 @@ export function vendorActivationIssues(vendor = {}) {
 
   if (blank(vendor.cuisine_types)) issues.push("category");
   if (blank(vendor.operating_hours_raw) && blank(vendor.operating_hours)) issues.push("operating hours");
-  if (blank(vendor.phone)) issues.push("phone number");
+  // Phone is optional — not every stall has a published number, and that
+  // alone shouldn't keep an otherwise-complete listing stuck in Draft.
   if (blank(vendor.price_range)) issues.push("price range");
   if (blank(vendor.signature_dishes)) issues.push("signature dishes");
   // A vendor with no cover photo reads as a broken/empty listing on the
