@@ -1,4 +1,5 @@
 const ARRAY_SECTIONS = [
+  'kpis',
   'stats',
   'vendorTrend',
   'statusBreakdown',
