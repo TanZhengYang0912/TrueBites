@@ -152,7 +152,11 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
                     <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
                   </span>
                 </span>
-                <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
+                <span className="hidden items-center gap-1 text-sm font-bold sm:flex">
+                  <span>Share it</span>
+                  <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
+                </span>
+                <ArrowRight size={16} aria-hidden="true" className="shrink-0 sm:hidden" />
               </button>
             </div>
 
