@@ -18,6 +18,7 @@ import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
 import { resolvePublicBaseUrl } from "../lib/publicBaseUrl.js";
 import { requireDashboardData } from "../lib/adminDashboardData.js";
+import { parseMyAuditLogQuery, queryMyAuditLog } from "../lib/myAuditLogQuery.js";
 
 const router = Router();
 
@@ -816,46 +817,29 @@ function customerDisplayName(user) {
 // appeal decisions, ...). Same audit_log table and shape as the per-customer
 // activity log below, just scoped to req.callerUser instead of a :id param.
 router.get("/me/activity", async (req, res) => {
-  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-  const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 25));
+  let parsed;
+  try {
+    parsed = parseMyAuditLogQuery(req.query);
+  } catch {
+    return res.status(400).json({ error: "Invalid activity log filters" });
+  }
 
   // The DISABLE_AUTH dev bypass's synthetic caller has id "dev" — not a real
   // uuid, and logActivity stores a null actor_id for it (see lib/auditLog.js),
   // so there's nothing to query and the eq() below would just error on the
   // malformed uuid.
   if (req.callerUser.id === "dev") {
-    return res.json({ items: [], pagination: { page: 1, pageSize, total: 0, totalPages: 1 } });
+    return res.json({
+      items: [],
+      pagination: { page: parsed.page, pageSize: parsed.pageSize, total: 0, totalPages: 1 },
+    });
   }
 
   try {
-    const { data, error, count } = await supabase
-      .from("audit_log")
-      .select("id, action, entity_type, entity_id, metadata, created_at", { count: "exact" })
-      .eq("actor_id", req.callerUser.id)
-      .order("created_at", { ascending: false })
-      .range((page - 1) * pageSize, page * pageSize - 1);
-    if (error) throw error;
-
-    const items = (data || []).map((row) => ({
-      id: row.id,
-      action: row.action,
-      entityType: row.entity_type,
-      entityId: row.entity_id,
-      metadata: row.metadata,
-      createdAt: row.created_at,
-    }));
-
-    res.json({
-      items,
-      pagination: {
-        page,
-        pageSize,
-        total: count || 0,
-        totalPages: Math.max(1, Math.ceil((count || 0) / pageSize)),
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to load your activity log", details: error.message });
+    const result = await queryMyAuditLog(supabase, req.callerUser.id, parsed);
+    return res.json(result);
+  } catch {
+    return res.status(500).json({ error: "Failed to load your activity log" });
   }
 });
 
