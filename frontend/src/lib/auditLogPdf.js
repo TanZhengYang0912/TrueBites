@@ -2,7 +2,6 @@ import { createPdfText } from './dashboardPdfText.js';
 import { DASHBOARD_COLORS as COLOR } from './dashboardReport.js';
 
 const MARGIN = 28;
-const TABLE_TOP = 112;
 const HEADER_HEIGHT = 29;
 const LINE = 12;
 const PADDING = 10;
@@ -14,7 +13,11 @@ export function renderAuditLogPdf(doc, report) {
   const height = doc.internal.pageSize.getHeight();
   const tableWidth = width - MARGIN * 2;
   const bottom = height - 48;
-  const bodyTop = TABLE_TOP + HEADER_HEIGHT;
+  // Keep this deliberately narrower than the table: a very long search term
+  // must wrap predictably instead of colliding with the count at the right.
+  const filterLines = wrap(`Filters: ${report.filters || 'All entities · Any time · Newest first'}`, Math.min(tableWidth, 390), 8);
+  const tableTop = 122 + filterLines.lines.length * 10;
+  const bodyTop = tableTop + HEADER_HEIGHT;
   const columns = [
     { key: 'when', label: 'When', width: tableWidth * 0.23 },
     { key: 'action', label: 'Action', width: tableWidth * 0.30 },
@@ -29,10 +32,11 @@ export function renderAuditLogPdf(doc, report) {
     draw(report.subtitle, MARGIN, 83, 9, COLOR.muted);
     draw(report.generated, MARGIN, 100, 8, COLOR.muted);
     draw(`${report.count} ${report.count === 1 ? 'entry' : 'entries'}`, width - MARGIN, 100, 8, COLOR.muted, false, { align: 'right' });
-    doc.setFillColor(COLOR.track); doc.rect(MARGIN, TABLE_TOP, tableWidth, HEADER_HEIGHT, 'F');
+    drawLines(filterLines, MARGIN, 116, COLOR.muted, filterLines.lines.length, 10);
+    doc.setFillColor(COLOR.track); doc.rect(MARGIN, tableTop, tableWidth, HEADER_HEIGHT, 'F');
     let x = MARGIN;
     columns.forEach((column) => {
-      draw(column.label, x + PADDING, TABLE_TOP + 19, 8.5, COLOR.muted, true);
+      draw(column.label, x + PADDING, tableTop + 19, 8.5, COLOR.muted, true);
       x += column.width;
     });
     doc.setDrawColor(COLOR.border); doc.setLineWidth(0.6);

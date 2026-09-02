@@ -3389,7 +3389,9 @@
   .admin-audit-log-toolbar {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
     width: 100%;
     margin-bottom: 14px;
   }
@@ -3398,14 +3400,76 @@
     margin: -2px 0 14px;
   }
 
+  .admin-audit-log-export {
+    order: 2;
+    min-height: 40px;
+    margin-left: auto;
+    border-color: var(--admin-navy);
+    background: var(--admin-navy);
+    color: #fff;
+  }
+
+  .admin-audit-log-export:hover:not(:disabled) { background: var(--admin-navy-strong); color: #fff; }
+
+  .admin-audit-log-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex: 1 1 680px;
+    flex-wrap: wrap;
+  }
+
+  .admin-audit-log-field {
+    display: grid;
+    gap: 4px;
+    color: var(--admin-muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .admin-audit-log-field input,
+  .admin-audit-log-field select {
+    min-height: 40px;
+    border: 1px solid var(--admin-border);
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(30, 43, 58, 0.05);
+    background: #fff;
+    color: var(--admin-navy);
+    font: inherit;
+    font-size: 12px;
+    padding: 7px 11px;
+  }
+
+  .admin-audit-log-search { position: relative; flex: 1 1 320px; }
+  .admin-audit-log-search svg { position: absolute; bottom: 12px; left: 11px; color: var(--admin-muted); pointer-events: none; }
+  .admin-audit-log-field input { width: min(340px, 100%); }
+  .admin-audit-log-search input { width: 100%; padding-left: 34px; }
+
+  .admin-audit-log-field input:focus-visible,
+  .admin-audit-log-field select:focus-visible { outline: 3px solid var(--admin-focus); outline-offset: 2px; }
+
   @media (max-width: 860px) {
     .admin-audit-log-toolbar {
       width: 100%;
+      align-items: stretch;
     }
 
     .admin-audit-log-toolbar .admin-secondary-btn {
       max-width: 100%;
     }
+
+    .admin-audit-log-export { margin-left: 0; }
+    .admin-audit-log-filters { flex-basis: 100%; }
+    .admin-audit-log-field { flex: 1 1 145px; min-width: 0; }
+    .admin-audit-log-search { flex-basis: 100%; }
+    .admin-audit-log-field input, .admin-audit-log-field select { width: 100%; }
+  }
+
+  @media (max-width: 1023px) {
+    .admin-audit-log-export,
+    .admin-audit-log-field input,
+    .admin-audit-log-field select { min-height: 44px; }
+    .admin-audit-log-search svg { bottom: 14px; }
   }
 
   .mode-btn {

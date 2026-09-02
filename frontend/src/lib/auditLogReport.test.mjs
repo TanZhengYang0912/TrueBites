@@ -31,3 +31,13 @@ test('audit report copies only table values and marks generation time separately
   entries[0].action = 'changed';
   assert.equal(report.rows[0].action, 'Vendor Update');
 });
+
+test('audit report describes filtered scope without including arbitrary query data', () => {
+  const report = model.buildAuditLogReport([], new Date('2026-09-03T04:00:00Z'), {
+    q: 'vendor', entity: 'vendor', sort: 'oldest', from: '', to: '', metadata: 'PRIVATE_QUERY',
+  });
+  assert.equal(typeof report.filters, 'string');
+  assert.match(report.filters, /vendor/i);
+  assert.match(report.filters, /Oldest first/);
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_QUERY/);
+});

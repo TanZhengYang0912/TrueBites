@@ -1,3 +1,5 @@
+import { describeAuditLogQuery } from './myAuditLogFilters.js';
+
 const text = (value, fallback = '—') => value == null || value === '' ? fallback : String(value);
 
 function dateLabel(value) {
@@ -18,7 +20,7 @@ export function formatAuditEntry(entry = {}) {
   };
 }
 
-export function buildAuditLogReport(entries, now = new Date()) {
+export function buildAuditLogReport(entries, now = new Date(), query) {
   const rows = entries.map((entry) => {
     const { when, action, entity } = formatAuditEntry(entry);
     return { when, action, entity };
@@ -27,6 +29,7 @@ export function buildAuditLogReport(entries, now = new Date()) {
     title: 'My Audit Log',
     subtitle: "Everything you've personally done in the admin console",
     generated: `Generated ${dateLabel(now)}`,
+    filters: describeAuditLogQuery(query),
     count: rows.length,
     rows,
   };

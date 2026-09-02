@@ -35,6 +35,28 @@ test('empty audit PDF is still a titled one-page report', () => {
   assert.ok(doc.output().includes('0 entries'));
 });
 
+test('filter summary wraps above repeated table headers without clipping records', () => {
+  const model = report(45);
+  model.filters = `Search: ${'long-search '.repeat(10)} | All entities | 28 Aug 2026 - 3 Sep 2026 (Malaysia) | Oldest first`;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape', compress: false });
+  const calls = [], original = doc.text.bind(doc);
+  doc.text = (value, x, y, ...args) => {
+    calls.push({ value: String(value), x, y, page: doc.getCurrentPageInfo().pageNumber });
+    return original(value, x, y, ...args);
+  };
+  pdf.renderAuditLogPdf(doc, model);
+  assert.ok(calls.some(call => call.value.includes('Oldest first')));
+  for (let page = 1; page <= doc.getNumberOfPages(); page++) {
+    const pageCalls = calls.filter(call => call.page === page);
+    const header = pageCalls.find(call => call.value === 'When');
+    const summary = pageCalls.filter(call => /long-search|Oldest first|All entities/.test(call.value));
+    assert.ok(summary.length >= 2);
+    assert.ok(summary.every(call => call.y < header.y - 10));
+    assert.ok(pageCalls.every(call => call.x >= 24 && call.y <= 580));
+  }
+  assert.ok(doc.output().includes('Vendor Update 44'));
+});
+
 test('oversized audit rows continue without clipped or missing tail text', () => {
   const model = report(2);
   model.rows[0].action = `${'Long audit action '.repeat(600)}END LONG ACTION`;

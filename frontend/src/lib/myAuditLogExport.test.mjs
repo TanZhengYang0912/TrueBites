@@ -107,3 +107,19 @@ test('personal export forwards its cancellation signal to the in-flight page req
   assert.equal(receivedSignal, controller.signal);
   assert.equal(env.blobs.length, 0);
 });
+
+test('personal PDF snapshots only canonical filters for every page and cannot override pagination', async (t) => {
+  browser(t);
+  const calls = [];
+  const query = { q: 'vendor', entity: 'vendor', from: '2026-08-27T16:00:00.000Z', to: '2026-09-03T16:00:00.000Z', sort: 'oldest', page: 99, actorId: 'OTHER_ADMIN' };
+  const expected = { q: query.q, entity: query.entity, from: query.from, to: query.to, sort: query.sort };
+  await exporter.openMyAuditLogPdf(async options => {
+    calls.push({ ...options });
+    query.q = 'review'; query.sort = 'newest';
+    return { items: [{ action: 'vendor.update' }], pagination: { totalPages: 2 } };
+  }, { query });
+  assert.equal(calls.length, 2);
+  for (const [index, call] of calls.entries()) {
+    assert.deepEqual(call, { ...expected, page: index + 1, pageSize: 100, signal: undefined });
+  }
+});
