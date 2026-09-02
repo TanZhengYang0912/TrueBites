@@ -27,12 +27,13 @@ There is no in-page Saved/My reviews tab switch and no `setTab` navigation path.
 
 ## Header Navigation
 
-The primary customer navigation uses React Router links with real destinations:
+The real-link requirement applies to the three requested customer destinations:
 
-- Discover: `/map`
 - Saved: `/saved`
 - My reviews: `/reviews`
 - Suggest: `/suggestions`
+
+Discover intentionally remains its existing callback/button because it participates in the map/list discovery view behavior. It is outside the scope of the requested three dedicated destinations and is not required to become a `/map` link.
 
 Each page supplies the correct active section so `aria-current="page"` and active styling continue to work. Existing authentication gates remain in place: signed-out users who choose a protected destination are sent to sign in.
 
