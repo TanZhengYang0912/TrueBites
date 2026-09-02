@@ -93,9 +93,6 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
         onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
         activeSection="discover"
         onOpenDiscover={() => navigate("/map")}
-        onOpenSaved={requireAuth(() => navigate("/engagement"))}
-        onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
-        onOpenSuggestions={requireAuth(() => navigate("/suggestions"))}
         onSignUp={() => navigate("/login")}
         onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />

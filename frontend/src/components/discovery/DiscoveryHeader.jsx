@@ -33,8 +33,7 @@ function HeaderAvatar({ avatarUrl, initials }) {
 export default function DiscoveryHeader({
   onOpenMap,
   session, userEmail, initials, firstName, avatarUrl, onLogin, onOpenProfile, onSignUp,
-  onOpenSaved, onOpenReviews, onOpenDiscover, activeSection = "discover",
-  onOpenSuggestions, savedCount = 0,
+  onOpenDiscover, activeSection = "discover", savedCount = 0,
   mapActive = false,
   onOpenVendor,
 }) {
@@ -61,10 +60,9 @@ export default function DiscoveryHeader({
         >
           Discover
         </button>
-        <button
-          type="button"
+        <Link
+          to="/saved"
           className={activeSection === "saved" ? NAV_ACTIVE : NAV_IDLE}
-          onClick={() => onOpenSaved?.()}
           aria-current={activeSection === "saved" ? "page" : undefined}
         >
           <Bookmark size={14} strokeWidth={1.7} />
@@ -72,24 +70,22 @@ export default function DiscoveryHeader({
           {savedCount > 0 && (
             <span className="rounded-full bg-forest px-1.5 text-[10px] font-bold text-white">{savedCount}</span>
           )}
-        </button>
-        <button
-          type="button"
+        </Link>
+        <Link
+          to="/reviews"
           className={activeSection === "reviews" ? NAV_ACTIVE : NAV_IDLE}
-          onClick={() => onOpenReviews?.()}
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
           My reviews
-        </button>
-        <button
-          type="button"
+        </Link>
+        <Link
+          to="/suggestions"
           className={activeSection === "suggestions" ? NAV_ACTIVE : NAV_IDLE}
-          onClick={() => onOpenSuggestions?.()}
           aria-current={activeSection === "suggestions" ? "page" : undefined}
         >
           <Lightbulb size={14} strokeWidth={1.8} />
           <span>Suggest</span>
-        </button>
+        </Link>
       </nav>
 
       <div className="ml-auto flex items-center gap-2">

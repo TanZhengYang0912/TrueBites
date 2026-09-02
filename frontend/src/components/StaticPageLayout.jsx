@@ -18,7 +18,6 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
   const initials = firstName
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
-  const requireSession = (path) => () => navigate(session ? path : "/login");
 
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
@@ -32,9 +31,6 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
         savedCount={0}
         activeSection={null}
         onOpenDiscover={() => navigate("/map")}
-        onOpenSaved={requireSession("/engagement")}
-        onOpenReviews={requireSession("/engagement?tab=reviews")}
-        onOpenSuggestions={requireSession("/suggestions")}
         onLogin={() => navigate("/login")}
         onSignUp={() => navigate("/login")}
         onOpenProfile={() => navigate("/profile")}

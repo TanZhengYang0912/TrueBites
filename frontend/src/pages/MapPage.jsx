@@ -595,10 +595,7 @@ export default function MapPage() {
               activeSection={null}
               mapActive
               onOpenDiscover={backToDashboard}
-              onOpenSaved={() => navigate("/engagement")}
-              onOpenReviews={() => navigate("/engagement?tab=reviews")}
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
-              onOpenSuggestions={() => navigate("/suggestions")}
             />
           </div>
         )}

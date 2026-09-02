@@ -31,3 +31,21 @@ test("legacy engagement URLs redirect to their dedicated pages", async ({ page }
   await page.goto("/engagement?tab=reviews", { waitUntil: "networkidle" });
   await expect(page).toHaveURL(/\/reviews$/);
 });
+
+test("primary customer navigation uses dedicated page links", async ({ page }) => {
+  await stubCustomerApis(page);
+  await page.goto("/saved", { waitUntil: "networkidle" });
+
+  const primary = page.getByRole("navigation", { name: "Primary navigation" });
+  await expect(primary.getByRole("link", { name: /Saved/ })).toHaveAttribute("href", "/saved");
+  await expect(primary.getByRole("link", { name: "My reviews" })).toHaveAttribute("href", "/reviews");
+  await expect(primary.getByRole("link", { name: /Suggest/ })).toHaveAttribute("href", "/suggestions");
+
+  await primary.getByRole("link", { name: "My reviews" }).click();
+  await expect(page).toHaveURL(/\/reviews$/);
+  await expect(page.getByRole("heading", { name: "My reviews" })).toBeVisible();
+
+  await primary.getByRole("link", { name: /Suggest/ }).click();
+  await expect(page).toHaveURL(/\/suggestions$/);
+  await expect(page.getByRole("heading", { name: "My suggestions" })).toBeVisible();
+});
