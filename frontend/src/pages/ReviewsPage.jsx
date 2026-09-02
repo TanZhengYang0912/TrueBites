@@ -66,9 +66,14 @@ export default function ReviewsPage() {
   }
 
   function refreshReviews() {
-    getMyReviews()
+    return getMyReviews()
       .then((payload) => setReviews(payload.reviews))
       .catch((error) => { console.error(error.message); notify("Couldn't load your reviews.", true); });
+  }
+
+  function refreshReviewsAfterMutation() {
+    setReviewPage(1);
+    return refreshReviews();
   }
 
   if (sessionLoading) return null;
@@ -254,6 +259,7 @@ export default function ReviewsPage() {
           onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
           onClose={() => setDetailVendor(null)}
           onVendorUpdated={patchVendorStats}
+          onReviewsChanged={refreshReviewsAfterMutation}
         />
       )}
 

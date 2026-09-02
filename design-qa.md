@@ -2,10 +2,10 @@
 
 ## Comparison target
 
-- Source visual truth: `/var/folders/2k/9gm24jc16p513yff3zkk7lmw0000gn/T/codex-clipboard-47c435b4-31f2-4310-a887-8f1d9ff6d8fb.png`
-- Final desktop implementation: `/var/tmp/truebites-discovery-swap-desktop-passed.png`
-- Final mobile implementation: `/var/tmp/truebites-discovery-swap-mobile-passed.png`
-- Normalized full-view comparison: `/var/tmp/truebites-discovery-swap-comparison-passed.png`
+- Source visual truth: `codex-clipboard-47c435b4-31f2-4310-a887-8f1d9ff6d8fb.png`
+- Final desktop implementation: `truebites-discovery-swap-desktop-passed.png`
+- Final mobile implementation: `truebites-discovery-swap-mobile-passed.png`
+- Normalized full-view comparison: `truebites-discovery-swap-comparison-passed.png`
 - Route and state: `/map`, default search and filters, 300-vendor discovery state.
 
 ## Capture normalization
@@ -44,7 +44,7 @@ The component is already large and readable in the normalized full-view comparis
 
 - Finding [P2]: the compact desktop CTA showed only an arrow, while the source CTA explicitly labeled the action `Share it →`. This weakened the desktop affordance and was a visible copy mismatch.
 - Fix: added a responsive action treatment that shows `Share it` with a Lucide ArrowRight from `sm` upward, while retaining an icon-only action on narrow mobile screens.
-- Post-fix evidence: `/var/tmp/truebites-discovery-swap-comparison-passed.png` shows the desktop label restored; `/var/tmp/truebites-discovery-swap-mobile-passed.png` shows the mobile CTA remains uncluttered and does not overflow.
+- Post-fix evidence: `truebites-discovery-swap-comparison-passed.png` shows the desktop label restored; `truebites-discovery-swap-mobile-passed.png` shows the mobile CTA remains uncluttered and does not overflow.
 
 ## Findings
 

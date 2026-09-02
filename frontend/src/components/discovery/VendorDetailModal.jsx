@@ -18,7 +18,7 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 
-export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated }) {
+export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated, onReviewsChanged }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
@@ -69,6 +69,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
       const r = await getReviews(vendor.id);
       setReviews(r.reviews);
       applyVendorStats(res.vendor);
+      onReviewsChanged?.();
       notify("Review deleted successfully!");
     } catch (e) { notify(e.message, true); }
   }
@@ -80,6 +81,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
     });
     setEditingReview(null);
     applyVendorStats(vendorStats);
+    onReviewsChanged?.();
   }
 
   useEffect(() => {
