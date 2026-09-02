@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -23,7 +23,12 @@ import { loadTrip, saveTrip } from "../lib/tripStorage";
 import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
-import { matchesFilters } from "../lib/vendorFilters";
+import {
+  DEFAULT_VENDOR_FILTERS,
+  DEFAULT_VENDOR_SORT,
+  matchesFilters,
+  sortVendors,
+} from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
 import { customerSession } from "../lib/roles";
 
@@ -79,8 +84,13 @@ export default function MapPage() {
   const [userPos, setUserPos] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
-  const [filters, setFilters] = useState({ search: "", category: "all", creator: "all" });
-  const updateFilters = (partial) => setFilters((f) => ({ ...f, ...partial }));
+  const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
+  const [sort, setSort] = useState(DEFAULT_VENDOR_SORT);
+  const updateFilters = (partial) => setFilters((current) => ({ ...current, ...partial }));
+  const clearFilters = () => {
+    setFilters(DEFAULT_VENDOR_FILTERS);
+    setSort(DEFAULT_VENDOR_SORT);
+  };
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
@@ -426,6 +436,33 @@ export default function MapPage() {
     ? (profileMeta.first_name?.[0] || "") + (profileMeta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
+  // The API's initial distance is measured from Melaka centre so its response
+  // can be usefully ordered before the user shares a position. Discovery's
+  // distance controls must not treat that fallback as the user's distance:
+  // expose distKm only after GPS or a typed origin creates a real anchor.
+  const vendorsWithDistance = useMemo(() => userPos
+    ? vendors.map((vendor) => (
+      vendor.latitude == null || vendor.longitude == null
+        ? { ...vendor, distKm: undefined }
+        : {
+            ...vendor,
+            distKm: haversineKm(userPos.lat, userPos.lng, vendor.latitude, vendor.longitude),
+          }
+    ))
+    : vendors.map((vendor) => ({ ...vendor, distKm: undefined })),
+  [vendors, userPos]);
+
+  // One collection powers cards, pins and the map sidebar. Downstream views
+  // may paginate or apply the map's separate visibility radius, but they never
+  // repeat discovery matching or sorting.
+  const filteredVendors = useMemo(
+    () => sortVendors(
+      vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters)),
+      sort,
+    ),
+    [vendorsWithDistance, filters, sort],
+  );
+
   if (!API_KEY) {
     return (
       <div className="p-6 font-body">
@@ -439,7 +476,14 @@ export default function MapPage() {
     return (
       <>
         <Dashboard
-          vendors={vendors}
+          vendors={vendorsWithDistance}
+          filteredVendors={filteredVendors}
+          filters={filters}
+          sort={sort}
+          onFilters={updateFilters}
+          onSort={setSort}
+          onClearFilters={clearFilters}
+          hasLocation={userPos != null}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
@@ -507,7 +551,9 @@ export default function MapPage() {
 
   // Pins respect the active discovery filters, while trip stops survive so a
   // route never loses one of its own markers.
-  const pinVendors = vendors.filter((v) => stopIds.has(v.id) || matchesFilters(v, filters));
+  const filteredIds = new Set(filteredVendors.map((vendor) => vendor.id));
+  const pinVendors = vendorsWithDistance
+    .filter((vendor) => stopIds.has(vendor.id) || filteredIds.has(vendor.id));
 
   const visibleVendors = selectVisibleVendors({
     vendors: pinVendors,
@@ -522,15 +568,11 @@ export default function MapPage() {
   // within the chosen radius of the anchor, closest first. Filters on the raw
   // distance so the list and the map pins agree at the boundary; rounds only
   // for display.
-  const nearbyToAdd = anchor
-    ? vendors
-      .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
-      .filter((v) => matchesFilters(v, filters))
-      .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
-      .filter((v) => v.distKm <= effectiveRadiusKm)
-      .sort((a, b) => a.distKm - b.distKm)
+  const nearbyToAdd = anchor ? filteredVendors
+      .filter((vendor) => vendor.latitude != null && vendor.longitude != null && !stopIds.has(vendor.id))
+      .filter((vendor) => vendor.distKm <= effectiveRadiusKm)
       .slice(0, 12)
-      .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
+      .map((vendor) => ({ ...vendor, distKm: parseFloat(vendor.distKm.toFixed(2)) }))
     : [];
 
   return (
@@ -660,10 +702,15 @@ export default function MapPage() {
               />
             ) : (
               <VendorPanel
-                vendors={vendors}
+                vendors={vendorsWithDistance}
+                filteredVendors={filteredVendors}
                 nearby={nearbyToAdd}
                 filters={filters}
+                sort={sort}
                 onFilters={updateFilters}
+                onSort={setSort}
+                onClearFilters={clearFilters}
+                hasLocation={userPos != null}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}
