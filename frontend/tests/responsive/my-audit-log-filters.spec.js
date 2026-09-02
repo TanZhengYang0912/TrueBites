@@ -148,6 +148,7 @@ test('shows a current query error, keeps its filters, and retries that same quer
   const state = await setup(page, { failSearch: true });
   await search(page).fill('broken');
   await expect(page.getByRole('alert')).toContainText('Temporary audit failure');
+  await expect(page.getByText('No activity matches your filters.')).toHaveCount(0);
   await expect(exportButton(page)).toBeDisabled();
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -161,11 +162,30 @@ test('full entity UUID search and empty filtered result are clearable', async ({
   await search(page).fill(UUID);
   await expect(page.getByRole('row')).toHaveCount(2);
   await expect(page.getByRole('cell', { name: `vendor · ${UUID}`, exact: true })).toBeVisible();
+  await expect(page.getByText('1 entry', { exact: true })).toBeVisible();
   await search(page).fill('unmatched result');
   await expect(page.getByText(/No activity matches/)).toBeVisible();
+  await expect(page.getByText('0 entries', { exact: true })).toBeVisible();
   await expect(exportButton(page)).toBeEnabled();
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page.getByRole('row')).toHaveCount(26);
+});
+
+test('limits a pasted search to the visible 100-character query sent to list and export', async ({ page }) => {
+  const state = await setup(page);
+  const pasted = 'v'.repeat(120);
+  const canonical = pasted.slice(0, 100);
+  await search(page).fill(pasted);
+  await expect(search(page)).toHaveValue(canonical);
+  await expect(exportButton(page)).toBeEnabled();
+  const listCall = state.calls.filter(call => call.pageSize === '25').at(-1);
+  expect(listCall.q).toBe(canonical);
+  const popupPromise = page.waitForEvent('popup');
+  await exportButton(page).click();
+  const popup = await popupPromise;
+  await expect.poll(() => state.calls.some(call => call.pageSize === '100')).toBeTruthy();
+  expect(state.calls.filter(call => call.pageSize === '100').every(call => call.q === canonical)).toBeTruthy();
+  await popup.close();
 });
 
 test('mobile filter controls wrap without horizontal overflow', async ({ page }) => {
@@ -174,4 +194,13 @@ test('mobile filter controls wrap without horizontal overflow', async ({ page })
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await mkdir(resolve('responsive-output/my-audit-log-filters'), { recursive: true });
   await page.screenshot({ path: resolve('responsive-output/my-audit-log-filters/mobile.png'), fullPage: true });
+});
+
+test('export control keeps the Vendors-style white and blue treatment', async ({ page }) => {
+  await setup(page);
+  const style = await exportButton(page).evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return { background: computed.backgroundColor, color: computed.color, borderColor: computed.borderColor, height: computed.height };
+  });
+  expect(style).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(37, 99, 235)', borderColor: 'rgb(227, 231, 237)', height: '40px' });
 });

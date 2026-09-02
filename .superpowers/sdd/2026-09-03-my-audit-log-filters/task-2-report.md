@@ -30,3 +30,17 @@ Controller-provided RED tests failed before production changes:
 ## Scope / review
 
 Only Task 2 frontend code, frontend tests, and this report are included. The unrelated untracked `output/` directory is excluded. A separate `luna_worker` review was not run because the parent task explicitly prohibited spawning further agents; the focused request/metadata review was performed locally instead.
+
+## Final review fix wave
+
+- Pagination now always announces the matching total (including 0, 1, and 25 results) while hiding only unnecessary page controls; singular wording is preserved.
+- Search visibly enforces the 100-character canonical limit, including pasted input, so the input, list request, PDF request, and report cannot diverge.
+- The export action now matches the Vendors white/blue, bordered, subtly shadowed treatment while retaining 40px desktop and 44px touch height.
+- An unsuccessful current request now presents the error and Retry state without a misleading successful-empty message.
+
+Fresh regression evidence:
+
+- `cd frontend && npm run test:responsive -- tests/responsive/my-audit-log-filters.spec.js tests/responsive/my-audit-log-pdf.spec.js` — 17/17 passed.
+- `cd frontend && npm run test:unit` — 158/158 passed.
+- `cd frontend && npm run build` — passed (existing Vite chunk-size advisory only).
+- `git diff --check` — passed.

@@ -12,12 +12,11 @@ const queryKey = (query, page, accountId) => JSON.stringify([accountId || "", pa
 
 function Pagination({ pagination, onPageChange }) {
   const { page, totalPages, total } = pagination;
-  if (totalPages <= 1) return null;
-  return <div className="admin-pagination"><div className="admin-pagination-meta"><strong>{total}</strong> entries</div><div className="admin-pagination-controls">
+  return <div className="admin-pagination"><div className="admin-pagination-meta" aria-live="polite"><strong>{total}</strong> {total === 1 ? "entry" : "entries"}</div>{totalPages > 1 ? <div className="admin-pagination-controls">
     <button type="button" className="admin-secondary-btn compact" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</button>
     <span>Page {page} / {totalPages}</span>
     <button type="button" className="admin-secondary-btn compact" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
-  </div></div>;
+  </div> : null}</div>;
 }
 
 // Read-only — every action the signed-in admin has personally taken.
@@ -67,7 +66,7 @@ export default function AdminMyAuditLogPage() {
 
   const applyFilters = (next) => setApplied({ query: createAuditLogQuery(next), page: 1 });
   const updateSearch = (event) => {
-    const next = { ...filters, q: event.target.value };
+    const next = { ...filters, q: event.target.value.slice(0, 100) };
     setFilters(next);
     window.clearTimeout(searchTimer.current);
     setSearchPending(true);
@@ -111,7 +110,7 @@ export default function AdminMyAuditLogPage() {
     <div className="admin-audit-log-toolbar">
       <button type="button" className="admin-secondary-btn compact admin-audit-log-export" onClick={handleExport} disabled={exportDisabled}><FileDown size={14} />{exporting ? "Preparing PDF…" : "Export PDF"}</button>
       <div className="admin-audit-log-filters">
-        <label className="admin-audit-log-field admin-audit-log-search">Search<Search size={15} aria-hidden="true" /><input type="search" value={filters.q} onChange={updateSearch} placeholder="Search action, entity, or full UUID" /></label>
+        <label className="admin-audit-log-field admin-audit-log-search">Search<Search size={15} aria-hidden="true" /><input type="search" maxLength={100} value={filters.q} onChange={updateSearch} placeholder="Search action, entity, or full UUID" /></label>
         <label className="admin-audit-log-field">Entity<select value={filters.entity} onChange={(event) => updateFilter("entity", event.target.value)}>{AUDIT_ENTITY_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label className="admin-audit-log-field">Time range<select value={filters.period} onChange={(event) => updateFilter("period", event.target.value)}>{AUDIT_PERIOD_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label className="admin-audit-log-field">Sort order<select value={filters.sort} onChange={(event) => updateFilter("sort", event.target.value)}>{AUDIT_SORT_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -121,7 +120,7 @@ export default function AdminMyAuditLogPage() {
     {loadState.status === "error" ? <div className="admin-feedback error" role="alert">{loadState.error} <button type="button" className="admin-link-btn" onClick={() => setReload((value) => value + 1)}>Retry</button></div> : null}
     {exportError ? <div className="admin-feedback error admin-audit-log-export-error" role="alert">{exportError}</div> : null}
     <section className="admin-panel admin-table-panel"><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>When</th><th>Action</th><th>Entity</th></tr></thead><tbody>
-      {loadState.status === "loading" ? <tr><td colSpan="3"><div className="admin-feedback" role="status" aria-live="polite">Loading your activity…</div></td></tr> : items.length ? items.map((entry) => {
+      {loadState.status === "loading" ? <tr><td colSpan="3"><div className="admin-feedback" role="status" aria-live="polite">Loading your activity…</div></td></tr> : loadState.status === "error" ? <tr><td colSpan="3"><div className="admin-feedback" role="status">Could not load activity. Use Retry above.</div></td></tr> : items.length ? items.map((entry) => {
         const row = formatAuditEntry(entry);
         return <tr key={row.id ?? entry.id}><td>{row.when}</td><td>{row.action}</td><td>{row.entity}</td></tr>;
       }) : <tr><td colSpan="3"><div className="admin-empty-state" role="status">{filtersActive ? "No activity matches your filters." : "No recorded activity yet."}</div></td></tr>}
