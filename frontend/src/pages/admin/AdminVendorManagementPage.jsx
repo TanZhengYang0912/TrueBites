@@ -182,9 +182,9 @@ function validateForm(form) {
 
   if (!form.signature_dishes.trim()) errors.signature_dishes = "Signature dishes are required.";
 
+  // Optional — not every stall has a published number.
   const phone = form.phone.trim();
-  if (!phone) errors.phone = "Contact number is required.";
-  else if (!PHONE_RE.test(phone.replace(/[\s-]/g, ""))) errors.phone = "Invalid Malaysian number, e.g. 06-283 1234.";
+  if (phone && !PHONE_RE.test(phone.replace(/[\s-]/g, ""))) errors.phone = "Invalid Malaysian number, e.g. 06-283 1234.";
 
   if (form.openSlot === form.closeSlot) errors.hours = "Opening and closing time can't be the same.";
 
@@ -235,6 +235,14 @@ function Pagination({ pagination, pageSize, onPageChange, onPageSizeChange }) {
 
 function FieldError({ message }) {
   return message ? <div className="admin-field-error">{message}</div> : null;
+}
+
+// Marks a label as "can't be left blank" — Name/Address/Latitude/Longitude/
+// Price Range/Signature Dishes below. Deliberately NOT on Category/Operating
+// Hours/Status (selects always carry a value, so there's no blank state to
+// warn about) or Phone (optional — see validateForm).
+function RequiredMark() {
+  return <span className="admin-required-mark" aria-hidden="true"> *</span>;
 }
 
 // Table-row thumbnail — uses the SAME resolver as the public site
@@ -543,7 +551,7 @@ function AddressAutocompleteField({ form, error, onChange, disabled, notify }) {
 
   return (
     <label className="admin-address-field">
-      <span>Address</span>
+      <span>Address<RequiredMark /></span>
       <input
         ref={inputRef}
         name="address"
@@ -567,7 +575,7 @@ function AddressAutocompleteField({ form, error, onChange, disabled, notify }) {
 function PlainAddressField({ form, error, onChange, disabled, hint }) {
   return (
     <label className="admin-address-field">
-      <span>Address</span>
+      <span>Address<RequiredMark /></span>
       <input
         name="address"
         value={form.address}
@@ -621,7 +629,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
   const fields = (
     <>
       <label>
-        <span>Name</span>
+        <span>Name<RequiredMark /></span>
         <input name="vendor_name" value={form.vendor_name} onChange={onChange} disabled={disabled} placeholder="e.g. Cendol Pak Hj Ramli" />
         <FieldError message={errors?.vendor_name} />
       </label>
@@ -630,12 +638,12 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
 
       <div className="admin-modal-grid">
         <label>
-          <span>Latitude</span>
+          <span>Latitude<RequiredMark /></span>
           <input type="number" step="any" name="latitude" value={form.latitude} onChange={onChange} disabled={disabled} placeholder="e.g. 2.1946" />
           <FieldError message={errors?.latitude} />
         </label>
         <label>
-          <span>Longitude</span>
+          <span>Longitude<RequiredMark /></span>
           <input type="number" step="any" name="longitude" value={form.longitude} onChange={onChange} disabled={disabled} placeholder="e.g. 102.2485" />
           <FieldError message={errors?.longitude} />
         </label>
@@ -652,7 +660,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         </label>
 
         <label>
-          <span>Price Range (RM / Person)</span>
+          <span>Price Range (RM / Person)<RequiredMark /></span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>RM</span>
             <input type="number" min="0" name="priceMin" value={form.priceMin} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 56 }} />
@@ -679,14 +687,14 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
       </div>
 
       <label>
-        <span>Signature Dishes</span>
+        <span>Signature Dishes<RequiredMark /></span>
         <input name="signature_dishes" value={form.signature_dishes} onChange={onChange} disabled={disabled} placeholder="Comma-separated e.g. Cendol, Ice Kacang" />
         <FieldError message={errors?.signature_dishes} />
       </label>
 
       <div className="admin-modal-grid">
         <label>
-          <span>Phone</span>
+          <span>Phone (optional)</span>
           <input name="phone" value={form.phone} onChange={onChange} disabled={disabled} placeholder="e.g. +60 12-345 6789" />
           <FieldError message={errors?.phone} />
         </label>
