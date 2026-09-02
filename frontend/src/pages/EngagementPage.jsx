@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Heart, Trash2, FolderInput, Plus, Search, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Check } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import {
@@ -34,12 +34,11 @@ const CARD_MERGE_FOOTER = "[&>article]:rounded-b-none [&>article]:border-b-0 [&>
 // one card taller than its neighbours the way the main discovery grid never does.
 const CARD_FOOTER = "flex h-11 shrink-0 items-center gap-1.5 overflow-hidden rounded-b border border-t-0 border-sand bg-chalk px-3 text-[11px] text-muted";
 
-export default function EngagementPage() {
+export default function EngagementPage({ section }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const isReviews = section === "reviews";
   const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
-  const [tab, setTab] = useState(searchParams.get("tab") === "reviews" ? "reviews" : "bookmarks");
 
   const [bookmarks, setBookmarks] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -63,9 +62,9 @@ export default function EngagementPage() {
   useEffect(() => {
     if (!session && !ENGAGEMENT_TEST_MODE) return;
     refreshBookmarks();
-    refreshReviews();
+    if (isReviews) refreshReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, isReviews]);
 
   useEffect(() => { setBookmarkPage(1); }, [activeFolder]);
   useEffect(() => { setReviewPage(1); }, [reviewSearch, reviewRating, reviewSort]);
@@ -227,10 +226,10 @@ export default function EngagementPage() {
         firstName,
         avatarUrl,
         savedCount: bookmarks.length,
-        activeSection: tab === "reviews" ? "reviews" : "saved",
+        activeSection: isReviews ? "reviews" : "saved",
         onOpenDiscover: () => navigate("/map"),
-        onOpenSaved: () => { setTab("bookmarks"); navigate("/engagement"); },
-        onOpenReviews: () => { setTab("reviews"); navigate("/engagement?tab=reviews"); },
+        onOpenSaved: () => navigate("/saved"),
+        onOpenReviews: () => navigate("/reviews"),
         onOpenSuggestions: () => navigate("/suggestions"),
         onLogin: () => navigate("/login"),
         onSignUp: () => navigate("/login"),
@@ -240,10 +239,10 @@ export default function EngagementPage() {
       >
         <DiscoveryPageIntro
           eyebrow="Your TrueBites collection"
-          title={tab === "reviews" ? "My reviews" : "Saved places"}
-          description={tab === "reviews" ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
+          title={isReviews ? "My reviews" : "Saved places"}
+          description={isReviews ? "Keep track of the places and flavours you have shared." : "Keep the Melaka places you want to return to."}
         />
-        {tab === "bookmarks" && (
+        {!isReviews && (
           <div className="flex flex-col gap-5">
             {/* Folder tabs — horizontal row, Instagram-style */}
             <div className="no-scrollbar flex snap-x items-center gap-2 overflow-x-auto scroll-smooth pb-2">
@@ -318,7 +317,7 @@ export default function EngagementPage() {
           </div>
         )}
 
-        {tab === "reviews" && (
+        {isReviews && (
           <section className="flex flex-col gap-5">
             {myReviews.length > 0 && (
               <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">

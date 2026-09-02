@@ -110,6 +110,12 @@ function AuthGate({ children }) {
   return children;
 }
 
+function LegacyEngagementRedirect() {
+  const { search } = useLocation();
+  const destination = new URLSearchParams(search).get("tab") === "reviews" ? "/reviews" : "/saved";
+  return <Navigate to={destination} replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -133,7 +139,9 @@ export default function App() {
 
           {/* Dev-only design preview, tree-shaken out of production builds. */}
           {import.meta.env.DEV && <Route path="/dev/map" element={<DevPinPrecision />} />}
-          <Route path="/engagement" element={<EngagementPage />} />
+          <Route path="/saved" element={<EngagementPage section="saved" />} />
+          <Route path="/reviews" element={<EngagementPage section="reviews" />} />
+          <Route path="/engagement" element={<LegacyEngagementRedirect />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/suggestions/new" element={<SuggestionFormPage />} />
           <Route path="/ai" element={<Navigate to="/map" replace />} />
