@@ -42,7 +42,14 @@ export default function ConfirmDialog({
       }
       const first = focusable[0];
       const last = focusable.at(-1);
-      if (event.shiftKey && document.activeElement === first) {
+      // A pending operation leaves focus on the dialog while both controls
+      // are disabled. Once a failure re-enables them, that container focus
+      // must re-enter the same cycle instead of letting Shift+Tab escape to
+      // the page behind the modal.
+      if (!focusable.includes(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {

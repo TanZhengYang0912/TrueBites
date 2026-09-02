@@ -1715,11 +1715,10 @@ export default function AdminVendorManagementPage() {
         );
       }
     } catch (err) {
-      // The mutation may already have succeeded when the follow-up GET fails.
-      // Keep its failed-ID selection intact and avoid offering a stale dialog
-      // that could repeat successful deletions; the persistent banner can
-      // refresh the list without issuing DELETE again.
-      const message = `Vendors were deleted, but the list couldn't refresh: ${err.message}`;
+      // A follow-up GET can fail whether every DELETE succeeded, none did, or
+      // only some did. Keep the failed-ID selection intact and use neutral
+      // wording so the banner never claims a deletion that did not happen.
+      const message = `Could not refresh vendor deletion results: ${err.message}`;
       setError(message);
       notify(message, true);
     } finally {
