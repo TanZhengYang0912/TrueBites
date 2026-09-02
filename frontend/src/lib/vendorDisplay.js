@@ -2,6 +2,7 @@
 // stops. Category keys are derived from cuisine_types first so discovery filters
 // use the database contract instead of a collection of visual guesses.
 import { categoryPhoto } from "./categoryPhotos.js";
+import { operatingStatus } from "./operatingHours.js";
 export const CATEGORY_FILTERS = [
   { key: "all", label: "All", values: null },
   { key: "local", label: "Malaysian / Local", values: ["Malaysian / Local"] },
@@ -177,39 +178,10 @@ export function priceRangeLabel(vendor) {
   return `RM${min} – RM${max}`;
 }
 
-// Parses the "HH:MM AM/PM - HH:MM AM/PM" shape the admin form already
-// enforces (see HOURS_RE in AdminVendorManagementPage.jsx) into an open/closed
-// status plus a lowercase-formatted label ("6:00 am – 12:00 pm"). Older
-// AI-scraped strings that don't match this shape ("3 - 4", "4 pm, 5.5 pm, 6
-// pm") return null rather than guessing at a status — no badge is better than
-// a wrong one.
-const HOURS_RANGE_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i;
-
-function hoursToMinutes(hh, mm, period) {
-  const h = Number.parseInt(hh, 10) % 12;
-  return (h + (/pm/i.test(period) ? 12 : 0)) * 60 + Number.parseInt(mm, 10);
-}
-
-function formatClock(hh, mm, period) {
-  return `${String(Number.parseInt(hh, 10)).padStart(2, "0")}:${mm} ${period.toLowerCase()}`;
-}
-
-export function hoursStatus(vendor) {
-  const raw = vendor.operating_hours_raw || vendor.operating_hours;
-  const match = HOURS_RANGE_RE.exec(raw || "");
-  if (!match) return null;
-  const [, oh, om, op, ch, cm, cp] = match;
-
-  const openMin = hoursToMinutes(oh, om, op);
-  const closeMin = hoursToMinutes(ch, cm, cp);
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  // Closing time <= opening time means the window crosses midnight
-  // (e.g. "4:00 pm - 12:00 am") — treat closing as happening "the next day".
-  const isOpen = closeMin <= openMin
-    ? nowMin >= openMin || nowMin < closeMin
-    : nowMin >= openMin && nowMin < closeMin;
-
-  return { isOpen, label: `${formatClock(oh, om, op)} – ${formatClock(ch, cm, cp)}` };
+// Cards and discovery filters deliberately share one parser and Malaysia-time
+// evaluator, so the badge cannot claim "Open" while Open now hides the vendor.
+export function hoursStatus(vendor, now = new Date()) {
+  return operatingStatus(vendor, now);
 }
 
 // Backend already computes this via haversine (see /restaurants/nearby).

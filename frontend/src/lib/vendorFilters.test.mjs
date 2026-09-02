@@ -9,6 +9,7 @@ import {
   parsePriceRange,
   sortVendors,
 } from "./vendorFilters.js";
+import { hoursStatus } from "./vendorDisplay.js";
 
 const NANCY = {
   id: "n",
@@ -84,6 +85,7 @@ test("filters combine with AND", () => {
 test("missing fields never throw", () => {
   assert.equal(matchesFilters({ id: "x" }, { search: "anything" }), false);
   assert.equal(matchesFilters({ id: "x" }), true);
+  assert.doesNotThrow(() => matchesFilters({ id: "x" }, { search: null }));
 });
 
 test("filtersActive reports whether any filter is narrowing", () => {
@@ -111,6 +113,9 @@ test("price filters match overlapping stored ranges", () => {
 test("parses daytime and overnight operating windows", () => {
   assert.deepEqual(parseOperatingWindow("09:00 AM - 11:00 PM"), { open: 540, close: 1380 });
   assert.deepEqual(parseOperatingWindow("10:00 PM - 02:00 AM"), { open: 1320, close: 120 });
+  assert.deepEqual(parseOperatingWindow("Mon–Sun 9am – 10pm"), { open: 540, close: 1320 });
+  assert.deepEqual(parseOperatingWindow("Daily 09:00 - 22:00"), { open: 540, close: 1320 });
+  assert.deepEqual(parseOperatingWindow("Open 24 hours"), { open: 0, close: 1440 });
   assert.equal(parseOperatingWindow("usually evenings"), null);
 });
 
@@ -127,6 +132,14 @@ test("open now evaluates Kuala Lumpur time deterministically", () => {
   assert.equal(matchesFilters(COMPLETE, { openNow: true }, { now: openInstant }), true);
   assert.equal(matchesFilters(COMPLETE, { openNow: true }, { now: closedInstant }), false);
   assert.equal(matchesFilters({ ...COMPLETE, operating_hours_raw: null }, { openNow: true }, { now: openInstant }), false);
+  assert.equal(matchesFilters({ ...COMPLETE, operating_hours_raw: "24 hours" }, { openNow: true }, { now: closedInstant }), true);
+});
+
+test("card hours status and open-now filtering share Malaysia time rules", () => {
+  const instant = new Date("2026-09-02T05:00:00.000Z"); // 13:00 MYT
+  const vendor = { ...COMPLETE, operating_hours_raw: "Mon–Sun 9am – 10pm" };
+  assert.equal(matchesFilters(vendor, { openNow: true }, { now: instant }), true);
+  assert.deepEqual(hoursStatus(vendor, instant), { isOpen: true, label: "09:00 am – 10:00 pm" });
 });
 
 test("rating and distance require known values when active", () => {
@@ -167,9 +180,10 @@ test("sorting is stable and keeps missing values last", () => {
     { id: "b", average_rating: 5, review_count: 1, distKm: 1, price_range: null },
     { id: "c", average_rating: 5, review_count: 7, distKm: null, price_range: "RM10" },
     { id: "d", average_rating: null, review_count: 99, distKm: 1, price_range: "RM10" },
+    { id: "e", average_rating: null, review_count: 1, distKm: 2, price_range: "RM15" },
   ];
-  assert.deepEqual(sortVendors(rows, "rating").map((vendor) => vendor.id), ["c", "b", "a", "d"]);
-  assert.deepEqual(sortVendors(rows, "nearest").map((vendor) => vendor.id), ["b", "d", "a", "c"]);
-  assert.deepEqual(sortVendors(rows, "price-low").map((vendor) => vendor.id), ["c", "d", "a", "b"]);
-  assert.deepEqual(sortVendors(rows, "relevant").map((vendor) => vendor.id), ["a", "b", "c", "d"]);
+  assert.deepEqual(sortVendors(rows, "rating").map((vendor) => vendor.id), ["c", "b", "a", "d", "e"]);
+  assert.deepEqual(sortVendors(rows, "nearest").map((vendor) => vendor.id), ["b", "d", "e", "a", "c"]);
+  assert.deepEqual(sortVendors(rows, "price-low").map((vendor) => vendor.id), ["c", "d", "e", "a", "b"]);
+  assert.deepEqual(sortVendors(rows, "relevant").map((vendor) => vendor.id), ["a", "b", "c", "d", "e"]);
 });

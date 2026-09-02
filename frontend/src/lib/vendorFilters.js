@@ -2,6 +2,13 @@
 // panel. MapPage derives one result collection from this module so cards, pins,
 // and sidebar rows cannot disagree about an active filter.
 import { categoryMatches, creatorHandle } from "./vendorDisplay.js";
+import {
+  isOperatingNow,
+  operatingWindowsOverlap,
+  parseOperatingWindow,
+} from "./operatingHours.js";
+
+export { parseOperatingWindow } from "./operatingHours.js";
 
 export const DEFAULT_VENDOR_FILTERS = Object.freeze({
   search: "",
@@ -31,7 +38,6 @@ const OPERATING_PERIODS = Object.freeze({
 });
 
 const PRICE_RE = /^\s*RM\s*(\d+(?:\.\d+)?)\s*(?:[-–—]\s*(?:RM\s*)?(\d+(?:\.\d+)?))?(?:\s+per person)?\s*$/i;
-const HOURS_RE = /^\s*(\d{1,2}):(\d{2})\s*(AM|PM)\s*[-–—]\s*(\d{1,2}):(\d{2})\s*(AM|PM)\s*$/i;
 
 function finiteNumber(value) {
   if (value == null || value === "") return NaN;
@@ -48,53 +54,10 @@ export function parsePriceRange(value) {
   return { min: Math.min(first, second), max: Math.max(first, second) };
 }
 
-function toMinutes(hour, minute, period) {
-  const numericHour = Number(hour);
-  const numericMinute = Number(minute);
-  if (numericHour < 1 || numericHour > 12 || numericMinute < 0 || numericMinute > 59) return null;
-  return (numericHour % 12 + (/pm/i.test(period) ? 12 : 0)) * 60 + numericMinute;
-}
-
-export function parseOperatingWindow(value) {
-  const match = HOURS_RE.exec(String(value || ""));
-  if (!match) return null;
-  const open = toMinutes(match[1], match[2], match[3]);
-  const close = toMinutes(match[4], match[5], match[6]);
-  return open == null || close == null ? null : { open, close };
-}
-
-function rangeSegments(range) {
-  return range.close > range.open
-    ? [[range.open, range.close]]
-    : [[range.open, 1440], [0, range.close]];
-}
-
-function operatingWindowsOverlap(left, right) {
-  return rangeSegments(left).some(([leftStart, leftEnd]) =>
-    rangeSegments(right).some(([rightStart, rightEnd]) => leftStart < rightEnd && rightStart < leftEnd));
-}
-
-function containsMinute(range, minute) {
-  return range.close > range.open
-    ? minute >= range.open && minute < range.close
-    : minute >= range.open || minute < range.close;
-}
-
-function malaysiaMinutes(now) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kuala_Lumpur",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(now);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return Number(values.hour) * 60 + Number(values.minute);
-}
-
 export function matchesFilters(vendor, filters = {}, { now = new Date() } = {}) {
   const active = { ...DEFAULT_VENDOR_FILTERS, ...filters };
 
-  const query = active.search.trim().toLowerCase();
+  const query = String(active.search || "").trim().toLowerCase();
   if (query) {
     const haystack = [vendor.name, vendor.cuisine_types, vendor.signature_dishes]
       .map((field) => String(field || "").toLowerCase());
@@ -115,7 +78,7 @@ export function matchesFilters(vendor, filters = {}, { now = new Date() } = {}) 
     const period = OPERATING_PERIODS[active.hours];
     if (!operatingWindow || !period || !operatingWindowsOverlap(operatingWindow, period)) return false;
   }
-  if (active.openNow && (!operatingWindow || !containsMinute(operatingWindow, malaysiaMinutes(now)))) return false;
+  if (active.openNow && !isOperatingNow(operatingWindow, now)) return false;
 
   if (active.rating !== "any") {
     const rating = finiteNumber(vendor.average_rating);
@@ -152,7 +115,7 @@ export function sortVendors(vendors, sort = DEFAULT_VENDOR_SORT) {
     const leftKnown = Number.isFinite(leftValue);
     const rightKnown = Number.isFinite(rightValue);
     if (leftKnown !== rightKnown) return leftKnown ? -1 : 1;
-    if (!leftKnown) return left.index - right.index;
+    if (!leftKnown) return stable ? left.index - right.index : 0;
     const comparison = descending ? rightValue - leftValue : leftValue - rightValue;
     return comparison || (stable ? left.index - right.index : 0);
   };
