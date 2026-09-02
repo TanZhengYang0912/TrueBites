@@ -30,6 +30,11 @@ export function parseOperatingWindow(value) {
   };
 }
 
+export function operatingWindowForVendor(vendor) {
+  return parseOperatingWindow(vendor?.operating_hours_raw)
+    || parseOperatingWindow(vendor?.operating_hours);
+}
+
 export function rangeSegments(range) {
   if (range.open === 0 && range.close === 1440) return [[0, 1440]];
   return range.close > range.open
@@ -68,7 +73,7 @@ function formatClock(totalMinutes) {
 }
 
 export function operatingStatus(vendor, now = new Date()) {
-  const window = parseOperatingWindow(vendor?.operating_hours_raw || vendor?.operating_hours);
+  const window = operatingWindowForVendor(vendor);
   if (!window) return null;
   return {
     isOpen: isOperatingNow(window, now),

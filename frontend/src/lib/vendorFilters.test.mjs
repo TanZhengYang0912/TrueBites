@@ -142,6 +142,17 @@ test("card hours status and open-now filtering share Malaysia time rules", () =>
   assert.deepEqual(hoursStatus(vendor, instant), { isOpen: true, label: "09:00 am – 10:00 pm" });
 });
 
+test("hours fall back to the legacy field when the raw value is malformed", () => {
+  const instant = new Date("2026-09-02T05:00:00.000Z"); // 13:00 MYT
+  const vendor = {
+    ...COMPLETE,
+    operating_hours_raw: "schedule pending",
+    operating_hours: "09:00 AM - 10:00 PM",
+  };
+  assert.equal(matchesFilters(vendor, { hours: "lunch", openNow: true }, { now: instant }), true);
+  assert.deepEqual(hoursStatus(vendor, instant), { isOpen: true, label: "09:00 am – 10:00 pm" });
+});
+
 test("rating and distance require known values when active", () => {
   assert.equal(matchesFilters(COMPLETE, { rating: "4.5" }), true);
   assert.equal(matchesFilters(COMPLETE, { rating: "5" }), false);

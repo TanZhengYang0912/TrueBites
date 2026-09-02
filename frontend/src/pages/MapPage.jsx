@@ -82,6 +82,10 @@ export default function MapPage() {
   const [selected, setSelected] = useState(null);
   const [openId, setOpenId] = useState(null); // vendor id whose InfoWindow is open
   const [userPos, setUserPos] = useState(null);
+  // Kept separate from userPos because the map may fall back to Melaka centre
+  // after a denied/failed geolocation request. That fallback is useful for the
+  // camera and nearby panel, but it must never masquerade as the user's origin.
+  const [distanceOrigin, setDistanceOrigin] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
   const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
@@ -328,6 +332,7 @@ export default function MapPage() {
   // geolocation resolving, just fed a chosen address instead of GPS.
   function setManualLocation(pos) {
     setUserPos(pos);
+    setDistanceOrigin(pos);
     setLocateTarget(pos);
   }
 
@@ -391,10 +396,16 @@ export default function MapPage() {
         // Label first, then set userPos once. The [userPos] effect re-plans the
         // trip with optimize=true, so setting it twice would silently reorder
         // the user's stops the moment the geocode came back.
-        labelForPosition(pos).then(setUserPos);
+        labelForPosition(pos).then((labelled) => {
+          setUserPos(labelled);
+          setDistanceOrigin(labelled);
+        });
       },
       () => {
         setUserPos(MELAKA_CENTER);
+        setDistanceOrigin(null);
+        setFilters((current) => ({ ...current, distance: "any" }));
+        setSort((current) => (current === "nearest" ? DEFAULT_VENDOR_SORT : current));
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
           notify("Couldn't get your location — showing Melaka centre instead.", true);
@@ -412,15 +423,26 @@ export default function MapPage() {
     }
     const focusOn = (pos) => {
       setUserPos(pos);
+      setDistanceOrigin(pos);
       setLocateTarget(pos);
       setFocusVendor(null);
       setSelected(null);
       setSearchParams({ view: "map" });
     };
-    if (userPos) { focusOn(userPos); return; }
+    if (distanceOrigin) { focusOn(distanceOrigin); return; }
     navigator.geolocation.getCurrentPosition(
       (p) => focusOn({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => { focusOn(MELAKA_CENTER); notify("Couldn't get your location — showing vendors near Melaka centre.", true); }
+      () => {
+        setUserPos(MELAKA_CENTER);
+        setDistanceOrigin(null);
+        setFilters((current) => ({ ...current, distance: "any" }));
+        setSort((current) => (current === "nearest" ? DEFAULT_VENDOR_SORT : current));
+        setLocateTarget(MELAKA_CENTER);
+        setFocusVendor(null);
+        setSelected(null);
+        setSearchParams({ view: "map" });
+        notify("Couldn't get your location — showing vendors near Melaka centre.", true);
+      }
     );
   }
 
@@ -440,17 +462,17 @@ export default function MapPage() {
   // can be usefully ordered before the user shares a position. Discovery's
   // distance controls must not treat that fallback as the user's distance:
   // expose distKm only after GPS or a typed origin creates a real anchor.
-  const vendorsWithDistance = useMemo(() => userPos
+  const vendorsWithDistance = useMemo(() => distanceOrigin
     ? vendors.map((vendor) => (
       vendor.latitude == null || vendor.longitude == null
         ? { ...vendor, distKm: undefined }
         : {
             ...vendor,
-            distKm: haversineKm(userPos.lat, userPos.lng, vendor.latitude, vendor.longitude),
+            distKm: haversineKm(distanceOrigin.lat, distanceOrigin.lng, vendor.latitude, vendor.longitude),
           }
     ))
     : vendors.map((vendor) => ({ ...vendor, distKm: undefined })),
-  [vendors, userPos]);
+  [vendors, distanceOrigin]);
 
   // One collection powers cards, pins and the map sidebar. Downstream views
   // may paginate or apply the map's separate visibility radius, but they never
@@ -483,7 +505,7 @@ export default function MapPage() {
           onFilters={updateFilters}
           onSort={setSort}
           onClearFilters={clearFilters}
-          hasLocation={userPos != null}
+          hasLocation={distanceOrigin != null}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
@@ -554,6 +576,9 @@ export default function MapPage() {
   const filteredIds = new Set(filteredVendors.map((vendor) => vendor.id));
   const pinVendors = vendorsWithDistance
     .filter((vendor) => stopIds.has(vendor.id) || filteredIds.has(vendor.id));
+  const visibleFocusVendor = focusVendor && (stopIds.has(focusVendor.id) || filteredIds.has(focusVendor.id))
+    ? focusVendor
+    : null;
 
   const visibleVendors = selectVisibleVendors({
     vendors: pinVendors,
@@ -561,15 +586,19 @@ export default function MapPage() {
     radiusKm: effectiveRadiusKm,
     showAll: showAllVendors,
     stopIds,
-    focusVendor,
+    focusVendor: visibleFocusVendor,
   });
 
-  // "Nearby to add" — vendors matching the filters, not already in the trip,
-  // within the chosen radius of the anchor, closest first. Filters on the raw
+  // "Nearby to add" — vendors matching the shared discovery order, not already
+  // in the trip, and within the chosen radius of the anchor. Filters on the raw
   // distance so the list and the map pins agree at the boundary; rounds only
   // for display.
   const nearbyToAdd = anchor ? filteredVendors
       .filter((vendor) => vendor.latitude != null && vendor.longitude != null && !stopIds.has(vendor.id))
+      .map((vendor) => ({
+        ...vendor,
+        distKm: haversineKm(anchor.lat, anchor.lng, vendor.latitude, vendor.longitude),
+      }))
       .filter((vendor) => vendor.distKm <= effectiveRadiusKm)
       .slice(0, 12)
       .map((vendor) => ({ ...vendor, distKm: parseFloat(vendor.distKm.toFixed(2)) }))
@@ -597,7 +626,7 @@ export default function MapPage() {
                   locateMe() call in the same update. Without this order, "focus on
                   me" would win and undo the "focus on the vendor I picked" zoom. */}
               <FocusOnUser pos={locateTarget} />
-              <FocusOnVendor vendor={focusVendor} />
+              <FocusOnVendor vendor={visibleFocusVendor} />
               <VendorMarkers
                 vendors={visibleVendors}
                 userPos={userPos}
@@ -710,7 +739,7 @@ export default function MapPage() {
                 onFilters={updateFilters}
                 onSort={setSort}
                 onClearFilters={clearFilters}
-                hasLocation={userPos != null}
+                hasLocation={distanceOrigin != null}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}

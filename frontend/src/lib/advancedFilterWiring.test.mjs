@@ -6,6 +6,7 @@ const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.ur
 const mapPage = read("../pages/MapPage.jsx");
 const dashboard = read("../components/Dashboard.jsx");
 const vendorPanel = read("../components/VendorPanel.jsx");
+const vendorMarkers = read("../components/VendorMarkers.jsx");
 
 test("MapPage owns the complete canonical filter and sort state", () => {
   assert.match(mapPage, /useState\(DEFAULT_VENDOR_FILTERS\)/);
@@ -16,9 +17,15 @@ test("MapPage owns the complete canonical filter and sort state", () => {
 
 test("MapPage derives location-aware distances only from a user origin", () => {
   assert.match(mapPage, /const vendorsWithDistance = useMemo/);
-  assert.match(mapPage, /userPos\s*\?/);
-  assert.match(mapPage, /haversineKm\(userPos\.lat, userPos\.lng/);
+  assert.match(mapPage, /distanceOrigin\s*\?/);
+  assert.match(mapPage, /haversineKm\(distanceOrigin\.lat, distanceOrigin\.lng/);
   assert.match(mapPage, /distKm:\s*undefined/);
+});
+
+test("MapPage keeps Melaka-centre fallback separate from a real distance origin", () => {
+  assert.match(mapPage, /const \[distanceOrigin, setDistanceOrigin\] = useState\(null\)/);
+  assert.match(mapPage, /hasLocation=\{distanceOrigin != null\}/);
+  assert.doesNotMatch(mapPage, /setDistanceOrigin\(MELAKA_CENTER\)/);
 });
 
 test("MapPage derives one filtered sorted collection and shares it with both views", () => {
@@ -27,7 +34,7 @@ test("MapPage derives one filtered sorted collection and shares it with both vie
   assert.match(mapPage, /sortVendors\(/);
   assert.match(mapPage, /<Dashboard[\s\S]*?filteredVendors=\{filteredVendors\}/);
   assert.match(mapPage, /<VendorPanel[\s\S]*?filteredVendors=\{filteredVendors\}/);
-  assert.match(mapPage, /hasLocation=\{userPos != null\}/);
+  assert.match(mapPage, /hasLocation=\{distanceOrigin != null\}/);
 });
 
 test("map pins and nearby rows reuse the shared result instead of matching again", () => {
@@ -35,6 +42,16 @@ test("map pins and nearby rows reuse the shared result instead of matching again
   assert.match(mapPage, /const nearbyToAdd = anchor\s*\? filteredVendors/);
   const sharedPipeline = mapPage.slice(mapPage.indexOf("const filteredIds"));
   assert.doesNotMatch(sharedPipeline, /matchesFilters\(/);
+});
+
+test("a focused vendor cannot bypass active discovery filters", () => {
+  assert.match(mapPage, /const visibleFocusVendor = focusVendor && \(stopIds\.has\(focusVendor\.id\) \|\| filteredIds\.has\(focusVendor\.id\)\)/);
+  assert.match(mapPage, /focusVendor: visibleFocusVendor/);
+  assert.match(mapPage, /<FocusOnVendor vendor=\{visibleFocusVendor\}/);
+});
+
+test("individual map pins expose their vendor name", () => {
+  assert.match(vendorMarkers, /<AdvancedMarker[\s\S]*?title=\{vendor\.name\}/);
 });
 
 test("AdvancedFilters exposes every approved control and responsive semantics", () => {

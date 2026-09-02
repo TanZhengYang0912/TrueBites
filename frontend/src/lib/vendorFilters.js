@@ -4,6 +4,7 @@
 import { categoryMatches, creatorHandle } from "./vendorDisplay.js";
 import {
   isOperatingNow,
+  operatingWindowForVendor,
   operatingWindowsOverlap,
   parseOperatingWindow,
 } from "./operatingHours.js";
@@ -73,7 +74,7 @@ export function matchesFilters(vendor, filters = {}, { now = new Date() } = {}) 
     if (!storedPrice || !bucket || storedPrice.max < bucket.min || storedPrice.min > bucket.max) return false;
   }
 
-  const operatingWindow = parseOperatingWindow(vendor.operating_hours_raw || vendor.operating_hours);
+  const operatingWindow = operatingWindowForVendor(vendor);
   if (active.hours !== "any") {
     const period = OPERATING_PERIODS[active.hours];
     if (!operatingWindow || !period || !operatingWindowsOverlap(operatingWindow, period)) return false;

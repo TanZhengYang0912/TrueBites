@@ -58,6 +58,7 @@ function VendorMarker({ vendor, position, stopNum, isSelected, isApproximate, on
   return (
     <AdvancedMarker
       position={position}
+      title={vendor.name}
       ref={markerRef}
       onClick={() => { onOpenChange(vendor.id); onSelect(vendor); }}
       zIndex={isSelected ? 999 : undefined}
