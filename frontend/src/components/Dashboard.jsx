@@ -139,32 +139,33 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
                   </p>
                 </div>
               </div>
-              <label className="relative flex items-center">
-                <Search size={18} className="absolute left-3.5 text-muted" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
-                  aria-label="Search places"
-                  className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
-                />
-              </label>
+              <button
+                type="button"
+                data-testid="community-discoveries-cta"
+                onClick={requireAuth(() => navigate("/suggestions/new"))}
+                className="group flex min-h-16 w-full items-center justify-between gap-3 border border-forest/20 bg-forest px-4 py-3 text-left text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={17} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Community discoveries</span>
+                    <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-bold" aria-hidden="true">→</span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={requireAuth(() => navigate("/suggestions/new"))}
-              className="group mb-8 flex w-full items-center justify-between gap-5 border border-forest/20 bg-forest px-5 py-4 text-left text-white transition-transform hover:-translate-y-0.5 sm:px-6"
-            >
-              <span className="flex items-center gap-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={19} /></span>
-                <span>
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Community discoveries</span>
-                  <span className="mt-1 block font-display text-2xl leading-none">Know a hidden gem in Melaka?</span>
-                </span>
-              </span>
-              <span className="hidden text-sm font-bold sm:block">Share it →</span>
-            </button>
+            <label data-testid="discovery-search" className="relative mb-8 flex w-full items-center">
+              <Search size={18} className="absolute left-3.5 text-muted" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
+                aria-label="Search places"
+                className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
+              />
+            </label>
 
             <div className="mb-6">
               <FilterChips
