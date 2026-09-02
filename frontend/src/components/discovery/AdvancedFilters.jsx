@@ -19,7 +19,6 @@ import {
   creatorHandle,
 } from "../../lib/vendorDisplay";
 import {
-  DEFAULT_VENDOR_SORT,
   filtersActive,
 } from "../../lib/vendorFilters";
 
@@ -52,13 +51,6 @@ const DISTANCE_OPTIONS = [
   { value: "2", label: "Within 2 km" },
   { value: "5", label: "Within 5 km" },
   { value: "10", label: "Within 10 km" },
-];
-
-const SORT_OPTIONS = [
-  { value: "relevant", label: "Most relevant" },
-  { value: "rating", label: "Highest rated" },
-  { value: "nearest", label: "Nearest" },
-  { value: "price-low", label: "Price: low to high" },
 ];
 
 const CONTROL = "min-h-11 w-full appearance-none rounded border border-sand bg-white px-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
@@ -96,7 +88,6 @@ function FilterSelect({
   value,
   onChange,
   disabled = false,
-  disabledOption = null,
   "data-testid": testId,
 }) {
   return (
@@ -115,11 +106,7 @@ function FilterSelect({
           aria-label={label}
         >
           {options.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              disabled={option.value === disabledOption}
-            >
+            <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
@@ -137,9 +124,7 @@ function FilterSelect({
 
 export default function AdvancedFilters({
   filters,
-  sort,
   onChange,
-  onSortChange,
   onClear,
   vendors = [],
   resultCount = 0,
@@ -150,7 +135,7 @@ export default function AdvancedFilters({
     typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
   ));
   const regionId = useId();
-  const active = filtersActive(filters, sort);
+  const active = filtersActive(filters);
 
   return (
     <section
@@ -279,29 +264,19 @@ export default function AdvancedFilters({
             ? "m-0 text-xs leading-5 text-muted"
             : "m-0 text-xs leading-5 text-muted md:col-span-2 xl:col-span-5"}
           >
-            Set your location to filter or sort by distance.
+            Set your location to filter by distance.
           </p>
         )}
       </div>
 
-      <div className={compact
-        ? "mt-4 flex flex-col gap-3 border-t border-sand pt-4"
-        : "mt-5 flex flex-col gap-3 border-t border-sand pt-4 sm:flex-row sm:items-end sm:justify-between"}
+      <p
+        className={compact
+          ? "mb-0 mt-4 border-t border-sand pt-4 text-[13px] text-muted"
+          : "mb-0 mt-5 border-t border-sand pt-4 text-[13px] text-muted"}
+        aria-live="polite"
       >
-        <p className="m-0 min-h-11 content-center text-[13px] text-muted" aria-live="polite">
-          <strong className="font-semibold text-forest">{resultCount}</strong> places found
-        </p>
-        <div className={compact ? "w-full" : "w-full sm:max-w-[260px]"}>
-          <FilterSelect
-            data-testid="filter-sort"
-            label="Sort by"
-            options={SORT_OPTIONS}
-            value={!hasLocation && sort === "nearest" ? DEFAULT_VENDOR_SORT : sort}
-            disabledOption={!hasLocation ? "nearest" : null}
-            onChange={onSortChange}
-          />
-        </div>
-      </div>
+        <strong className="font-semibold text-forest">{resultCount}</strong> places found
+      </p>
     </section>
   );
 }

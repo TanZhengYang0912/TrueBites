@@ -1,5 +1,7 @@
 # Advanced Discovery Filters Design
 
+> **Latest product decision (2026-09-02):** The customer-facing `Sort by` control and its mutable state are removed. Discovery keeps one fixed default result order. This decision supersedes the sorting UI and `Nearest`-sort references below; the pure sorting helper remains an internal compatibility utility.
+
 ## Goal
 
 Expand TrueBites discovery from search, category, and creator filters into a reliable filtering system backed only by fields the product already stores. The same filter state and matching rules must drive the discovery list, map pins, and map vendor sidebar so switching views never changes the result set unexpectedly.

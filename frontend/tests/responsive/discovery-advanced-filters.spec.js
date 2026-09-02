@@ -133,9 +133,8 @@ test("distance controls are unavailable before a location exists", async ({ page
   await page.goto("/map", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("filter-distance")).toBeDisabled();
-  await expect(page.getByTestId("advanced-filters")).toContainText("Set your location");
-  const nearest = page.getByTestId("filter-sort").locator('option[value="nearest"]');
-  await expect(nearest).toHaveAttribute("disabled", "");
+  await expect(page.getByTestId("advanced-filters")).toContainText("Set your location to filter by distance");
+  await expect(page.getByText("Sort by", { exact: true })).toHaveCount(0);
 });
 
 test("hours, open-now and Clear all stay deterministic", async ({ page }) => {

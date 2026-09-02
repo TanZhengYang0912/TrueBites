@@ -8,11 +8,11 @@ const dashboard = read("../components/Dashboard.jsx");
 const vendorPanel = read("../components/VendorPanel.jsx");
 const vendorMarkers = read("../components/VendorMarkers.jsx");
 
-test("MapPage owns the complete canonical filter and sort state", () => {
+test("MapPage owns canonical filters and keeps the result order fixed", () => {
   assert.match(mapPage, /useState\(DEFAULT_VENDOR_FILTERS\)/);
-  assert.match(mapPage, /useState\(DEFAULT_VENDOR_SORT\)/);
   assert.match(mapPage, /setFilters\(DEFAULT_VENDOR_FILTERS\)/);
-  assert.match(mapPage, /setSort\(DEFAULT_VENDOR_SORT\)/);
+  assert.doesNotMatch(mapPage, /useState\(DEFAULT_VENDOR_SORT\)/);
+  assert.doesNotMatch(mapPage, /setSort\(/);
 });
 
 test("MapPage derives location-aware distances only from a user origin", () => {
@@ -69,11 +69,12 @@ test("AdvancedFilters exposes every approved control and responsive semantics", 
     "filter-rating",
     "filter-distance",
     "filter-open-now",
-    "filter-sort",
     "clear-filters",
   ]) {
     assert.match(source, new RegExp(`data-testid=["']${testId}["']`));
   }
+  assert.doesNotMatch(source, /data-testid=["']filter-sort["']/);
+  assert.doesNotMatch(source, />Sort by</);
   assert.match(source, /aria-expanded/);
   assert.match(source, /aria-controls/);
   assert.match(source, /role="switch"/);
@@ -87,7 +88,7 @@ test("AdvancedFilters disables and explains location-dependent controls", () => 
   assert.match(source, /hasLocation/);
   assert.match(source, /Set your location/);
   assert.match(source, /disabled=\{!hasLocation\}/);
-  assert.match(source, /disabledOption=/);
+  assert.doesNotMatch(source, /sort by distance/i);
 });
 
 test("Dashboard renders controlled advanced filters and paginates the shared result", () => {
@@ -96,6 +97,7 @@ test("Dashboard renders controlled advanced filters and paginates the shared res
   assert.match(dashboard, /paginate\(filteredVendors, page, PAGE_SIZE\)/);
   assert.match(dashboard, /value=\{filters\.search\}/);
   assert.match(dashboard, /onClear=\{onClearFilters\}/);
+  assert.doesNotMatch(dashboard, /onSort/);
   assert.doesNotMatch(dashboard, /<FilterChips/);
 });
 
@@ -104,5 +106,6 @@ test("VendorPanel uses controlled search and the compact shared panel", () => {
   assert.match(vendorPanel, /<AdvancedFilters/);
   assert.match(vendorPanel, /resultCount=\{filteredVendors\.length\}/);
   assert.match(vendorPanel, /compact/);
+  assert.doesNotMatch(vendorPanel, /onSort/);
   assert.doesNotMatch(vendorPanel, /<FilterChips/);
 });

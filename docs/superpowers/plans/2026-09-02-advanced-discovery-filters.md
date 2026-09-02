@@ -1,5 +1,7 @@
 # Advanced Discovery Filters Implementation Plan
 
+> **Post-implementation update (2026-09-02):** The user removed the customer-facing `Sort by` control. `MapPage`, `Dashboard`, `VendorPanel`, and `AdvancedFilters` no longer own or pass mutable sort state; results use the fixed default order. Historical sort steps below document the original implementation plan and are superseded by this update.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add eight reliable discovery filtering and sorting capabilities that stay synchronized across the TrueBites list, map pins, and map vendor sidebar.

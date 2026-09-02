@@ -25,7 +25,6 @@ import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
 import {
   DEFAULT_VENDOR_FILTERS,
-  DEFAULT_VENDOR_SORT,
   matchesFilters,
   sortVendors,
 } from "../lib/vendorFilters";
@@ -89,12 +88,8 @@ export default function MapPage() {
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
   const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
-  const [sort, setSort] = useState(DEFAULT_VENDOR_SORT);
   const updateFilters = (partial) => setFilters((current) => ({ ...current, ...partial }));
-  const clearFilters = () => {
-    setFilters(DEFAULT_VENDOR_FILTERS);
-    setSort(DEFAULT_VENDOR_SORT);
-  };
+  const clearFilters = () => setFilters(DEFAULT_VENDOR_FILTERS);
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
@@ -405,7 +400,6 @@ export default function MapPage() {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
         setFilters((current) => ({ ...current, distance: "any" }));
-        setSort((current) => (current === "nearest" ? DEFAULT_VENDOR_SORT : current));
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
           notify("Couldn't get your location — showing Melaka centre instead.", true);
@@ -436,7 +430,6 @@ export default function MapPage() {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
         setFilters((current) => ({ ...current, distance: "any" }));
-        setSort((current) => (current === "nearest" ? DEFAULT_VENDOR_SORT : current));
         setLocateTarget(MELAKA_CENTER);
         setFocusVendor(null);
         setSelected(null);
@@ -478,11 +471,8 @@ export default function MapPage() {
   // may paginate or apply the map's separate visibility radius, but they never
   // repeat discovery matching or sorting.
   const filteredVendors = useMemo(
-    () => sortVendors(
-      vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters)),
-      sort,
-    ),
-    [vendorsWithDistance, filters, sort],
+    () => sortVendors(vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters))),
+    [vendorsWithDistance, filters],
   );
 
   if (!API_KEY) {
@@ -501,9 +491,7 @@ export default function MapPage() {
           vendors={vendorsWithDistance}
           filteredVendors={filteredVendors}
           filters={filters}
-          sort={sort}
           onFilters={updateFilters}
-          onSort={setSort}
           onClearFilters={clearFilters}
           hasLocation={distanceOrigin != null}
           loading={vendorsLoading}
@@ -735,9 +723,7 @@ export default function MapPage() {
                 filteredVendors={filteredVendors}
                 nearby={nearbyToAdd}
                 filters={filters}
-                sort={sort}
                 onFilters={updateFilters}
-                onSort={setSort}
                 onClearFilters={clearFilters}
                 hasLocation={distanceOrigin != null}
                 radiusKm={radiusKm}
