@@ -1,61 +1,69 @@
-# Discovery Search and Community CTA Swap — Design QA
+# Advanced discovery filters — design QA
 
 ## Comparison target
 
-- Source visual truth: `codex-clipboard-47c435b4-31f2-4310-a887-8f1d9ff6d8fb.png`
-- Final desktop implementation: `truebites-discovery-swap-desktop-passed.png`
-- Final mobile implementation: `truebites-discovery-swap-mobile-passed.png`
-- Normalized full-view comparison: `truebites-discovery-swap-comparison-passed.png`
-- Route and state: `/map`, default search and filters, 300-vendor discovery state.
+- Source visual truth: `docs/screenshots/advanced-filters-reference.png`
+- Rendered desktop implementation: `docs/screenshots/advanced-filters-desktop.jpg`
+- Rendered mobile implementation: `docs/screenshots/advanced-filters-mobile.jpg`
+- Focused side-by-side evidence: `docs/screenshots/advanced-filters-comparison.png`
+- Route: `http://localhost:5173/map`
+- Theme/state: light theme; List view; filters expanded on desktop and collapsed by default on mobile; API-backed vendor data loaded.
 
-## Capture normalization
+## Capture and normalization
 
-- Source pixels: 2706 × 576. The source is a main-content crop captured at approximately 1.5× density.
-- Source normalized comparison size: 1804 × 384 at 1× density.
-- Desktop implementation viewport: 1804 × 576 CSS px, device scale factor 1.
-- Desktop comparison crop: implementation y=72–456, producing 1804 × 384 px to exclude browser-owned page header and align with the source's main-content crop.
-- Mobile implementation viewport: 375 × 900 CSS px, device scale factor 1.
-- The normalized comparison places the source above the final implementation in one 1804 × 788 image with a 20px separator.
+- Source pixels: 1998 × 558.
+- Desktop implementation pixels: 1585 × 892, captured from an explicit 1600 × 900 CSS viewport override in the Codex in-app browser.
+- Mobile implementation pixels: 375 × 812, captured from an explicit 390 × 844 CSS viewport override in the same browser.
+- Focused comparison pixels: 1270 × 917. The source was proportionally normalized to 1270 px wide; the implementation filter region was cropped at its native density to the same 1270 px width. No device frame or browser chrome was included in the focused comparison.
+- Density: both artifacts were treated as 1× raster evidence after width normalization. No finding was based on antialiasing or density-only differences.
 
-## Evidence
+## Full-view comparison evidence
 
-The combined comparison shows the requested spatial exchange: the Community Discoveries CTA now occupies the former 300–420px search column, while search spans the full content row previously occupied by the CTA. The final CTA preserves its forest background, lightbulb icon, eyebrow, prompt, and desktop `Share it` action. The search retains its original height, border, icon, placeholder, and focus affordance.
+The desktop capture preserves the reference hierarchy: creator filter and clear/collapse actions first, a divider, then the five reliable primary filters, followed by availability and result/sort feedback. The TrueBites implementation deliberately omits Dietary options, Amenities, Vibe, and Crowd level because the current vendor records do not provide reliable fields for them. It uses the existing TrueBites chalk, forest, sand, ink, display, and body tokens rather than copying the reference application's neutral theme.
 
-The component is already large and readable in the normalized full-view comparison, so a separate focused desktop crop would duplicate the same evidence. The 375 × 900 mobile capture is the additional focused responsive evidence: title, CTA, and search stack in order without horizontal overflow, and the CTA uses an icon-only action at that width.
+At 390 px, the panel defaults to collapsed, the creator control and actions remain readable, and the filter controls expand into a single column. The header, hero, search, and results retain their hierarchy without horizontal overflow.
 
-## Required fidelity surfaces
+## Focused region comparison evidence
 
-- Fonts and typography: Existing display and body font families, weights, italics, line heights, and tracking are preserved. Compact CTA type scales down without losing hierarchy or clipping.
-- Spacing and layout rhythm: Desktop grid tracks remain `minmax(0,1fr)` and `minmax(300px,420px)`. The full-width search aligns with the content frame. Mobile spacing is even and no control crosses the viewport.
-- Colors and visual tokens: Existing chalk, forest, terracotta, sand, ink, muted, and white tokens remain unchanged.
-- Image quality and asset fidelity: The supplied mascot and Lucide lightbulb/arrow icons remain sharp and correctly scaled; no placeholder or code-drawn replacement was introduced.
-- Copy and content: Hero, vendor count, search placeholder, Community Discoveries eyebrow, prompt, and desktop `Share it` action are preserved.
+`docs/screenshots/advanced-filters-comparison.png` places the normalized source and rendered filter panel in one image. It confirms:
 
-## Interaction checks
+- Fonts and typography: labels, control text, result count, and actions use a consistent TrueBites body hierarchy; no clipped or cramped text was observed.
+- Spacing and layout rhythm: creator/actions, dividers, five-column desktop grid, controls, location hint, result count, and sort are aligned and consistently spaced.
+- Colors and tokens: semantic disabled states, forest actions, sand borders, and white surfaces map cleanly to the existing product system with sufficient contrast.
+- Image quality and assets: the filter panel contains no target imagery; all visible symbols use the existing Lucide icon family, with no placeholder, CSS-drawn, or custom SVG substitutions.
+- Copy and content: labels and option ranges are concise, locally relevant (RM and kilometres), and coherent without the reference application's unsupported fields.
 
-- In the authenticated in-app browser, entering `Chef Wan` in the relocated search reduced the vendor results to Chef Wan's Cafe, confirming immediate filtering still works.
-- Clicking the compact Community Discoveries CTA opened `/suggestions/new`.
-- The suggestion form Back action returned to `/map`.
-- No broken or error state appeared during these checks.
+## Interaction and responsive evidence
 
-## Comparison history
-
-### Iteration 1
-
-- Finding [P2]: the compact desktop CTA showed only an arrow, while the source CTA explicitly labeled the action `Share it →`. This weakened the desktop affordance and was a visible copy mismatch.
-- Fix: added a responsive action treatment that shows `Share it` with a Lucide ArrowRight from `sm` upward, while retaining an icon-only action on narrow mobile screens.
-- Post-fix evidence: `truebites-discovery-swap-comparison-passed.png` shows the desktop label restored; `truebites-discovery-swap-mobile-passed.png` shows the mobile CTA remains uncluttered and does not overflow.
+- Category selection changed the List result count from 300 to 178 and updated the visible cards.
+- Rating 4.5+ changed the Map result count to 4 and reduced the rendered map pins/clusters to the same four vendors.
+- Returning from Map to List preserved the 4.5+ state and the same four results.
+- Distance and Nearest stay disabled until a real location is available, with an explanatory hint.
+- Mobile loaded with `Show filters`; expanding it revealed a one-column filter stack.
+- The in-app browser console contained no warnings or errors during the final pass.
+- Focused Playwright coverage passed 9/9 scenarios, including filter reset, pagination reset, location success/failure, and one-result List/Map consistency.
+- The complete responsive Playwright suite passed 122/122 scenarios across customer and admin routes.
 
 ## Findings
 
-No actionable P0, P1, or P2 differences remain. No P3 follow-up is required for the requested swap.
+- No actionable P0, P1, or P2 visual or interaction differences remain.
+- [P3] The pre-existing global trip FAB can overlap a small portion of the lower-right edge of a control at narrow viewport scroll positions. The controls remain usable from the rest of their full-width target, and this does not block the filtering flow. A future polish pass could integrate the trip shortcut into the mobile header or reserve a dedicated safe area.
+
+## Open questions
+
+- Dietary options, Amenities, Vibe, and Crowd level remain intentionally deferred until those attributes have a trustworthy source in the vendor model.
+
+## Comparison history
+
+- Pass 1: no P0/P1/P2 mismatch was found. The first evidence capture occurred before vendor loading completed, so it was replaced with a post-load capture; this was an evidence correction, not a visual implementation fix.
+- Post-load evidence: desktop and mobile layouts, selected-filter behavior, List/Map synchronization, responsive collapse, and console state were rechecked. No P0/P1/P2 finding was introduced.
 
 ## Implementation checklist
 
-- [x] Community Discoveries moved to the hero's right column.
-- [x] Search moved to the full-width row below the hero.
-- [x] Desktop and mobile CTA actions remain clear.
-- [x] Search and CTA interactions remain functional.
-- [x] Desktop and mobile layouts have no horizontal overflow.
+- [x] Match the reference filter hierarchy with supported TrueBites data.
+- [x] Keep desktop expanded and mobile collapsed by default.
+- [x] Keep List cards, Map pins, and Map sidebar synchronized.
+- [x] Verify disabled location-dependent states and clear explanations.
+- [x] Verify typography, spacing, tokens, icons, copy, responsiveness, and console state.
 
 final result: passed
