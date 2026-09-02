@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { X, Bookmark, Bot, Play, Wallet, MapPin, Star } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
@@ -10,6 +9,7 @@ import { useSession } from "../../lib/SessionContext";
 import { getReviews, deleteReview, voteReview, removeVote } from "../../api/engagement";
 import ReviewForm from "../engagement/ReviewForm";
 import ReviewList from "../engagement/ReviewList";
+import GuestPrompt from "./GuestPrompt";
 import Toast from "../engagement/Toast";
 import { customerSession } from "../../lib/roles";
 import { useToast } from "../../lib/useToast";
@@ -19,7 +19,6 @@ const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 
 export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated }) {
-  const navigate = useNavigate();
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
@@ -27,6 +26,13 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
   const [editingReview, setEditingReview] = useState(null); // "new" | review object | null
   const [stats, setStats] = useState({ average_rating: vendor?.average_rating, review_count: vendor?.review_count });
   const [toast, notify] = useToast();
+  // Voting on a review and writing one are actions this modal owns directly
+  // (unlike bookmarking, which is guarded one level up by whichever page
+  // rendered this modal — see Dashboard.jsx's requireAuth) — so a guest
+  // trying either one needs its own guard here. Same GuestPrompt popup
+  // Dashboard/MapPage use elsewhere, instead of sending a guest straight to
+  // /login with no context for why.
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
 
   useEffect(() => {
     if (!vendor) return;
@@ -49,7 +55,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
   const myReview = reviews.find((r) => r.isOwn);
 
   async function handleVote(reviewId, isLike) {
-    if (!session && !ENGAGEMENT_TEST_MODE) { navigate("/login"); return; }
+    if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }
     try {
       isLike === null ? await removeVote(reviewId) : await voteReview(reviewId, isLike);
       const r = await getReviews(vendor.id);
@@ -206,7 +212,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
               <h3 className="m-0 font-display text-base text-forest">Reviews</h3>
               {!myReview && editingReview !== "new" && (
                 <button
-                  onClick={() => { if (!session && !ENGAGEMENT_TEST_MODE) { navigate("/login"); return; } setEditingReview("new"); }}
+                  onClick={() => { if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; } setEditingReview("new"); }}
                   className="min-h-11 text-[13px] font-semibold text-terracotta"
                 >
                   + Write a review
@@ -242,6 +248,7 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
         </div>
       </div>
       <Toast toast={toast} />
+      <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
     </div>
   );
 }

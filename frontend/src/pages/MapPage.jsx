@@ -15,6 +15,7 @@ import DirectionsRenderer from "../components/DirectionsRenderer";
 import TransitLayer from "../components/TransitLayer";
 import Dashboard from "../components/Dashboard";
 import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
+import GuestPrompt from "../components/discovery/GuestPrompt";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
@@ -87,6 +88,18 @@ export default function MapPage() {
   const [panelTab, setPanelTab] = useState(loadPanelTab);
   function changeTab(tab) { setPanelTab(tab); savePanelTab(tab); }
   const [mapFullscreen, setMapFullscreen] = useState(false);
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+
+  // Same pattern as Dashboard.jsx's own requireAuth — guests can browse the
+  // map freely but Saved/My reviews/Suggestions need an identity, so nudge
+  // with the GuestPrompt popup instead of sending them straight to /login
+  // (or, worse, straight to a page whose whole content is "please sign in").
+  function requireAuth(fn) {
+    return (...args) => {
+      if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }
+      fn(...args);
+    };
+  }
 
   // Trip planning is unauthenticated, browser-local state — restored from
   // localStorage on mount (see lib/tripStorage.js) so a reload doesn't lose it.
@@ -595,13 +608,15 @@ export default function MapPage() {
               activeSection={null}
               mapActive
               onOpenDiscover={backToDashboard}
-              onOpenSaved={() => navigate("/engagement")}
-              onOpenReviews={() => navigate("/engagement?tab=reviews")}
+              onOpenSaved={requireAuth(() => navigate("/engagement"))}
+              onOpenReviews={requireAuth(() => navigate("/engagement?tab=reviews"))}
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
-              onOpenSuggestions={() => navigate("/suggestions")}
+              onOpenSuggestions={requireAuth(() => navigate("/suggestions"))}
             />
           </div>
         )}
+
+        <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
 
         <button
           onClick={() => setMapFullscreen((v) => !v)}

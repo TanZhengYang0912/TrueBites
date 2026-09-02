@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { ThumbsUp, ThumbsDown, Pencil, Trash2 } from "lucide-react";
 import StarRating from "./StarRating";
 import ImageLightbox from "./ImageLightbox";
@@ -85,7 +86,14 @@ export default function ReviewList({ reviews, onVote, onEdit, onDelete }) {
       ))}
       <ImageLightbox src={openPhoto} onClose={() => setOpenPhoto(null)} />
 
-      {pendingDelete && (
+      {pendingDelete && createPortal(
+        // Rendered via a portal straight into <body>, same reasoning as
+        // ImageLightbox: ReviewList's own caller (VendorDetailModal) animates
+        // its card with a CSS transform (animate-modal-in), which makes that
+        // card the containing block for any `position: fixed` descendant —
+        // without the portal this popup was "fixed" relative to that card
+        // instead of the real viewport, so it showed up confined to/on top
+        // of the vendor detail modal instead of as a true full-screen popup.
         <div
           onClick={() => setPendingDelete(null)}
           className="fixed inset-0 z-[1200] flex items-end justify-center bg-forest/60 p-0 animate-backdrop-in sm:items-center sm:p-5"
@@ -111,7 +119,8 @@ export default function ReviewList({ reviews, onVote, onEdit, onDelete }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
