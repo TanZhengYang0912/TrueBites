@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import FilterChips from "./discovery/FilterChips";
@@ -152,7 +152,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
                     <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-bold" aria-hidden="true">→</span>
+                <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
               </button>
             </div>
 
