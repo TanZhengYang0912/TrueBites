@@ -26,7 +26,7 @@ const vendor = (id, name, status, imageUrl = "https://images.example.test/storef
   coverLocked: false,
 });
 
-async function setup(page, width = 1440, { failPatchOnceFor, failDeleteOnceFor, deferPatchFor } = {}) {
+async function setup(page, width = 1440, { failPatchOnceFor, failDeleteOnceFor, failRefreshAfterDelete, deferPatchFor } = {}) {
   const writes = [];
   const vendors = [
     vendor("draft", "Draft Cafe", "draft"),
@@ -37,6 +37,7 @@ async function setup(page, width = 1440, { failPatchOnceFor, failDeleteOnceFor, 
   ];
   const failedPatchIds = new Set(failPatchOnceFor ? [failPatchOnceFor] : []);
   const failedDeleteIds = new Set(failDeleteOnceFor ? [failDeleteOnceFor] : []);
+  let pendingRefreshFailure = failRefreshAfterDelete;
   let releaseDeferredPatch;
   const deferredPatch = new Promise(resolve => { releaseDeferredPatch = resolve; });
   await page.setViewportSize({ width, height: 900 });
@@ -44,6 +45,11 @@ async function setup(page, width = 1440, { failPatchOnceFor, failDeleteOnceFor, 
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname === "/api/admin/vendors" && request.method() === "GET") {
+      if (pendingRefreshFailure && writes.some(write => write.method === "DELETE")) {
+        pendingRefreshFailure = false;
+        await route.fulfill({ status: 500, json: { error: "Vendor list refresh failed" } });
+        return;
+      }
       const pageNumber = Number(url.searchParams.get("page") || 1);
       const pageSize = Number(url.searchParams.get("pageSize") || 10);
       await route.fulfill({ json: {
@@ -111,6 +117,13 @@ async function dialogGeometry(dialog) {
   });
 }
 
+async function buttonColors(locator) {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.color, style.backgroundColor, style.borderColor];
+  });
+}
+
 for (const width of [1440, 390]) {
   test(`vendor action confirmation is safe and matches Delete geometry at ${width}px`, async ({ page }) => {
     const { writes } = await setup(page, width);
@@ -138,6 +151,8 @@ for (const width of [1440, 390]) {
     const suspendDialog = page.getByRole("dialog", { name: "Suspend vendor?" });
     await expect(suspendDialog).toBeVisible();
     const suspendGeometry = await dialogGeometry(suspendDialog);
+    await expect(suspendDialog.locator(".admin-primary-btn")).toHaveClass(/danger/);
+    const suspendColors = await buttonColors(suspendDialog.locator(".admin-primary-btn"));
     await suspendDialog.getByRole("button", { name: "Cancel", exact: true }).click();
 
     await page.getByRole("button", { name: "Edit Draft Cafe", exact: true }).first().click();
@@ -169,6 +184,7 @@ for (const width of [1440, 390]) {
     expect(deleteGeometry).toEqual(approveGeometry);
     expect(deleteGeometry).toEqual(suspendGeometry);
     expect(deleteGeometry).toEqual(saveGeometry);
+    expect(await buttonColors(deleteDialog.locator(".admin-primary-btn"))).toEqual(suspendColors);
     await deleteDialog.getByRole("button", { name: "Cancel", exact: true }).click();
   });
 }
@@ -239,6 +255,21 @@ test("delete entry points confirm captured targets and retry a failed deletion",
   await expect(page.getByRole("dialog", { name: "Delete vendor?" })).toBeVisible();
   await page.getByRole("dialog", { name: "Delete vendor?" }).getByRole("button", { name: "Delete", exact: true }).click();
   await expect.poll(() => writes.filter(write => write.method === "DELETE").length).toBe(5);
+});
+
+test("a post-delete refresh failure keeps failed bulk targets selected without repeating deletes", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  const { writes } = await setup(page, 1440, { failDeleteOnceFor: "missing", failRefreshAfterDelete: true });
+  await page.getByRole("checkbox", { name: "Select Draft Cafe", exact: true }).first().check();
+  await page.getByRole("checkbox", { name: "Select Missing Photo Cafe", exact: true }).check();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("dialog", { name: "Delete 2 vendors?" }).getByRole("button", { name: "Delete", exact: true }).click();
+  await expect.poll(() => writes.filter(write => write.method === "DELETE").length).toBe(2);
+  await expect(page.getByRole("status").filter({ hasText: /Vendors were deleted, but the list couldn't refresh/i })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Select Missing Photo Cafe", exact: true })).toBeChecked();
+  expect(pageErrors).toEqual([]);
+  expect(writes.filter(write => write.id === "draft")).toHaveLength(1);
 });
 
 test("a failed status confirmation can retry", async ({ page }) => {

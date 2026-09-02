@@ -1714,6 +1714,14 @@ export default function AdminVendorManagementPage() {
           true
         );
       }
+    } catch (err) {
+      // The mutation may already have succeeded when the follow-up GET fails.
+      // Keep its failed-ID selection intact and avoid offering a stale dialog
+      // that could repeat successful deletions; the persistent banner can
+      // refresh the list without issuing DELETE again.
+      const message = `Vendors were deleted, but the list couldn't refresh: ${err.message}`;
+      setError(message);
+      notify(message, true);
     } finally {
       setBulkBusy(false);
     }
@@ -2154,7 +2162,7 @@ export default function AdminVendorManagementPage() {
           title={`${label} ${statusConfirmation.bulk ? `${count} vendor${count === 1 ? "" : "s"}` : "vendor"}?`}
           message={`${label} ${subject}? ${effect}`}
           confirmLabel={label}
-          tone="primary"
+          tone={statusConfirmation.status === "suspended" ? "danger" : "primary"}
           onConfirm={() => executeStatusConfirmation(statusConfirmation)}
           onCancel={() => setStatusConfirmation(null)}
         />;
