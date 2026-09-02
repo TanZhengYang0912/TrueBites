@@ -38,7 +38,7 @@ async function gap(page, locator) {
 
 test("saved places and reviews use the square control shape", async ({ page }) => {
   await stubEngagementApi(page);
-  await page.goto("/engagement", { waitUntil: "networkidle" });
+  await page.goto("/saved", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("button", { name: /New folder/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "All 0" })).toBeVisible();
@@ -51,7 +51,7 @@ test("saved places and reviews use the square control shape", async ({ page }) =
   expect(await gap(page, allFolder)).toBe("6px");
   expect(await gap(page, defaultFolder)).toBe("6px");
 
-  await page.goto("/engagement?tab=reviews", { waitUntil: "networkidle" });
+  await page.goto("/reviews", { waitUntil: "networkidle" });
   await expect(page.getByPlaceholder("Search by place or review text")).toBeVisible();
   expect(await radius(page, page.getByPlaceholder("Search by place or review text"))).toBe("6px");
   expect(await radius(page, page.getByRole("combobox", { name: "Filter by rating" }))).toBe("6px");
