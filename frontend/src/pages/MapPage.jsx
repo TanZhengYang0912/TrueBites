@@ -19,7 +19,7 @@ import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
-import { loadTrip, saveTrip } from "../lib/tripStorage";
+import { loadTrip, saveTrip, tripOwner } from "../lib/tripStorage";
 import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
@@ -71,8 +71,9 @@ export default function MapPage() {
   }
   const [vendors, setVendors] = useState([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
-  const { session: authSession } = useSession();
+  const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
+  const owner = tripOwner(authSession);
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
   const [folders, setFolders] = useState([]);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
@@ -97,12 +98,14 @@ export default function MapPage() {
   function changeTab(tab) { setPanelTab(tab); savePanelTab(tab); }
   const [mapFullscreen, setMapFullscreen] = useState(false);
 
-  // Trip planning is unauthenticated, browser-local state — restored from
-  // localStorage on mount (see lib/tripStorage.js) so a reload doesn't lose it.
-  const [trip, setTrip] = useState(() => loadTrip()?.stops || []);              // unified draggable stops
+  // Guest trips and account trips are browser-local but isolated from each
+  // other. Hydration waits for Supabase to resolve the current identity so a
+  // logged-in trip can never be mistaken for a guest trip during startup.
+  const [trip, setTrip] = useState([]);              // unified draggable stops
   const [tripData, setTripData] = useState(null);
   const [tripLoading, setTripLoading] = useState(false);
-  const [travelMode, setTravelMode] = useState(() => loadTrip()?.travelMode || null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
+  const [travelMode, setTravelMode] = useState(null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
+  const [hydratedOwner, setHydratedOwner] = useState(null);
   const [dirSummary, setDirSummary] = useState(null);
   const [routeIndex, setRouteIndex] = useState(0);       // selected alt route (DRIVING)
   const [routeOptions, setRouteOptions] = useState([]);  // alt routes + toll flags (DRIVING)
@@ -111,6 +114,18 @@ export default function MapPage() {
   const [toast, notify] = useToast();
   const [accountStatus, setAccountStatus] = useState(null);
   const [mapError, setMapError] = useState("");
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    const stored = loadTrip(owner);
+    setTrip(stored?.stops || []);
+    setTravelMode(stored?.travelMode || null);
+    setTripData(null);
+    setDirSummary(null);
+    setRouteOptions([]);
+    setTransitLegs([]);
+    setHydratedOwner(owner);
+  }, [owner, sessionLoading]);
 
   useEffect(() => {
     const mapAuthFailure = () => {
@@ -205,7 +220,10 @@ export default function MapPage() {
 
   // Persist the trip on every change (id/name/lat/lng/isMe/source only — see
   // lib/tripStorage.js for why the embedded `vendor` snapshot isn't saved).
-  useEffect(() => { saveTrip(trip, travelMode); }, [trip, travelMode]);
+  useEffect(() => {
+    if (hydratedOwner !== owner) return;
+    saveTrip(trip, travelMode, owner);
+  }, [trip, travelMode, owner, hydratedOwner]);
 
   // A trip restored from storage carries vendor stops with no `vendor` object
   // (it's never persisted). Re-attach it by id once the vendor list loads.
@@ -229,9 +247,10 @@ export default function MapPage() {
   // otherwise go stale). Runs once; DirectionsRenderer already handles this
   // reactively when a travelMode was also restored.
   useEffect(() => {
+    if (hydratedOwner !== owner) return;
     if (trip.length >= 2 && !travelMode) planTrip(trip, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hydratedOwner, owner]);
 
   // Bookmarks are server-backed and auth-gated — an anonymous browser sees
   // none, and any local state is dropped the moment the session disappears.

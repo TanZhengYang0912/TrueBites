@@ -57,8 +57,8 @@ export default function Dashboard({
     return () => { active = false; };
   }, [session]);
 
-  // Guests can browse freely but can't bookmark, add personal trip stops
-  // tied to an account, or view "My reviews" — nudge them to log in instead.
+  // Guests can browse and build a browser-local trip. Account-backed actions
+  // (bookmarking, suggestions, and "My reviews") still require login.
   function requireAuth(fn) {
     return (...args) => {
       if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }

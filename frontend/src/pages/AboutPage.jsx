@@ -79,11 +79,11 @@ export default function AboutPage() {
           Browse the discovery grid or the interactive map, filter by
           cuisine or by the creator who found the place, and bookmark
           favourites into folders you name yourself. Signed-in users can
-          write star-rated reviews with up to four photos, vote on reviews
-          they find helpful, and plan a multi-stop trip across Melaka with
-          real turn-by-turn directions. Guests can do all the browsing
-          without an account — bookmarking, reviewing, and trip-building are
-          reserved for signed-in users.
+          write star-rated reviews with up to four photos and vote on reviews
+          they find helpful. Everyone, including guests, can plan a
+          browser-local multi-stop trip across Melaka with real turn-by-turn
+          directions; signing in, signing out, or switching accounts starts a
+          fresh trip so plans never leak between identities.
         </p>
       </Section>
 
