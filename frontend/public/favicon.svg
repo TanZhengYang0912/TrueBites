@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TrueBites</title>
+  <style>
+    :root {
+      --mark: #000;
+      color: var(--mark);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --mark: #fff;
+      }
+    }
+  </style>
+  <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="5" />
+  <text
+    x="50"
+    y="61"
+    fill="currentColor"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="34"
+    font-weight="700"
+    letter-spacing="-2"
+    text-anchor="middle"
+  >TB</text>
+</svg>
