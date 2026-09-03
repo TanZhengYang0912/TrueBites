@@ -15,6 +15,7 @@ import ConfirmDialog from "../../components/admin/ConfirmDialog";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
 import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
+import "./vendorMobileFilters.css";
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
@@ -1762,8 +1763,8 @@ export default function AdminVendorManagementPage() {
 
   const content = (
     <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 xl:max-w-2xl">
+      <div className="vendor-filter-toolbar flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="vendor-filter-search flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 xl:max-w-2xl">
           <Search size={16} className="text-gray-400" />
           <input
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
@@ -1773,8 +1774,8 @@ export default function AdminVendorManagementPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-10 items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+        <div className="vendor-filter-controls flex flex-wrap items-center gap-3">
+          <div className="vendor-filter-view inline-flex h-10 items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
             <button
               type="button"
               className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors ${viewMode === "list" ? "bg-slate-100 text-blue-700" : "text-gray-500 hover:bg-gray-50"}`}
@@ -1792,7 +1793,7 @@ export default function AdminVendorManagementPage() {
               <MapPinned size={15} /> Map
             </button>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={category} onChange={(e) => { setCategory(e.target.value); resetToFirstPage(); }}>
               <option value="all">All Categories</option>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1801,7 +1802,7 @@ export default function AdminVendorManagementPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={status} onChange={(e) => { setStatus(e.target.value); resetToFirstPage(); }}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s === "all" ? "All Statuses" : s[0].toUpperCase() + s.slice(1)}</option>
@@ -1811,7 +1812,7 @@ export default function AdminVendorManagementPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={sort} onChange={(e) => { setSort(e.target.value); resetToFirstPage(); }}>
               {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
