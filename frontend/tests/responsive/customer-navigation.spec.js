@@ -47,19 +47,31 @@ test("primary customer navigation uses dedicated page links", async ({ page }) =
   const savedLink = primary.getByRole("link", { name: /Saved/ });
   const reviewsLink = primary.getByRole("link", { name: "My reviews" });
   const suggestionsLink = primary.getByRole("link", { name: /Suggest/ });
+  await expect(primary).not.toHaveAttribute("role", "tablist");
+  await expect(savedLink).not.toHaveAttribute("role", "tab");
+  await expect(reviewsLink).not.toHaveAttribute("role", "tab");
+  await expect(suggestionsLink).not.toHaveAttribute("role", "tab");
   await expect(savedLink).toHaveAttribute("href", "/saved");
   await expect(reviewsLink).toHaveAttribute("href", "/reviews");
   await expect(suggestionsLink).toHaveAttribute("href", "/suggestions");
   await expect(savedLink).toHaveAttribute("aria-current", "page");
   await expect(reviewsLink).not.toHaveAttribute("aria-current", "page");
 
+  await page.evaluate(() => {
+    window.__trueBitesDocumentMarker = "saved-document";
+  });
   await reviewsLink.click();
   await expect(page).toHaveURL(/\/reviews$/);
+  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBeUndefined();
   await expect(page.getByRole("heading", { name: "My reviews" })).toBeVisible();
   await expect(savedLink).not.toHaveAttribute("aria-current", "page");
   await expect(reviewsLink).toHaveAttribute("aria-current", "page");
 
+  await page.evaluate(() => {
+    window.__trueBitesDocumentMarker = "reviews-document";
+  });
   await suggestionsLink.click();
   await expect(page).toHaveURL(/\/suggestions$/);
+  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBeUndefined();
   await expect(page.getByRole("heading", { name: "My suggestions" })).toBeVisible();
 });

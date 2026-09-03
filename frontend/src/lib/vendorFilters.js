@@ -1,29 +1,135 @@
 // One vendor-matching rule, shared by the discovery list and the map's vendor
-// panel. It lives here rather than in either component because the map filters
-// its pins with the same predicate the panel filters its list with — when the
-// two drift apart the map shows pins the list has already hidden.
+// panel. MapPage derives one result collection from this module so cards, pins,
+// and sidebar rows cannot disagree about an active filter.
 import { categoryMatches, creatorHandle } from "./vendorDisplay.js";
+import {
+  isOperatingNow,
+  operatingWindowForVendor,
+  operatingWindowsOverlap,
+  parseOperatingWindow,
+} from "./operatingHours.js";
 
-const NONE = { search: "", category: "all", creator: "all" };
+export { parseOperatingWindow } from "./operatingHours.js";
 
-export function matchesFilters(vendor, filters = {}) {
-  const { search, category, creator } = { ...NONE, ...filters };
+export const DEFAULT_VENDOR_FILTERS = Object.freeze({
+  search: "",
+  category: "all",
+  creator: "all",
+  price: "all",
+  hours: "any",
+  rating: "any",
+  distance: "any",
+  openNow: false,
+});
 
-  const query = search.trim().toLowerCase();
+export const DEFAULT_VENDOR_SORT = "relevant";
+
+const PRICE_BUCKETS = Object.freeze({
+  "under-10": { min: 0, max: 9.999 },
+  "10-20": { min: 10, max: 20 },
+  "20-40": { min: 20, max: 40 },
+  "40-plus": { min: 40, max: Infinity },
+});
+
+const OPERATING_PERIODS = Object.freeze({
+  breakfast: { open: 6 * 60, close: 11 * 60 },
+  lunch: { open: 11 * 60, close: 15 * 60 },
+  dinner: { open: 17 * 60, close: 22 * 60 },
+  "late-night": { open: 22 * 60, close: 2 * 60 },
+});
+
+const PRICE_RE = /^\s*RM\s*(\d+(?:\.\d+)?)\s*(?:[-–—]\s*(?:RM\s*)?(\d+(?:\.\d+)?))?(?:\s+per person)?\s*$/i;
+
+function finiteNumber(value) {
+  if (value == null || value === "") return NaN;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : NaN;
+}
+
+export function parsePriceRange(value) {
+  const match = PRICE_RE.exec(String(value || ""));
+  if (!match) return null;
+  const first = Number(match[1]);
+  const second = Number(match[2] || match[1]);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+  return { min: Math.min(first, second), max: Math.max(first, second) };
+}
+
+export function matchesFilters(vendor, filters = {}, { now = new Date() } = {}) {
+  const active = { ...DEFAULT_VENDOR_FILTERS, ...filters };
+
+  const query = String(active.search || "").trim().toLowerCase();
   if (query) {
     const haystack = [vendor.name, vendor.cuisine_types, vendor.signature_dishes]
       .map((field) => String(field || "").toLowerCase());
     if (!haystack.some((field) => field.includes(query))) return false;
   }
 
-  if (!categoryMatches(vendor, category)) return false;
-  if (creator !== "all" && creatorHandle(vendor) !== creator) return false;
+  if (!categoryMatches(vendor, active.category)) return false;
+  if (active.creator !== "all" && creatorHandle(vendor) !== active.creator) return false;
+
+  if (active.price !== "all") {
+    const storedPrice = parsePriceRange(vendor.price_range);
+    const bucket = PRICE_BUCKETS[active.price];
+    if (!storedPrice || !bucket || storedPrice.max < bucket.min || storedPrice.min > bucket.max) return false;
+  }
+
+  const operatingWindow = operatingWindowForVendor(vendor);
+  if (active.hours !== "any") {
+    const period = OPERATING_PERIODS[active.hours];
+    if (!operatingWindow || !period || !operatingWindowsOverlap(operatingWindow, period)) return false;
+  }
+  if (active.openNow && !isOperatingNow(operatingWindow, now)) return false;
+
+  if (active.rating !== "any") {
+    const rating = finiteNumber(vendor.average_rating);
+    const minimumRating = finiteNumber(active.rating);
+    if (!Number.isFinite(rating) || !Number.isFinite(minimumRating) || rating < minimumRating) return false;
+  }
+
+  if (active.distance !== "any") {
+    const distance = finiteNumber(vendor.distKm);
+    const maximumDistance = finiteNumber(active.distance);
+    if (!Number.isFinite(distance) || !Number.isFinite(maximumDistance) || distance > maximumDistance) return false;
+  }
+
   return true;
 }
 
-// Drives the "Clear filters" affordance — there is nothing to clear when every
-// filter is still at its default.
-export function filtersActive(filters = {}) {
-  const { search, category, creator } = { ...NONE, ...filters };
-  return search.trim() !== "" || category !== "all" || creator !== "all";
+// Drives the Clear all affordance. A non-default sort also counts because the
+// same action restores both narrowing and ordering controls.
+export function filtersActive(filters = {}, sort = DEFAULT_VENDOR_SORT) {
+  const active = { ...DEFAULT_VENDOR_FILTERS, ...filters };
+  return Object.keys(DEFAULT_VENDOR_FILTERS)
+    .some((key) => key === "search"
+      ? String(active.search || "").trim() !== ""
+      : active[key] !== DEFAULT_VENDOR_FILTERS[key])
+    || sort !== DEFAULT_VENDOR_SORT;
+}
+
+export function sortVendors(vendors, sort = DEFAULT_VENDOR_SORT) {
+  const rows = vendors.map((vendor, index) => ({ vendor, index }));
+
+  const compareKnown = (left, right, read, { descending = false, stable = true } = {}) => {
+    const leftValue = finiteNumber(read(left.vendor));
+    const rightValue = finiteNumber(read(right.vendor));
+    const leftKnown = Number.isFinite(leftValue);
+    const rightKnown = Number.isFinite(rightValue);
+    if (leftKnown !== rightKnown) return leftKnown ? -1 : 1;
+    if (!leftKnown) return stable ? left.index - right.index : 0;
+    const comparison = descending ? rightValue - leftValue : leftValue - rightValue;
+    return comparison || (stable ? left.index - right.index : 0);
+  };
+
+  if (sort === "rating") {
+    rows.sort((left, right) =>
+      compareKnown(left, right, (vendor) => vendor.average_rating, { descending: true, stable: false })
+      || compareKnown(left, right, (vendor) => vendor.review_count, { descending: true }));
+  } else if (sort === "nearest") {
+    rows.sort((left, right) => compareKnown(left, right, (vendor) => vendor.distKm));
+  } else if (sort === "price-low") {
+    rows.sort((left, right) => compareKnown(left, right, (vendor) => parsePriceRange(vendor.price_range)?.min));
+  }
+
+  return rows.map(({ vendor }) => vendor);
 }

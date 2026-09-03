@@ -29,9 +29,10 @@ export default function TermsPage() {
           someone else's, and not a vendor's own promotional content.
         </p>
         <p>
-          You can browse the discovery grid and map as a guest without an
-          account. Bookmarking, writing reviews, voting, and building a trip
-          itinerary require signing in.
+          You can browse the discovery grid, use the map, and build a
+          browser-local trip as a guest. Bookmarking, writing reviews, and
+          voting require signing in. Guest trips are cleared when you sign in,
+          and account trips are cleared when you sign out or switch accounts.
         </p>
       </Section>
 

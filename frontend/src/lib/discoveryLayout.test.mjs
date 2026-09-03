@@ -16,7 +16,8 @@ test("the shared shell owns the Discover-sized page frame", () => {
 
 test("secondary discovery pages compose the shared shell and intro", () => {
   for (const path of [
-    "pages/EngagementPage.jsx",
+    "pages/SavedPage.jsx",
+    "pages/ReviewsPage.jsx",
     "pages/SuggestionsPage.jsx",
     "pages/SuggestionFormPage.jsx",
   ]) {

@@ -81,7 +81,7 @@ router.get("/restaurants/nearby", async (req, res) => {
       "id, vendor_name, address, latitude, longitude, location_precision, " +
       "cuisine_types, signature_dishes, price_range, ai_review_summary, " +
       "source_video_url, source_platform, average_rating, review_count, " +
-      "storefront_image_url, gallery_image_urls, operating_hours_raw"
+      "storefront_image_url, gallery_image_urls, operating_hours_raw, operating_hours"
     )
     // Only approved vendors are shown to end users — draft/suspended vendors
     // stay invisible on the public map until an admin approves them.

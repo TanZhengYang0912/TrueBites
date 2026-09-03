@@ -159,18 +159,23 @@ export default function AdminReviewModerationPage() {
   };
 
   return (
-    <section className="admin-vendors-page">
-      <div className="admin-toolbar">
-        <div className="admin-search">
-          <Search size={15} />
-          <input value={draftQuery} onChange={(e) => setDraftQuery(e.target.value)} placeholder="Search reviews, vendors, authors…" />
+    <section className="admin-vendors-page flex flex-col gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex h-10 w-full min-w-0 flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 max-lg:h-11 xl:max-w-2xl">
+          <Search size={16} className="shrink-0 text-gray-400" aria-hidden="true" />
+          <input type="search" aria-label="Search reviews" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400" value={draftQuery} onChange={(e) => setDraftQuery(e.target.value)} placeholder="Search reviews, vendors, authors…" />
         </div>
-        <div className="admin-filter-cluster">
-          <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-            {VISIBILITY_OPTIONS.map((v) => (
-              <option key={v} value={v}>{v === "all" ? "All Reviews" : v[0].toUpperCase() + v.slice(1)}</option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <select aria-label="Review visibility" className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+              {VISIBILITY_OPTIONS.map((v) => (
+                <option key={v} value={v}>{v === "all" ? "All Reviews" : v[0].toUpperCase() + v.slice(1)}</option>
+              ))}
+            </select>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -236,7 +241,7 @@ export default function AdminReviewModerationPage() {
               <tr><td colSpan="7"><div className="admin-feedback">Loading reviews…</div></td></tr>
             ) : filtered.length ? (
               filtered.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className="cursor-default">
                   <td className="admin-selection-column">
                     <input
                       type="checkbox"
@@ -248,9 +253,11 @@ export default function AdminReviewModerationPage() {
                   </td>
                   <td><strong>{r.vendorName || "—"}</strong></td>
                   <td>{r.authorName || "Anonymous"}</td>
-                  <td className="admin-table-score">
-                    <Star size={13} fill="currentColor" />
-                    <span>{r.rating}</span>
+                  <td>
+                    <span className="admin-table-score">
+                      <Star size={13} fill="currentColor" />
+                      <span>{r.rating}</span>
+                    </span>
                   </td>
                   <td>
                     <div className="admin-table-clamp clamp-2">{r.body || <span className="admin-dash">—</span>}</div>

@@ -43,7 +43,7 @@ Fields to extract:
 - cuisine_types: List of cuisine types or categories (e.g., ["Nyonya", "Dessert", "Cafe"]) (array of strings)
 - signature_dishes: List of specific dishes or foods mentioned in English (array of strings)
 - price_range: Approximate cost or price range in English (e.g. "RM10-20 per person"). Guess based on food type if needed.
-- operating_hours_raw: Opening hours if mentioned (in English)
+- operating_hours_raw: Opening hours only when an explicit opening and closing time (or "24 hours") is mentioned. Do not treat promotion dates or date ranges as opening hours; use null instead.
 - sentiment_score: Numeric score from 1.0 to 5.0 based on the reviewer's enthusiasm (e.g., 4.5)
 - special_notes: Any special tips, warnings, or highlights in English (short string)
 ${titleSection}${summarySection}

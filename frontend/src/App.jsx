@@ -12,7 +12,8 @@ import ProfilePage    from "./pages/ProfilePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DevPinPrecision from "./pages/DevPinPrecision";
-import EngagementPage from "./pages/EngagementPage";
+import SavedPage from "./pages/SavedPage";
+import ReviewsPage from "./pages/ReviewsPage";
 import SuggestionsPage from "./pages/SuggestionsPage";
 import SuggestionFormPage from "./pages/SuggestionFormPage";
 import AccountSuspendedPage from "./pages/AccountSuspendedPage";
@@ -139,8 +140,8 @@ export default function App() {
 
           {/* Dev-only design preview, tree-shaken out of production builds. */}
           {import.meta.env.DEV && <Route path="/dev/map" element={<DevPinPrecision />} />}
-          <Route path="/saved" element={<EngagementPage section="saved" />} />
-          <Route path="/reviews" element={<EngagementPage section="reviews" />} />
+          <Route path="/saved" element={<SavedPage />} />
+          <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/engagement" element={<LegacyEngagementRedirect />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/suggestions/new" element={<SuggestionFormPage />} />

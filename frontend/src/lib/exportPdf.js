@@ -1,3 +1,5 @@
+import { openPdfPreview } from './pdfPreview.js';
+
 // "vendor.create" -> "Vendor create"
 function formatAction(action) {
   const spaced = String(action || "").replace(/[._]/g, " ");
@@ -144,104 +146,15 @@ export async function openSuggestionsPdf({ title, subtitle, suggestions }) {
   });
 }
 
-function hexToRgb(hex) {
-  const n = Number.parseInt(hex.replace("#", ""), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-// Draws a legend (color swatch + label + value) as jsPDF vector content —
-// required whenever a chart has 2+ series, per the dataviz skill.
-function drawLegend(doc, { x, y, items, colors, rowHeight = 18 }) {
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10.5);
-  items.forEach((item, i) => {
-    const rowY = y + i * rowHeight;
-    const [r, g, b] = hexToRgb(colors[i % colors.length]);
-    doc.setFillColor(r, g, b);
-    doc.roundedRect(x, rowY - 8, 10, 10, 2, 2, "F");
-    doc.setTextColor(20, 26, 33);
-    doc.text(String(item.label), x + 16, rowY);
-    doc.setTextColor(105, 113, 122);
-    doc.text(String(item.value), x + 150, rowY);
+// Reserve the preview during the user's click, before lazy imports/font loading
+// can lose the browser's transient user activation. Snapshot before any await.
+export async function openOverviewPdf(report) {
+  const snapshot = structuredClone(report);
+  return openPdfPreview(async () => {
+    const { createDashboardPdf } = await import('./dashboardPdf.js');
+    return createDashboardPdf(snapshot);
+  }, {
+    preparing: 'Preparing your dashboard PDF…',
+    errorMessage: 'Could not prepare the dashboard PDF. Please try again. If it persists, contact support.',
   });
-  return y + items.length * rowHeight;
-}
-
-// Adds a new page and resets the cursor if the next block wouldn't fit —
-// keeps the report from clipping content at a page boundary.
-function ensureSpace(doc, y, needed, marginX) {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  if (y + needed <= pageHeight - 40) return y;
-  doc.addPage();
-  return drawPdfHeader(doc, { title: "Admin Overview (cont.)", marginX });
-}
-
-// The admin Overview page as a PDF report: KPI summary table, a status
-// breakdown pie chart, and bar charts for the other breakdowns — charts are
-// rendered to PNG via Canvas (see lib/chartCanvas.js) and embedded as
-// images since jsPDF has no native charting.
-export async function openOverviewPdf({ kpis = [], statusBreakdown = [], categoryBreakdown = [], sourceBreakdown = [], aiPipeline = [] }) {
-  const [{ jsPDF }, { default: autoTable }, { renderBarChartPng, renderPieChartPng }, { CATEGORICAL, colorsForBreakdown }] = await Promise.all([
-    import("jspdf"),
-    import("jspdf-autotable"),
-    import("./chartCanvas.js"),
-    import("./chartColors.js"),
-  ]);
-
-  const doc = new jsPDF({ unit: "pt" });
-  const marginX = 40;
-  let y = drawPdfHeader(doc, { title: "Admin Overview", subtitle: "Operations snapshot", marginX });
-
-  if (kpis.length) {
-    autoTable(doc, {
-      startY: y + 10,
-      head: [["Metric", "Value", "Note"]],
-      body: kpis.map((k) => [k.label, `${k.value}${k.suffix || ""}`, k.note || "—"]),
-      styles: { fontSize: 9.5, cellPadding: 6, textColor: [32, 42, 53] },
-      headStyles: { fillColor: [64, 84, 74], textColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [250, 248, 244] },
-      margin: { left: marginX, right: marginX },
-    });
-    y = doc.lastAutoTable.finalY + 30;
-  }
-
-  if (statusBreakdown.length) {
-    y = ensureSpace(doc, y, 260, marginX);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(20, 26, 33);
-    doc.text("Vendor status", marginX, y);
-    y += 14;
-
-    const pieColors = colorsForBreakdown(statusBreakdown);
-    const pieSize = 200;
-    const pieUrl = renderPieChartPng({ data: statusBreakdown, colors: pieColors, size: pieSize });
-    doc.addImage(pieUrl, "PNG", marginX, y, pieSize, pieSize);
-    drawLegend(doc, { x: marginX + pieSize + 30, y: y + 30, items: statusBreakdown, colors: pieColors });
-    y += pieSize + 30;
-  }
-
-  const barCharts = [
-    { title: "Vendor categories", data: categoryBreakdown },
-    { title: "Source mix", data: sourceBreakdown },
-    { title: "AI content pipeline", data: aiPipeline },
-  ].filter((chart) => chart.data.length);
-
-  for (const chart of barCharts) {
-    y = ensureSpace(doc, y, 300, marginX);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(20, 26, 33);
-    doc.text(chart.title, marginX, y);
-    y += 14;
-
-    const colors = colorsForBreakdown(chart.data).map((c, i) => c || CATEGORICAL[i % CATEGORICAL.length]);
-    const chartWidth = doc.internal.pageSize.getWidth() - marginX * 2;
-    const chartHeight = 240;
-    const url = renderBarChartPng({ data: chart.data, colors, width: chartWidth, height: chartHeight });
-    doc.addImage(url, "PNG", marginX, y, chartWidth, chartHeight);
-    y += chartHeight + 30;
-  }
-
-  window.open(doc.output("bloburl"), "_blank");
 }

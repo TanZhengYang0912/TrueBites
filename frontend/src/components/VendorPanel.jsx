@@ -1,6 +1,5 @@
-import { Plus, Eye, EyeOff, Search, X } from "lucide-react";
-import FilterChips from "./discovery/FilterChips";
-import { filtersActive } from "../lib/vendorFilters";
+import { Plus, Eye, EyeOff, Search } from "lucide-react";
+import AdvancedFilters from "./discovery/AdvancedFilters";
 import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDisplay";
 
 const RADII = [1, 2, 5, "all"];
@@ -9,15 +8,13 @@ const RADII = [1, 2, 5, "all"];
 // The filters are owned by MapPage rather than this component because the same
 // predicate decides which pins the map draws — see the pin rule in MapPage.
 export default function VendorPanel({
-  vendors, nearby,
-  filters, onFilters,
+  vendors, filteredVendors, nearby,
+  filters, onFilters, onClearFilters, hasLocation,
   radiusKm, onRadiusChange,
   showAllVendors, onToggleAllVendors,
   onAddStop, onSelectNearby,
   hasAnchor, tripIds,
 }) {
-  const active = filtersActive(filters);
-
   return (
     <>
       <label className="relative mb-2.5 flex items-center">
@@ -31,27 +28,19 @@ export default function VendorPanel({
         />
       </label>
 
-      <FilterChips
+      <AdvancedFilters
         compact
-        active={filters.category}
-        onSelect={(category) => onFilters({ category })}
-        creator={filters.creator}
-        onCreatorSelect={(creator) => onFilters({ creator })}
+        filters={filters}
+        onChange={onFilters}
+        onClear={onClearFilters}
         vendors={vendors}
+        resultCount={filteredVendors.length}
+        hasLocation={hasLocation}
       />
-
-      {active && (
-        <button
-          onClick={() => onFilters({ search: "", category: "all", creator: "all" })}
-          className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-terracotta bg-terracotta/6 px-2.5 text-[11.5px] font-semibold text-terracotta"
-        >
-          <X size={13} strokeWidth={1.8} /> Clear filters
-        </button>
-      )}
 
       {/* Radius. "All" is the escape hatch from the distance limit — the eye
           toggle below is an on/off for vendor pins, not a see-everything. */}
-      <div className="mt-2.5 flex items-center gap-1.5">
+      <div className="mt-3 flex items-center gap-1.5">
         <span className="text-[10.5px] font-bold uppercase tracking-[0.8px] text-terracotta">
           Nearby to Add
         </span>
@@ -119,7 +108,7 @@ export default function VendorPanel({
         <div className="mt-1.5 text-[11.5px] text-muted">
           {!hasAnchor
             ? "Set your starting point to see nearby vendors."
-            : active
+            : filteredVendors.length === 0
               ? "Nothing matches those filters."
               : `Nothing within ${radiusKm}km — try a bigger radius or All.`}
         </div>

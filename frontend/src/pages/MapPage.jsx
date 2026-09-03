@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -19,11 +19,15 @@ import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
-import { loadTrip, saveTrip } from "../lib/tripStorage";
+import { loadTrip, saveTrip, tripOwner } from "../lib/tripStorage";
 import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
-import { matchesFilters } from "../lib/vendorFilters";
+import {
+  DEFAULT_VENDOR_FILTERS,
+  matchesFilters,
+  sortVendors,
+} from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
 import { customerSession } from "../lib/roles";
 
@@ -67,8 +71,9 @@ export default function MapPage() {
   }
   const [vendors, setVendors] = useState([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
-  const { session: authSession } = useSession();
+  const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
+  const owner = tripOwner(authSession);
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
   const [folders, setFolders] = useState([]);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
@@ -77,10 +82,15 @@ export default function MapPage() {
   const [selected, setSelected] = useState(null);
   const [openId, setOpenId] = useState(null); // vendor id whose InfoWindow is open
   const [userPos, setUserPos] = useState(null);
+  // Kept separate from userPos because the map may fall back to Melaka centre
+  // after a denied/failed geolocation request. That fallback is useful for the
+  // camera and nearby panel, but it must never masquerade as the user's origin.
+  const [distanceOrigin, setDistanceOrigin] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
-  const [filters, setFilters] = useState({ search: "", category: "all", creator: "all" });
-  const updateFilters = (partial) => setFilters((f) => ({ ...f, ...partial }));
+  const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
+  const updateFilters = (partial) => setFilters((current) => ({ ...current, ...partial }));
+  const clearFilters = () => setFilters(DEFAULT_VENDOR_FILTERS);
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
@@ -88,12 +98,14 @@ export default function MapPage() {
   function changeTab(tab) { setPanelTab(tab); savePanelTab(tab); }
   const [mapFullscreen, setMapFullscreen] = useState(false);
 
-  // Trip planning is unauthenticated, browser-local state — restored from
-  // localStorage on mount (see lib/tripStorage.js) so a reload doesn't lose it.
-  const [trip, setTrip] = useState(() => loadTrip()?.stops || []);              // unified draggable stops
+  // Guest trips and account trips are browser-local but isolated from each
+  // other. Hydration waits for Supabase to resolve the current identity so a
+  // logged-in trip can never be mistaken for a guest trip during startup.
+  const [trip, setTrip] = useState([]);              // unified draggable stops
   const [tripData, setTripData] = useState(null);
   const [tripLoading, setTripLoading] = useState(false);
-  const [travelMode, setTravelMode] = useState(() => loadTrip()?.travelMode || null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
+  const [travelMode, setTravelMode] = useState(null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
+  const [hydratedOwner, setHydratedOwner] = useState(null);
   const [dirSummary, setDirSummary] = useState(null);
   const [routeIndex, setRouteIndex] = useState(0);       // selected alt route (DRIVING)
   const [routeOptions, setRouteOptions] = useState([]);  // alt routes + toll flags (DRIVING)
@@ -102,6 +114,18 @@ export default function MapPage() {
   const [toast, notify] = useToast();
   const [accountStatus, setAccountStatus] = useState(null);
   const [mapError, setMapError] = useState("");
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    const stored = loadTrip(owner);
+    setTrip(stored?.stops || []);
+    setTravelMode(stored?.travelMode || null);
+    setTripData(null);
+    setDirSummary(null);
+    setRouteOptions([]);
+    setTransitLegs([]);
+    setHydratedOwner(owner);
+  }, [owner, sessionLoading]);
 
   useEffect(() => {
     const mapAuthFailure = () => {
@@ -196,7 +220,10 @@ export default function MapPage() {
 
   // Persist the trip on every change (id/name/lat/lng/isMe/source only — see
   // lib/tripStorage.js for why the embedded `vendor` snapshot isn't saved).
-  useEffect(() => { saveTrip(trip, travelMode); }, [trip, travelMode]);
+  useEffect(() => {
+    if (hydratedOwner !== owner) return;
+    saveTrip(trip, travelMode, owner);
+  }, [trip, travelMode, owner, hydratedOwner]);
 
   // A trip restored from storage carries vendor stops with no `vendor` object
   // (it's never persisted). Re-attach it by id once the vendor list loads.
@@ -220,9 +247,10 @@ export default function MapPage() {
   // otherwise go stale). Runs once; DirectionsRenderer already handles this
   // reactively when a travelMode was also restored.
   useEffect(() => {
+    if (hydratedOwner !== owner) return;
     if (trip.length >= 2 && !travelMode) planTrip(trip, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hydratedOwner, owner]);
 
   // Bookmarks are server-backed and auth-gated — an anonymous browser sees
   // none, and any local state is dropped the moment the session disappears.
@@ -318,6 +346,7 @@ export default function MapPage() {
   // geolocation resolving, just fed a chosen address instead of GPS.
   function setManualLocation(pos) {
     setUserPos(pos);
+    setDistanceOrigin(pos);
     setLocateTarget(pos);
   }
 
@@ -381,10 +410,15 @@ export default function MapPage() {
         // Label first, then set userPos once. The [userPos] effect re-plans the
         // trip with optimize=true, so setting it twice would silently reorder
         // the user's stops the moment the geocode came back.
-        labelForPosition(pos).then(setUserPos);
+        labelForPosition(pos).then((labelled) => {
+          setUserPos(labelled);
+          setDistanceOrigin(labelled);
+        });
       },
       () => {
         setUserPos(MELAKA_CENTER);
+        setDistanceOrigin(null);
+        setFilters((current) => ({ ...current, distance: "any" }));
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
           notify("Couldn't get your location — showing Melaka centre instead.", true);
@@ -402,15 +436,25 @@ export default function MapPage() {
     }
     const focusOn = (pos) => {
       setUserPos(pos);
+      setDistanceOrigin(pos);
       setLocateTarget(pos);
       setFocusVendor(null);
       setSelected(null);
       setSearchParams({ view: "map" });
     };
-    if (userPos) { focusOn(userPos); return; }
+    if (distanceOrigin) { focusOn(distanceOrigin); return; }
     navigator.geolocation.getCurrentPosition(
       (p) => focusOn({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => { focusOn(MELAKA_CENTER); notify("Couldn't get your location — showing vendors near Melaka centre.", true); }
+      () => {
+        setUserPos(MELAKA_CENTER);
+        setDistanceOrigin(null);
+        setFilters((current) => ({ ...current, distance: "any" }));
+        setLocateTarget(MELAKA_CENTER);
+        setFocusVendor(null);
+        setSelected(null);
+        setSearchParams({ view: "map" });
+        notify("Couldn't get your location — showing vendors near Melaka centre.", true);
+      }
     );
   }
 
@@ -426,6 +470,30 @@ export default function MapPage() {
     ? (profileMeta.first_name?.[0] || "") + (profileMeta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
+  // The API's initial distance is measured from Melaka centre so its response
+  // can be usefully ordered before the user shares a position. Discovery's
+  // distance controls must not treat that fallback as the user's distance:
+  // expose distKm only after GPS or a typed origin creates a real anchor.
+  const vendorsWithDistance = useMemo(() => distanceOrigin
+    ? vendors.map((vendor) => (
+      vendor.latitude == null || vendor.longitude == null
+        ? { ...vendor, distKm: undefined }
+        : {
+            ...vendor,
+            distKm: haversineKm(distanceOrigin.lat, distanceOrigin.lng, vendor.latitude, vendor.longitude),
+          }
+    ))
+    : vendors.map((vendor) => ({ ...vendor, distKm: undefined })),
+  [vendors, distanceOrigin]);
+
+  // One collection powers cards, pins and the map sidebar. Downstream views
+  // may paginate or apply the map's separate visibility radius, but they never
+  // repeat discovery matching or sorting.
+  const filteredVendors = useMemo(
+    () => sortVendors(vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters))),
+    [vendorsWithDistance, filters],
+  );
+
   if (!API_KEY) {
     return (
       <div className="p-6 font-body">
@@ -439,7 +507,12 @@ export default function MapPage() {
     return (
       <>
         <Dashboard
-          vendors={vendors}
+          vendors={vendorsWithDistance}
+          filteredVendors={filteredVendors}
+          filters={filters}
+          onFilters={updateFilters}
+          onClearFilters={clearFilters}
+          hasLocation={distanceOrigin != null}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
@@ -507,7 +580,12 @@ export default function MapPage() {
 
   // Pins respect the active discovery filters, while trip stops survive so a
   // route never loses one of its own markers.
-  const pinVendors = vendors.filter((v) => stopIds.has(v.id) || matchesFilters(v, filters));
+  const filteredIds = new Set(filteredVendors.map((vendor) => vendor.id));
+  const pinVendors = vendorsWithDistance
+    .filter((vendor) => stopIds.has(vendor.id) || filteredIds.has(vendor.id));
+  const visibleFocusVendor = focusVendor && (stopIds.has(focusVendor.id) || filteredIds.has(focusVendor.id))
+    ? focusVendor
+    : null;
 
   const visibleVendors = selectVisibleVendors({
     vendors: pinVendors,
@@ -515,22 +593,22 @@ export default function MapPage() {
     radiusKm: effectiveRadiusKm,
     showAll: showAllVendors,
     stopIds,
-    focusVendor,
+    focusVendor: visibleFocusVendor,
   });
 
-  // "Nearby to add" — vendors matching the filters, not already in the trip,
-  // within the chosen radius of the anchor, closest first. Filters on the raw
+  // "Nearby to add" — vendors matching the shared discovery order, not already
+  // in the trip, and within the chosen radius of the anchor. Filters on the raw
   // distance so the list and the map pins agree at the boundary; rounds only
   // for display.
-  const nearbyToAdd = anchor
-    ? vendors
-      .filter((v) => v.latitude != null && v.longitude != null && !trip.some((s) => s.id === v.id))
-      .filter((v) => matchesFilters(v, filters))
-      .map((v) => ({ ...v, distKm: haversineKm(anchor.lat, anchor.lng, v.latitude, v.longitude) }))
-      .filter((v) => v.distKm <= effectiveRadiusKm)
-      .sort((a, b) => a.distKm - b.distKm)
+  const nearbyToAdd = anchor ? filteredVendors
+      .filter((vendor) => vendor.latitude != null && vendor.longitude != null && !stopIds.has(vendor.id))
+      .map((vendor) => ({
+        ...vendor,
+        distKm: haversineKm(anchor.lat, anchor.lng, vendor.latitude, vendor.longitude),
+      }))
+      .filter((vendor) => vendor.distKm <= effectiveRadiusKm)
       .slice(0, 12)
-      .map((v) => ({ ...v, distKm: parseFloat(v.distKm.toFixed(2)) }))
+      .map((vendor) => ({ ...vendor, distKm: parseFloat(vendor.distKm.toFixed(2)) }))
     : [];
 
   return (
@@ -555,7 +633,7 @@ export default function MapPage() {
                   locateMe() call in the same update. Without this order, "focus on
                   me" would win and undo the "focus on the vendor I picked" zoom. */}
               <FocusOnUser pos={locateTarget} />
-              <FocusOnVendor vendor={focusVendor} />
+              <FocusOnVendor vendor={visibleFocusVendor} />
               <VendorMarkers
                 vendors={visibleVendors}
                 userPos={userPos}
@@ -660,10 +738,13 @@ export default function MapPage() {
               />
             ) : (
               <VendorPanel
-                vendors={vendors}
+                vendors={vendorsWithDistance}
+                filteredVendors={filteredVendors}
                 nearby={nearbyToAdd}
                 filters={filters}
                 onFilters={updateFilters}
+                onClearFilters={clearFilters}
+                hasLocation={distanceOrigin != null}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}

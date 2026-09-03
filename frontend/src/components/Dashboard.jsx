@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
-import FilterChips from "./discovery/FilterChips";
+import AdvancedFilters from "./discovery/AdvancedFilters";
 import VendorCard from "./discovery/VendorCard";
 import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
 import Footer from "./Footer";
-import { matchesFilters } from "../lib/vendorFilters";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
@@ -20,12 +19,27 @@ const PAGE_SIZE = 12;
 
 // The map-page discovery dashboard. DiscoveryHeader (logo/search/List·Map/avatar)
 // + Vendors/Bookmarks/My reviews tab strip. Vendors come from Supabase.
-export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bookmarks, onToggleBookmark, onOpenMap, tripVendorIds, onAddStop, onVendorUpdated, focusVendorId, onFocusVendorHandled }) {
+export default function Dashboard({
+  vendors,
+  filteredVendors,
+  filters,
+  onFilters,
+  onClearFilters,
+  hasLocation,
+  loading,
+  loadError,
+  onRetryLoad,
+  bookmarks,
+  onToggleBookmark,
+  onOpenMap,
+  tripVendorIds,
+  onAddStop,
+  onVendorUpdated,
+  focusVendorId,
+  onFocusVendorHandled,
+}) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [creator, setCreator] = useState("all");
   const [page, setPage] = useState(1);
   const [detailVendor, setDetailVendor] = useState(null);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
@@ -43,8 +57,8 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
     return () => { active = false; };
   }, [session]);
 
-  // Guests can browse freely but can't bookmark, add personal trip stops
-  // tied to an account, or view "My reviews" — nudge them to log in instead.
+  // Guests can browse and build a browser-local trip. Account-backed actions
+  // (bookmarking, suggestions, and "My reviews") still require login.
   function requireAuth(fn) {
     return (...args) => {
       if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }
@@ -55,7 +69,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
 
   useEffect(() => {
     setPage(1);
-  }, [search, category, creator]);
+  }, [filters]);
 
   // Arrived from a notification: open that vendor's detail once the list has
   // loaded, then clear the param so it doesn't reopen on refresh.
@@ -74,8 +88,7 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
 
-  const displayed = vendors.filter((v) => matchesFilters(v, { search, category, creator }));
-  const pageData = paginate(displayed, page, PAGE_SIZE);
+  const pageData = paginate(filteredVendors, page, PAGE_SIZE);
   useEffect(() => {
     if (page > pageData.totalPages) setPage(pageData.totalPages);
   }, [page, pageData.totalPages]);
@@ -139,40 +152,46 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
                   </p>
                 </div>
               </div>
-              <label className="relative flex items-center">
-                <Search size={18} className="absolute left-3.5 text-muted" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
-                  aria-label="Search places"
-                  className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
-                />
-              </label>
+              <button
+                type="button"
+                data-testid="community-discoveries-cta"
+                onClick={requireAuth(() => navigate("/suggestions/new"))}
+                className="group flex min-h-16 w-full items-center justify-between gap-3 border border-forest/20 bg-forest px-4 py-3 text-left text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={17} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Community discoveries</span>
+                    <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
+                  </span>
+                </span>
+                <span className="hidden items-center gap-1 text-sm font-bold sm:flex">
+                  <span>Share it</span>
+                  <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
+                </span>
+                <ArrowRight size={16} aria-hidden="true" className="shrink-0 sm:hidden" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={requireAuth(() => navigate("/suggestions/new"))}
-              className="group mb-8 flex w-full items-center justify-between gap-5 border border-forest/20 bg-forest px-5 py-4 text-left text-white transition-transform hover:-translate-y-0.5 sm:px-6"
-            >
-              <span className="flex items-center gap-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={19} /></span>
-                <span>
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Community discoveries</span>
-                  <span className="mt-1 block font-display text-2xl leading-none">Know a hidden gem in Melaka?</span>
-                </span>
-              </span>
-              <span className="hidden text-sm font-bold sm:block">Share it →</span>
-            </button>
+            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center">
+              <Search size={18} className="absolute left-3.5 text-muted" />
+              <input
+                value={filters.search}
+                onChange={(event) => onFilters({ search: event.target.value })}
+                placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
+                aria-label="Search places"
+                className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
+              />
+            </label>
 
-            <div className="mb-6">
-              <FilterChips
-                active={category}
-                onSelect={setCategory}
-                creator={creator}
-                onCreatorSelect={setCreator}
+            <div className="mb-8">
+              <AdvancedFilters
+                filters={filters}
+                onChange={onFilters}
+                onClear={onClearFilters}
                 vendors={vendors}
+                resultCount={filteredVendors.length}
+                hasLocation={hasLocation}
               />
             </div>
 
@@ -182,8 +201,8 @@ export default function Dashboard({ vendors, loading, loadError, onRetryLoad, bo
               </div>
             ) : loadError && vendors.length === 0 ? (
               <LoadError message={loadError} onRetry={onRetryLoad} />
-            ) : displayed.length === 0 ? (
-              <Empty onClear={() => { setSearch(""); setCategory("all"); setCreator("all"); }} />
+            ) : filteredVendors.length === 0 ? (
+              <Empty onClear={onClearFilters} />
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -254,7 +273,7 @@ function Empty({ onClear }) {
   return (
     <div className="mt-6 border border-sand bg-white px-6 py-12 text-center md:py-16">
       <h2 className="mb-2 mt-0 font-display text-2xl text-ink">No places found</h2>
-      <p className="mb-5 mt-0 text-[13px] text-muted">Try a different category, creator, or search term.</p>
+      <p className="mb-5 mt-0 text-[13px] text-muted">Try changing or clearing your filters.</p>
       <button
         type="button"
         onClick={onClear}

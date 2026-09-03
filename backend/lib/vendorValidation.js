@@ -21,7 +21,46 @@ export const VENDOR_STATUSES = ["draft", "active", "suspended"];
 
 export const MELAKA_BOUNDS = { latMin: 1.8, latMax: 2.6, lngMin: 101.8, lngMax: 102.8 };
 
-const HOURS_RE = /(\d{1,2}([:.]\d{2})?\s*(am|pm))|(\d{1,2}[:.]\d{2})|(24\s*hours?)/i;
+// Keep this in step with frontend/lib/operatingHours.js: anything accepted
+// here must be parseable by the public cards and discovery filters. Requiring
+// a complete time range prevents AI-extracted promotion dates such as
+// "18 - 27" from masquerading as operating hours.
+const TWELVE_HOUR_RANGE_RE = /(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\s*[-–—]\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)/i;
+const TWENTY_FOUR_HOUR_RANGE_RE = /(?:^|[^\d])([01]?\d|2[0-3])[:.]([0-5]\d)\s*[-–—]\s*([01]?\d|2[0-3])[:.]([0-5]\d)(?:[^\d]|$)/;
+
+export function normaliseOperatingHours(value) {
+  const text = typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+  if (!text) return null;
+  if (/\b24\s*hours?\b/i.test(text)) return text;
+
+  const twelveHour = TWELVE_HOUR_RANGE_RE.exec(text);
+  if (twelveHour) {
+    const validPart = (hour, minute = "00") => {
+      const numericHour = Number(hour);
+      const numericMinute = Number(minute);
+      return numericHour >= 1 && numericHour <= 12 && numericMinute >= 0 && numericMinute <= 59;
+    };
+    if (validPart(twelveHour[1], twelveHour[2]) && validPart(twelveHour[4], twelveHour[5])) return text;
+  }
+
+  return TWENTY_FOUR_HOUR_RANGE_RE.test(text) ? text : null;
+}
+
+// Apply at database write boundaries as a final defence for import/AI flows
+// that do not pass through the HTTP request validators. The legacy and current
+// columns intentionally stay identical so either public-reader path behaves
+// consistently.
+export function normaliseVendorHoursFields(row = {}, { omitInvalid = false } = {}) {
+  const hours = normaliseOperatingHours(row.operating_hours_raw)
+    || normaliseOperatingHours(row.operating_hours);
+  const normalised = { ...row };
+  if (!hours && omitInvalid) {
+    delete normalised.operating_hours_raw;
+    delete normalised.operating_hours;
+    return normalised;
+  }
+  return { ...normalised, operating_hours_raw: hours, operating_hours: hours };
+}
 
 export function validateVendor(body = {}) {
   const errors = {};
@@ -79,9 +118,10 @@ export function validateVendor(body = {}) {
 
   // Operating hours
   const hours = str(body.operating_hours_raw);
+  const normalisedHours = normaliseOperatingHours(hours);
   if (!hours) errors.operating_hours_raw = "Operating hours are required";
-  else if (!HOURS_RE.test(hours)) errors.operating_hours_raw = 'Include a recognisable time, e.g. "Mon–Sun 9:00am – 10:00pm"';
-  else clean.operating_hours_raw = hours;
+  else if (!normalisedHours) errors.operating_hours_raw = 'Include a recognisable time range, e.g. "Mon–Sun 9:00am – 10:00pm"';
+  else clean.operating_hours_raw = normalisedHours;
 
   // Contact number — optional (not every stall has one to publish), but
   // whatever's entered must actually look like a Malaysian number.
@@ -177,8 +217,16 @@ export function validateVendorPatch(body = {}) {
     else clean.status = status;
   }
 
-  // Free-text fields — passed through trimmed, no format rules.
-  for (const k of ["state", "cuisine_types", "signature_dishes", "price_range", "operating_hours_raw"]) {
+  if (has("operating_hours_raw")) {
+    const hours = str(body.operating_hours_raw);
+    const normalisedHours = normaliseOperatingHours(hours);
+    if (!hours) errors.operating_hours_raw = "Operating hours are required";
+    else if (!normalisedHours) errors.operating_hours_raw = 'Include a recognisable time range, e.g. "Mon–Sun 9:00am – 10:00pm"';
+    else clean.operating_hours_raw = normalisedHours;
+  }
+
+  // Remaining free-text fields — passed through trimmed, no format rules.
+  for (const k of ["state", "cuisine_types", "signature_dishes", "price_range"]) {
     if (has(k)) clean[k] = str(body[k]);
   }
 
@@ -237,7 +285,9 @@ export function vendorActivationIssues(vendor = {}) {
   }
 
   if (blank(vendor.cuisine_types)) issues.push("category");
-  if (blank(vendor.operating_hours_raw) && blank(vendor.operating_hours)) issues.push("operating hours");
+  if (!normaliseOperatingHours(vendor.operating_hours_raw) && !normaliseOperatingHours(vendor.operating_hours)) {
+    issues.push("operating hours");
+  }
   // Phone is optional — not every stall has a published number, and that
   // alone shouldn't keep an otherwise-complete listing stuck in Draft.
   if (blank(vendor.price_range)) issues.push("price range");

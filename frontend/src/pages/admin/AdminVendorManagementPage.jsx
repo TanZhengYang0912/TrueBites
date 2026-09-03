@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, Eye, FileDown, ImagePlus, List, MapPinned, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, FileDown, ImagePlus, List, MapPinned, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
@@ -10,10 +10,13 @@ import Toast from "../../components/engagement/Toast";
 import ImageLightbox from "../../components/engagement/ImageLightbox";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import AdminVendorMap from "../../components/admin/AdminVendorMap";
+import AdminPagination from "../../components/admin/AdminPagination";
 import VendorLocationPicker from "../../components/admin/VendorLocationPicker";
+import ConfirmDialog from "../../components/admin/ConfirmDialog";
 import { useToast } from "../../lib/useToast";
 import { placeholderImage } from "../../lib/vendorDisplay";
 import { fetchAllPages, openVendorsPdf } from "../../lib/exportPdf";
+import "./vendorMobileFilters.css";
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
@@ -33,8 +36,6 @@ const COLUMN_SORTS = {
   category: ["cat_az", "cat_za"],
   status: ["status", "status_desc"],
 };
-
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 // Mirrors MAX_GALLERY_IMAGES in backend/lib/vendorValidation.js — the server
 // is the real enforcement point, this just keeps the "Add" tile from
@@ -205,34 +206,6 @@ function formFieldsEqual(a, b) {
   return FORM_COMPARE_KEYS.every((key) => (a[key] ?? "") === (b[key] ?? ""));
 }
 
-function Pagination({ pagination, pageSize, onPageChange, onPageSizeChange }) {
-  const { page, totalPages, total } = pagination;
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
-  return (
-    <div className="admin-pagination">
-      <div className="admin-pagination-meta">
-        Showing <strong>{from}–{to}</strong> of <strong>{total}</strong> vendors
-      </div>
-      <div className="admin-pagination-controls">
-        <label className="admin-page-size">
-          Rows
-          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}>
-            {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
-        <button type="button" className="admin-secondary-btn compact" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          Previous
-        </button>
-        <span>Page {page} / {totalPages}</span>
-        <button type="button" className="admin-secondary-btn compact" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-          Next
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function FieldError({ message }) {
   return message ? <div className="admin-field-error">{message}</div> : null;
 }
@@ -252,26 +225,14 @@ function RequiredMark() {
 // imageUrl changes so a freshly-uploaded photo always gets a fresh load
 // attempt instead of getting stuck on a stale failure.
 function VendorThumb({ vendor, className }) {
-  const [errored, setErrored] = useState(false);
-  useEffect(() => setErrored(false), [vendor.imageUrl]);
+  const [failedSource, setFailedSource] = useState(null);
+  const src = placeholderImage({ storefront_image_url: vendor.imageUrl });
+  const sourceKey = JSON.stringify([vendor.id, src]);
+  const imageClass = className || "admin-table-thumb";
 
-  const src = placeholderImage({
-    id: vendor.id,
-    name: vendor.name,
-    storefront_image_url: errored ? null : vendor.imageUrl,
-    cuisine_types: vendor.category,
-    signature_dishes: vendor.dishes?.join(", "),
-  });
-
-  return (
-    <img
-      src={src}
-      alt=""
-      className={className || "admin-table-thumb"}
-      loading="lazy"
-      onError={() => setErrored(true)}
-    />
-  );
+  return !src || failedSource === sourceKey
+    ? <span className={`${imageClass} flex items-center justify-center bg-slate-50 text-center text-[9px] leading-tight text-slate-500`} role="img" aria-label={`No photo for ${vendor.name}`}>No photo</span>
+    : <img key={sourceKey} src={src} alt="" className={imageClass} loading="lazy" onError={() => setFailedSource(sourceKey)} />;
 }
 
 // Drag-and-drop (or click-to-browse) image field. `onFileChange` receives the
@@ -731,31 +692,6 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
   );
 }
 
-// A real confirmation dialog for destructive actions — replaces the cramped
-// inline "Delete? Yes / No" that used to sit inside the table row / bulk bar.
-function ConfirmDialog({ title, message, confirmLabel = "Delete", busy, onConfirm, onCancel }) {
-  return (
-    <div className="admin-modal-backdrop" onClick={onCancel}>
-      <div className="admin-modal-card admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="admin-modal-header">
-          <h2>{title}</h2>
-        </div>
-        <div className="admin-modal-form">
-          <p className="admin-confirm-message">{message}</p>
-          <div className="admin-modal-actions">
-            <button type="button" className="admin-secondary-btn compact" onClick={onCancel} disabled={busy}>
-              Cancel
-            </button>
-            <button type="button" className="admin-primary-btn compact danger" onClick={onConfirm} disabled={busy}>
-              {busy ? "…" : confirmLabel}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Read-only side-by-side review of fuzzy name/address matches — nothing here
 // deletes or merges anything automatically. `onDeleteRequest` hands off to a
 // ConfirmDialog in the parent; this panel only lists pairs and a Delete button.
@@ -807,7 +743,7 @@ function DuplicatesPanel({ groups, onClose, onDeleteRequest }) {
   );
 }
 
-function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, pendingGalleryDeletes, onRequestRemoveGallery, onUndoRemoveGallery, onManualGalleryAdd, notify }) {
+function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, confirmationActive, error, onClose, onChange, onFileChange, onStartEdit, onCancelEdit, onSave, onGalleryChange, onCoverDiscovered, pendingGalleryDeletes, onRequestRemoveGallery, onUndoRemoveGallery, onManualGalleryAdd, notify }) {
   // While editing, backdrop/×/Escape must go through the same path as the
   // Cancel button (onCancelEdit) rather than the plain onClose — Cancel
   // doesn't just drop unsaved text, it also rolls back any gallery photos
@@ -817,7 +753,11 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, 
   // clicked outside the modal instead of using Cancel — a real contributor
   // to the orphaned-storage backlog scripts/auditOrphanStorage.js exists to
   // clean up.
-  const dismiss = editing ? onCancelEdit : onClose;
+  const controlsLocked = saving || cancelling || confirmationActive;
+  const dismiss = () => {
+    if (controlsLocked) return;
+    if (editing) onCancelEdit(); else onClose();
+  };
 
   useEffect(() => {
     if (!vendor) return;
@@ -835,11 +775,11 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, 
           <div>
             <h2>{editing ? "Edit Vendor" : vendor.name}</h2>
           </div>
-          <button type="button" className="admin-icon-btn subtle" onClick={dismiss}>×</button>
+          <button type="button" className="admin-icon-btn subtle" onClick={dismiss} disabled={controlsLocked}>×</button>
         </div>
 
         <div className="admin-modal-form">
-          <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing} notify={notify} />
+          <VendorFormFields form={form} errors={editing ? errors : null} onChange={onChange} onFileChange={onFileChange} disabled={!editing || controlsLocked} notify={notify} />
 
           {editing && (
             <PhotoDiscoveryPanel
@@ -866,7 +806,7 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, 
           <GalleryManager
             vendorId={vendor.id}
             images={vendor.galleryUrls || []}
-            disabled={!editing}
+            disabled={!editing || controlsLocked}
             pendingDeletes={pendingGalleryDeletes}
             onChange={onGalleryChange}
             onRequestRemove={editing ? onRequestRemoveGallery : undefined}
@@ -887,10 +827,10 @@ function VendorDetailModal({ vendor, editing, form, errors, saving, cancelling, 
           <div className="admin-modal-actions">
             {editing ? (
               <>
-                <button type="button" className="admin-secondary-btn compact" onClick={onCancelEdit} disabled={cancelling}>
+                <button type="button" className="admin-secondary-btn compact" onClick={onCancelEdit} disabled={controlsLocked}>
                   {cancelling ? "Cancelling…" : "Cancel"}
                 </button>
-                <button type="button" className="admin-primary-btn compact" onClick={onSave} disabled={saving || cancelling}>
+                <button type="button" className="admin-primary-btn compact" onClick={onSave} disabled={controlsLocked}>
                   {saving ? "Saving…" : "Save Changes"}
                 </button>
               </>
@@ -1277,21 +1217,34 @@ export default function AdminVendorManagementPage() {
   const [confirmDeleteGalleryUrl, setConfirmDeleteGalleryUrl] = useState(null);
   const [cancellingEdit, setCancellingEdit] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [pageSize, setPageSize] = useState(10);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(null);
+  const [statusConfirmation, setStatusConfirmation] = useState(null);
+  const [saveConfirmation, setSaveConfirmation] = useState(null);
   const [toast, notify] = useToast();
   const [duplicateGroups, setDuplicateGroups] = useState([]);
   const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
-  const [dupDeleteId, setDupDeleteId] = useState(null);
+  const [dupDelete, setDupDelete] = useState(null);
   const [dupDeleting, setDupDeleting] = useState(false);
   const [exportingVendors, setExportingVendors] = useState(false);
   const [viewMode, setViewMode] = useState("list");
   const [mapVendors, setMapVendors] = useState([]);
   const [mapLoading, setMapLoading] = useState(false);
+  const [isPhoneFilters, setIsPhoneFilters] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(width < 768px)").matches
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(width < 768px)");
+    const update = () => setIsPhoneFilters(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const loadDuplicates = () =>
     getAdminVendorDuplicates()
@@ -1390,7 +1343,7 @@ export default function AdminVendorManagementPage() {
   // visible set changes so a stale id can't be bulk-acted on off-screen.
   useEffect(() => {
     setSelectedIds(new Set());
-    setConfirmBulkDelete(false);
+    setConfirmBulkDelete(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.pagination.page, status, category, sort, query, pageSize]);
 
@@ -1452,7 +1405,7 @@ export default function AdminVendorManagementPage() {
     setData((cur) => ({ ...cur, pagination: { ...cur.pagination, page } }));
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!selectedVendor) return;
     const errs = validateForm(form);
     setErrors(errs);
@@ -1484,22 +1437,37 @@ export default function AdminVendorManagementPage() {
       return;
     }
 
+    setSaveConfirmation({
+      vendor: { ...selectedVendor },
+      form: { ...form },
+      editSnapshot: editSnapshot ? { ...editSnapshot, form: { ...editSnapshot.form } } : null,
+      pendingGalleryDeletes: new Set(pendingGalleryDeletes),
+      pendingGalleryAdds: new Set(pendingGalleryAdds),
+      fieldsChanged,
+      coverChanged,
+      coverChangedByDiscovery,
+      galleryChanged,
+    });
+  };
+
+  const executeSave = async (snapshot) => {
+    const { vendor, form: savedForm, fieldsChanged, coverChanged, pendingGalleryDeletes: savedDeletes } = snapshot;
     setSaving(true);
     setError("");
     try {
       if (fieldsChanged) {
-        await updateAdminVendor(selectedVendor.id, {
-          vendor_name: form.vendor_name,
-          address: form.address,
-          cuisine_types: form.cuisine_types,
-          signature_dishes: form.signature_dishes,
-          price_range: formatPriceRange(form.priceMin, form.priceMax),
-          phone: form.phone,
-          latitude: form.latitude,
-          longitude: form.longitude,
-          operating_hours_raw: `${form.openSlot} - ${form.closeSlot}`,
-          status: form.status,
-          source_video_url: form.source_video_url,
+        await updateAdminVendor(vendor.id, {
+          vendor_name: savedForm.vendor_name,
+          address: savedForm.address,
+          cuisine_types: savedForm.cuisine_types,
+          signature_dishes: savedForm.signature_dishes,
+          price_range: formatPriceRange(savedForm.priceMin, savedForm.priceMax),
+          phone: savedForm.phone,
+          latitude: savedForm.latitude,
+          longitude: savedForm.longitude,
+          operating_hours_raw: `${savedForm.openSlot} - ${savedForm.closeSlot}`,
+          status: savedForm.status,
+          source_video_url: savedForm.source_video_url,
         });
         // Persisted — if a gallery-delete failure below keeps the modal
         // open for a retry, a second Save click must not resend this.
@@ -1509,10 +1477,10 @@ export default function AdminVendorManagementPage() {
         // check compare against `undefined` and misfire a spurious cover
         // "restore" (a harmless no-op PATCH, but still wrong) on a Cancel
         // that comes after a field-only save with no cover change at all.
-        setEditSnapshot((cur) => ({ ...cur, form }));
+        setEditSnapshot((cur) => ({ ...cur, form: savedForm }));
       }
       if (coverChanged) {
-        await uploadVendorImage(selectedVendor.id, form.imageFile);
+        await uploadVendorImage(vendor.id, savedForm.imageFile);
         setForm((cur) => ({ ...cur, imageFile: null }));
       }
 
@@ -1523,9 +1491,9 @@ export default function AdminVendorManagementPage() {
       // not get retried forever — only the ones that actually failed stay
       // pending for a follow-up Save.
       const failedDeletes = new Set();
-      for (const url of pendingGalleryDeletes) {
+      for (const url of savedDeletes) {
         try {
-          await deleteVendorGalleryImage(selectedVendor.id, url);
+          await deleteVendorGalleryImage(vendor.id, url);
         } catch {
           failedDeletes.add(url);
         }
@@ -1560,6 +1528,7 @@ export default function AdminVendorManagementPage() {
       notify(err.message, true);
     } finally {
       setSaving(false);
+      setSaveConfirmation(null);
     }
   };
 
@@ -1613,11 +1582,13 @@ export default function AdminVendorManagementPage() {
     setEditing(false);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (target) => {
     setDeleting(true);
     try {
-      await deleteAdminVendor(id);
-      setConfirmDeleteId(null);
+      await deleteAdminVendor(target.id);
+      // Clear this as soon as the write succeeds: a refresh failure must not
+      // leave a dialog that can repeat a completed deletion.
+      setConfirmDelete(null);
       const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
       setData(refreshed);
       notify("Vendor deleted.");
@@ -1633,12 +1604,12 @@ export default function AdminVendorManagementPage() {
   // path from handleDelete above since it's acting on a pair the admin is
   // comparing side-by-side, not a table row. Never runs automatically:
   // findAllDuplicateGroups only ever informs this button, nothing auto-merges.
-  const handleDeleteDuplicateVendor = async (id) => {
+  const handleDeleteDuplicateVendor = async (target) => {
     setDupDeleting(true);
     try {
-      await deleteAdminVendor(id);
-      setDupDeleteId(null);
-      setDuplicateGroups((groups) => groups.filter((g) => g.a.id !== id && g.b.id !== id));
+      await deleteAdminVendor(target.id);
+      setDupDelete(null);
+      setDuplicateGroups((groups) => groups.filter((g) => g.a.id !== target.id && g.b.id !== target.id));
       await refreshList();
       notify("Vendor deleted.");
     } catch (err) {
@@ -1653,7 +1624,12 @@ export default function AdminVendorManagementPage() {
 
   // One-click status change straight from a table row (Approve / Suspend) —
   // reuses the partial-PATCH endpoint, no full edit needed.
-  const handleQuickStatus = async (id, newStatus) => {
+  const requestStatusConfirmation = (ids, newStatus, bulk = false) => {
+    const names = ids.map((id) => data.items.find((vendor) => vendor.id === id)?.name || "this vendor");
+    setStatusConfirmation({ ids: [...ids], names, status: newStatus, bulk });
+  };
+
+  const executeStatusConfirmation = async (confirmation) => {
     // The toast alone carries this — `error`/setError below renders a
     // persistent banner whose only action is "reload the vendor list"
     // (see loadVendors's own catch), which doesn't apply to a single row
@@ -1661,11 +1637,23 @@ export default function AdminVendorManagementPage() {
     // twice for no benefit.
     setError("");
     try {
-      await updateAdminVendor(id, { status: newStatus });
+      const results = await Promise.allSettled(confirmation.ids.map((id) => updateAdminVendor(id, { status: confirmation.status })));
+      const failedIds = confirmation.ids.filter((_, index) => results[index].status === "rejected");
+      if (confirmation.bulk) setSelectedIds(new Set(failedIds));
       await refreshList();
-      notify(`Vendor ${newStatus === "active" ? "approved" : newStatus}.`);
+      const okCount = confirmation.ids.length - failedIds.length;
+      if (!failedIds.length) {
+        notify(confirmation.bulk
+          ? `${okCount} vendor${okCount === 1 ? "" : "s"} updated.`
+          : `Vendor ${confirmation.status === "active" ? "approved" : confirmation.status}.`);
+      } else {
+        const firstError = results.find((result) => result.status === "rejected")?.reason?.message;
+        notify(`${okCount} of ${confirmation.ids.length} vendor${confirmation.ids.length === 1 ? "" : "s"} updated — ${failedIds.length} failed${firstError ? ` (${firstError})` : ""}.`, true);
+      }
     } catch (err) {
       notify(err.message, true);
+    } finally {
+      setStatusConfirmation(null);
     }
   };
 
@@ -1689,41 +1677,15 @@ export default function AdminVendorManagementPage() {
   // silently kept showing their old status until the next unrelated reload.
   // allSettled runs every request independently, refreshes once regardless,
   // and leaves only the ones that actually failed selected for a retry.
-  const bulkSetStatus = async (newStatus) => {
-    const ids = [...selectedIds];
-    if (!ids.length) return;
-    setBulkBusy(true);
-    setError("");
-    try {
-      const results = await Promise.allSettled(ids.map((id) => updateAdminVendor(id, { status: newStatus })));
-      const failedIds = ids.filter((_, i) => results[i].status === "rejected");
-      setSelectedIds(new Set(failedIds));
-      await refreshList();
-      const okCount = ids.length - failedIds.length;
-      if (failedIds.length === 0) {
-        notify(`${okCount} vendor${okCount === 1 ? "" : "s"} updated.`);
-      } else {
-        const firstError = results.find((r) => r.status === "rejected")?.reason?.message;
-        notify(
-          `${okCount} of ${ids.length} vendor${ids.length === 1 ? "" : "s"} updated — ${failedIds.length} failed${firstError ? ` (${firstError})` : ""}.`,
-          true
-        );
-      }
-    } finally {
-      setBulkBusy(false);
-    }
-  };
-
-  const bulkDelete = async () => {
-    const ids = [...selectedIds];
-    if (!ids.length) return;
+  const bulkDelete = async (confirmation) => {
+    const ids = confirmation.ids;
     setBulkBusy(true);
     setError("");
     try {
       const results = await Promise.allSettled(ids.map((id) => deleteAdminVendor(id)));
       const failedIds = ids.filter((_, i) => results[i].status === "rejected");
       setSelectedIds(new Set(failedIds));
-      setConfirmBulkDelete(false);
+      setConfirmBulkDelete(null);
       await refreshList();
       const okCount = ids.length - failedIds.length;
       if (failedIds.length === 0) {
@@ -1735,6 +1697,13 @@ export default function AdminVendorManagementPage() {
           true
         );
       }
+    } catch (err) {
+      // A follow-up GET can fail whether every DELETE succeeded, none did, or
+      // only some did. Keep the failed-ID selection intact and use neutral
+      // wording so the banner never claims a deletion that did not happen.
+      const message = `Could not refresh vendor deletion results: ${err.message}`;
+      setError(message);
+      notify(message, true);
     } finally {
       setBulkBusy(false);
     }
@@ -1774,10 +1743,29 @@ export default function AdminVendorManagementPage() {
     resetToFirstPage();
   };
 
+  const duplicatesControl = duplicateGroups.length > 0 ? (
+    <button key="duplicates" type="button" className="vendor-filter-duplicates inline-flex h-10 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 shadow-sm transition-colors hover:bg-amber-100" onClick={() => setShowDuplicatesPanel(true)}>
+      <AlertTriangle size={16} />
+      {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
+    </button>
+  ) : null;
+  const exportControl = (
+    <button
+      key="export"
+      type="button"
+      className="vendor-filter-export inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60"
+      onClick={handleExportVendors}
+      disabled={exportingVendors}
+    >
+      <FileDown size={16} />
+      <span>{exportingVendors ? "Preparing PDF…" : "Export PDF"}</span>
+    </button>
+  );
+
   const content = (
     <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 xl:max-w-2xl">
+      <div className="vendor-filter-toolbar flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="vendor-filter-search flex h-10 w-full flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 xl:max-w-2xl">
           <Search size={16} className="text-gray-400" />
           <input
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
@@ -1787,8 +1775,8 @@ export default function AdminVendorManagementPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-10 items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+        <div className="vendor-filter-controls flex flex-wrap items-center gap-3">
+          <div className="vendor-filter-view inline-flex h-10 items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm">
             <button
               type="button"
               className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors ${viewMode === "list" ? "bg-slate-100 text-blue-700" : "text-gray-500 hover:bg-gray-50"}`}
@@ -1806,7 +1794,7 @@ export default function AdminVendorManagementPage() {
               <MapPinned size={15} /> Map
             </button>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={category} onChange={(e) => { setCategory(e.target.value); resetToFirstPage(); }}>
               <option value="all">All Categories</option>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1815,7 +1803,7 @@ export default function AdminVendorManagementPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={status} onChange={(e) => { setStatus(e.target.value); resetToFirstPage(); }}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>{s === "all" ? "All Statuses" : s[0].toUpperCase() + s.slice(1)}</option>
@@ -1825,7 +1813,7 @@ export default function AdminVendorManagementPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-          <div className="relative">
+          <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={sort} onChange={(e) => { setSort(e.target.value); resetToFirstPage(); }}>
               {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
@@ -1834,22 +1822,9 @@ export default function AdminVendorManagementPage() {
             </div>
           </div>
 
-          {duplicateGroups.length > 0 && (
-            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 shadow-sm transition-colors hover:bg-amber-100" onClick={() => setShowDuplicatesPanel(true)}>
-              <AlertTriangle size={16} />
-              {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60"
-            onClick={handleExportVendors}
-            disabled={exportingVendors}
-          >
-            <FileDown size={16} />
-            {exportingVendors ? "Preparing PDF…" : "Export PDF"}
-          </button>
+          {isPhoneFilters
+            ? [exportControl, duplicatesControl]
+            : [duplicatesControl, exportControl]}
         </div>
       </div>
 
@@ -1864,16 +1839,19 @@ export default function AdminVendorManagementPage() {
         <div className="admin-bulk-bar">
           <span className="admin-bulk-count">{selectedIds.size} selected</span>
           <div className="admin-bulk-actions">
-            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => bulkSetStatus("active")}>
+            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => requestStatusConfirmation([...selectedIds], "active", true)}>
               <Check size={14} /> Approve
             </button>
-            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => bulkSetStatus("draft")}>
+            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => requestStatusConfirmation([...selectedIds], "draft", true)}>
               Set Draft
             </button>
-            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => bulkSetStatus("suspended")}>
+            <button type="button" className="admin-secondary-btn compact" disabled={bulkBusy} onClick={() => requestStatusConfirmation([...selectedIds], "suspended", true)}>
               <Ban size={14} /> Suspend
             </button>
-            <button type="button" className="admin-secondary-btn compact danger" disabled={bulkBusy} onClick={() => setConfirmBulkDelete(true)}>
+            <button type="button" className="admin-secondary-btn compact danger" disabled={bulkBusy} onClick={() => {
+              const ids = [...selectedIds];
+              setConfirmBulkDelete({ ids, names: ids.map((id) => data.items.find((vendor) => vendor.id === id)?.name || "this vendor") });
+            }}>
               <Trash2 size={14} /> Delete
             </button>
             <button type="button" className="admin-link-btn" onClick={() => setSelectedIds(new Set())}>Clear</button>
@@ -1942,7 +1920,11 @@ export default function AdminVendorManagementPage() {
                       <VendorThumb vendor={vendor} className="h-full w-full object-cover" />
                     </div>
                   </td>
-                  <td className="px-4 py-4 font-bold text-gray-900">{vendor.name}</td>
+                  <td className="px-4 py-4 font-bold text-gray-900">
+                    <button type="button" className="text-left font-bold text-gray-900" onClick={(event) => { event.stopPropagation(); openVendor(vendor); }}>
+                      {vendor.name}
+                    </button>
+                  </td>
                   <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
                   <td className="px-4 py-4 text-gray-500">{vendor.operatingHours || "—"}</td>
                   <td className="px-4 py-4">
@@ -1963,18 +1945,15 @@ export default function AdminVendorManagementPage() {
                   <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-3 text-gray-400">
                       {st !== "active" && (
-                        <button type="button" className="transition-colors hover:text-emerald-600" onClick={() => handleQuickStatus(vendor.id, "active")} aria-label={`Approve ${vendor.name}`} title="Approve">
+                        <button type="button" className="transition-colors hover:text-emerald-600" onClick={() => requestStatusConfirmation([vendor.id], "active")} aria-label={`Approve ${vendor.name}`} title="Approve">
                           <Check size={16} />
                         </button>
                       )}
                       {st === "active" && (
-                        <button type="button" className="transition-colors hover:text-gray-600" onClick={() => handleQuickStatus(vendor.id, "suspended")} aria-label={`Suspend ${vendor.name}`} title="Suspend">
+                        <button type="button" className="transition-colors hover:text-gray-600" onClick={() => requestStatusConfirmation([vendor.id], "suspended")} aria-label={`Suspend ${vendor.name}`} title="Suspend">
                           <Ban size={16} />
                         </button>
                       )}
-                      <button type="button" className="transition-colors hover:text-gray-600" onClick={() => openVendor(vendor)} aria-label={`View ${vendor.name}`} title="View">
-                        <Eye size={16} />
-                      </button>
                       <button
                         type="button"
                         className="transition-colors hover:text-gray-600"
@@ -1987,7 +1966,7 @@ export default function AdminVendorManagementPage() {
                       <button
                         type="button"
                         className="transition-colors hover:text-red-500"
-                        onClick={() => setConfirmDeleteId(vendor.id)}
+                        onClick={() => setConfirmDelete({ id: vendor.id, name: vendor.name })}
                         aria-label={`Delete ${vendor.name}`}
                         title="Delete"
                       >
@@ -2016,7 +1995,7 @@ export default function AdminVendorManagementPage() {
           </tbody>
         </table>
         </div>
-        <Pagination
+        <AdminPagination
           pagination={data.pagination}
           pageSize={pageSize}
           onPageChange={handlePageChange}
@@ -2051,6 +2030,7 @@ export default function AdminVendorManagementPage() {
         errors={errors}
         saving={saving}
         cancelling={cancellingEdit}
+        confirmationActive={!!saveConfirmation || !!confirmDeleteGalleryUrl}
         error={error}
         onClose={() => setSelectedVendor(null)}
         onStartEdit={() => selectedVendor && openVendorForEdit(selectedVendor)}
@@ -2101,13 +2081,13 @@ export default function AdminVendorManagementPage() {
         />
       )}
 
-      {confirmDeleteId && (
+      {confirmDelete && (
         <ConfirmDialog
           title="Delete vendor?"
-          message={`This will permanently delete "${data.items.find((v) => v.id === confirmDeleteId)?.name || "this vendor"}" along with its reviews, bookmarks, and storefront image. This can't be undone.`}
+          message={`This will permanently delete "${confirmDelete.name}" along with its reviews, bookmarks, and storefront image. This can't be undone.`}
           busy={deleting}
-          onConfirm={() => handleDelete(confirmDeleteId)}
-          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
 
@@ -2116,7 +2096,7 @@ export default function AdminVendorManagementPage() {
           title="Delete gallery photo?"
           message="Are you sure you want to delete this gallery photo? It won't be permanently removed until you save your changes."
           busy={false}
-          onConfirm={() => {
+          onConfirm={async () => {
             setPendingGalleryDeletes((cur) => new Set(cur).add(confirmDeleteGalleryUrl));
             setConfirmDeleteGalleryUrl(null);
           }}
@@ -2126,11 +2106,11 @@ export default function AdminVendorManagementPage() {
 
       {confirmBulkDelete && (
         <ConfirmDialog
-          title={`Delete ${selectedIds.size} vendor${selectedIds.size === 1 ? "" : "s"}?`}
+          title={`Delete ${confirmBulkDelete.ids.length} vendor${confirmBulkDelete.ids.length === 1 ? "" : "s"}?`}
           message="This will permanently delete the selected vendors along with their reviews, bookmarks, and storefront images. This can't be undone."
           busy={bulkBusy}
-          onConfirm={bulkDelete}
-          onCancel={() => setConfirmBulkDelete(false)}
+          onConfirm={() => bulkDelete(confirmBulkDelete)}
+          onCancel={() => setConfirmBulkDelete(null)}
         />
       )}
 
@@ -2138,19 +2118,53 @@ export default function AdminVendorManagementPage() {
         <DuplicatesPanel
           groups={duplicateGroups}
           onClose={() => setShowDuplicatesPanel(false)}
-          onDeleteRequest={setDupDeleteId}
+          onDeleteRequest={(id) => {
+            const vendor = duplicateGroups.flatMap((group) => [group.a, group.b]).find((entry) => entry.id === id);
+            setDupDelete({ id, name: vendor?.vendor_name || "this vendor" });
+          }}
         />
       )}
 
-      {dupDeleteId && (
+      {dupDelete && (
         <ConfirmDialog
           title="Delete vendor?"
-          message={`This will permanently delete "${
-            duplicateGroups.flatMap((g) => [g.a, g.b]).find((v) => v.id === dupDeleteId)?.vendor_name || "this vendor"
-          }" along with its reviews, bookmarks, and storefront image. This can't be undone.`}
+          message={`This will permanently delete "${dupDelete.name}" along with its reviews, bookmarks, and storefront image. This can't be undone.`}
           busy={dupDeleting}
-          onConfirm={() => handleDeleteDuplicateVendor(dupDeleteId)}
-          onCancel={() => setDupDeleteId(null)}
+          onConfirm={() => handleDeleteDuplicateVendor(dupDelete)}
+          onCancel={() => setDupDelete(null)}
+        />
+      )}
+
+      {statusConfirmation && (() => {
+        const label = statusConfirmation.status === "active" ? "Approve" : statusConfirmation.status === "suspended" ? "Suspend" : "Set Draft";
+        const count = statusConfirmation.ids.length;
+        const subject = statusConfirmation.bulk
+          ? `${count} selected vendor${count === 1 ? "" : "s"}`
+          : `"${statusConfirmation.names[0]}"`;
+        const effect = statusConfirmation.status === "active"
+          ? "They will become active and visible in public listings."
+          : statusConfirmation.status === "suspended"
+            ? "They will be removed from public listings."
+            : "They will be saved as drafts and removed from public listings.";
+        return <ConfirmDialog
+          title={`${label} ${statusConfirmation.bulk ? `${count} vendor${count === 1 ? "" : "s"}` : "vendor"}?`}
+          message={`${label} ${subject}? ${effect}`}
+          confirmLabel={label}
+          tone={statusConfirmation.status === "suspended" ? "danger" : "primary"}
+          onConfirm={() => executeStatusConfirmation(statusConfirmation)}
+          onCancel={() => setStatusConfirmation(null)}
+        />;
+      })()}
+
+      {saveConfirmation && (
+        <ConfirmDialog
+          title="Save changes?"
+          message={`Save the changes to "${saveConfirmation.vendor.name}"?`}
+          confirmLabel="Save Changes"
+          tone="primary"
+          busy={saving}
+          onConfirm={() => executeSave(saveConfirmation)}
+          onCancel={() => setSaveConfirmation(null)}
         />
       )}
 

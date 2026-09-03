@@ -1,0 +1,94 @@
+/* Keep non-phone layouts on the existing utility styles. */
+@media (width < 768px) {
+  .vendor-filter-toolbar {
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .vendor-filter-search {
+    flex: none;
+    height: 52px;
+    min-width: 0;
+  }
+
+  .vendor-filter-search input {
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .vendor-filter-search svg,
+  .vendor-filter-controls button > svg {
+    flex-shrink: 0;
+  }
+
+  .vendor-filter-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .vendor-filter-view,
+  .vendor-filter-duplicates {
+    grid-column: 1 / -1;
+  }
+
+  .vendor-filter-controls > *,
+  .vendor-filter-select select {
+    width: 100%;
+    height: 52px;
+    min-width: 0;
+  }
+
+  .vendor-filter-controls button,
+  .vendor-filter-select select {
+    font-size: 14px;
+  }
+
+  .vendor-filter-select select {
+    /* Symmetric space keeps native selected text centered in the whole pill. */
+    padding-left: 20px;
+    padding-right: 20px;
+    text-align: center;
+    text-align-last: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vendor-filter-select > div {
+    padding-right: 6px;
+  }
+
+  .vendor-filter-select > div > svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .vendor-filter-controls > button {
+    justify-content: center;
+  }
+
+  .vendor-filter-view {
+    padding: 3px;
+  }
+
+  .vendor-filter-view > button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 44px;
+    justify-content: center;
+  }
+
+  .vendor-filter-export {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 6px;
+    line-height: 18px;
+  }
+
+  .vendor-filter-export > span {
+    min-width: 0;
+    white-space: normal;
+  }
+}

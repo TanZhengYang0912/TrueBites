@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Map } from "lucide-react";
-import { subscribeTripCount } from "../lib/tripStorage";
+import { useSession } from "../lib/SessionContext";
+import { subscribeTripCount, tripOwner } from "../lib/tripStorage";
 
 // Global floating action button — appears on every page once the trip has at
 // least one stop, and jumps to the map. Hidden only on the actual pin-map
@@ -12,8 +13,13 @@ export default function TripFab() {
   const [count, setCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
+  const { session, loading } = useSession();
+  const owner = tripOwner(session);
 
-  useEffect(() => subscribeTripCount(setCount), []);
+  useEffect(() => {
+    if (loading) { setCount(0); return undefined; }
+    return subscribeTripCount(setCount, owner);
+  }, [loading, owner]);
 
   const onMapView = location.pathname === "/map" && new URLSearchParams(location.search).get("view") === "map";
   if (count === 0 || onMapView) return null;

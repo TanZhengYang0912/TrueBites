@@ -229,9 +229,14 @@ export async function setReviewVisibility(id, isHidden) {
   });
 }
 
-export async function getMyActivity({ page = 1, pageSize = 25 } = {}) {
-  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-  return requestJson(`/api/admin/me/activity?${params}`);
+export async function getMyActivity({ page = 1, pageSize = 25, q = '', entity = 'all', from = '', to = '', sort = 'newest', signal } = {}) {
+  // Select the public filter contract rather than spreading caller options:
+  // actor identity and arbitrary metadata must never reach this endpoint.
+  const params = new URLSearchParams({
+    page: String(page), pageSize: String(pageSize), q: String(q), entity: String(entity),
+    from: String(from), to: String(to), sort: String(sort),
+  });
+  return requestJson(`/api/admin/me/activity?${params}`, { signal });
 }
 
 export async function getAdminUsers({ page = 1, pageSize = 10, q = "" }) {

@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { backfillFromSummary } from "./extractor.js";
+
+test("AI extraction explicitly excludes promotion date ranges from operating hours", () => {
+  const source = readFileSync(new URL("./extractor.js", import.meta.url), "utf8");
+  assert.match(source, /Do not treat promotion dates or date ranges as opening hours/i);
+});
 
 test("backfillFromSummary: fills vendor_name and city from a typical AI summary opener", () => {
   const summary = "This video features a food spot in Melaka. The influencer reviews the cendol here.";

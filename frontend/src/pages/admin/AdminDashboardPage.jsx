@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { getAdminDashboard } from "../../api/admin";
 import { normalizeDashboardPayload, statusToneFor } from "../../lib/adminDashboard";
+import { buildDashboardReport, DASHBOARD_COPY } from "../../lib/dashboardReport";
 import { BarChart, KpiCard, LineChart, PipelineChart } from "../../components/admin/AdminCharts";
 import { openOverviewPdf } from "../../lib/exportPdf";
 
@@ -42,24 +43,13 @@ function DashboardSkeleton() {
   );
 }
 
-function KpiFallback({ stat, index }) {
-  const fallbackKeys = ["totalVendors", "activeRate", "pendingDrafts", "aiImported"];
-  return {
-    key: fallbackKeys[index] || `stat-${index}`,
-    label: stat.label,
-    value: stat.value,
-    note: stat.note,
-    tone: stat.tone,
-  };
-}
-
 function AttentionQueue({ items }) {
   return (
     <section className="admin-panel admin-attention-panel admin-span-4">
       <div className="admin-panel-header">
         <div>
-          <h2>Needs attention</h2>
-          <p>Items that need an admin decision</p>
+          <h2>{DASHBOARD_COPY.attention.title}</h2>
+          <p>{DASHBOARD_COPY.attention.subtitle}</p>
         </div>
         <AlertTriangle size={17} className="admin-panel-heading-icon" />
       </div>
@@ -74,7 +64,7 @@ function AttentionQueue({ items }) {
         )) : (
           <div className="admin-empty-state">
             <CheckCircle2 size={20} />
-            <span>No immediate issues.</span>
+            <span>{DASHBOARD_COPY.attention.empty}</span>
           </div>
         )}
       </div>
@@ -82,32 +72,13 @@ function AttentionQueue({ items }) {
   );
 }
 
-function ActivityPanel({ vendors = [], processing = [] }) {
-  const rows = [
-    ...vendors.slice(0, 4).map((vendor) => ({
-      id: `vendor-${vendor.id}`,
-      type: "Vendor",
-      title: vendor.name,
-      meta: `${vendor.category} · ${vendor.location}`,
-      status: vendor.status,
-      href: "/admin/vendors2",
-    })),
-    ...processing.slice(0, 4).map((item) => ({
-      id: `ai-${item.id}`,
-      type: item.platform,
-      title: item.vendor,
-      meta: item.recommendation,
-      status: "AI imported",
-      href: "/admin/ai",
-    })),
-  ].slice(0, 6);
-
+function ActivityPanel({ rows }) {
   return (
     <section className="admin-panel admin-activity-panel admin-span-12">
       <div className="admin-panel-header">
         <div>
-          <h2>Recent activity</h2>
-          <p>Latest changes across the admin console</p>
+          <h2>{DASHBOARD_COPY.activity.title}</h2>
+          <p>{DASHBOARD_COPY.activity.subtitle}</p>
         </div>
         <Database size={17} className="admin-panel-heading-icon" />
       </div>
@@ -120,7 +91,7 @@ function ActivityPanel({ vendors = [], processing = [] }) {
             <span className={`admin-status-pill ${statusToneFor(row.status)}`}>{row.status || "Updated"}</span>
             <ArrowRight size={15} />
           </Link>
-        )) : <div className="admin-empty-state">No recent activity yet.</div>}
+        )) : <div className="admin-empty-state">{DASHBOARD_COPY.activity.empty}</div>}
       </div>
     </section>
   );
@@ -131,6 +102,7 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState("");
   const [range, setRange] = useState(30);
   const [exportingOverview, setExportingOverview] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -140,28 +112,18 @@ export default function AdminDashboardPage() {
     return () => { active = false; };
   }, []);
 
-  const visibleTrend = useMemo(() => {
-    const trend = data?.vendorTrend || [];
-    return trend.slice(-range);
-  }, [data, range]);
+  const report = useMemo(() => (data ? buildDashboardReport(data, range) : null), [data, range]);
 
   if (error) return <div className="admin-feedback error">{error}</div>;
   if (!data) return <DashboardSkeleton />;
 
-  const kpis = data.kpis.length ? data.kpis : data.stats.map(KpiFallback);
-  const trend = visibleTrend.length ? visibleTrend : [{ label: "No data", value: 0, active: 0, draft: 0 }];
-  const sparkline = data.vendorTrend.slice(-12).map((item) => item.value);
-
   async function handleExportOverview() {
     setExportingOverview(true);
+    setExportError("");
     try {
-      await openOverviewPdf({
-        kpis,
-        statusBreakdown: data.statusBreakdown,
-        categoryBreakdown: data.categoryBreakdown,
-        sourceBreakdown: data.sourceBreakdown,
-        aiPipeline: data.aiPipeline,
-      });
+      await openOverviewPdf(report);
+    } catch (err) {
+      setExportError(err?.message || "Unable to export the dashboard PDF. Please try again.");
     } finally {
       setExportingOverview(false);
     }
@@ -171,56 +133,57 @@ export default function AdminDashboardPage() {
     <div className="admin-dashboard">
       <div className="admin-dashboard-heading">
         <div>
-          <div className="admin-eyebrow">Operations overview</div>
-          <h2>Good morning, Admin</h2>
-          <p>Monitor vendor quality, content processing, and moderation from one place.</p>
+          <div className="admin-eyebrow">{report.heading.eyebrow}</div>
+          <h2>{report.heading.title}</h2>
+          <p>{report.heading.subtitle}</p>
         </div>
         <div className="admin-dashboard-actions">
-          <span className="admin-last-updated">Updated {data.lastUpdated ? new Date(data.lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now"}</span>
+          <span className="admin-last-updated">{report.heading.updated}</span>
           <button type="button" className="admin-secondary-btn compact" onClick={handleExportOverview} disabled={exportingOverview}>
             <FileDown size={14} /> {exportingOverview ? "Preparing PDF…" : "Export PDF"}
           </button>
           <Link className="admin-secondary-btn compact" to="/admin/reviews"><MessageSquareWarning size={14} /> Review queue</Link>
           <Link className="admin-primary-btn compact" to="/admin/vendors2"><Store size={14} /> Add vendor</Link>
+          {exportError && <div className="admin-feedback error" role="alert">{exportError}</div>}
         </div>
       </div>
 
       <section className="admin-kpi-grid">
-        {kpis.map((item) => {
+        {report.kpis.map((item) => {
           const Icon = KPI_ICONS[item.key] || BarChart3;
-          return <KpiCard key={item.key || item.label} item={item} icon={Icon} sparkline={sparkline} />;
+          return <KpiCard key={item.key || item.label} item={item} icon={Icon} />;
         })}
       </section>
 
       <section className="admin-dashboard-grid">
         <article className="admin-panel admin-chart-panel admin-span-8">
           <div className="admin-panel-header">
-            <div><h2>Vendor growth</h2><p>New records created during the selected period</p></div>
+            <div><h2>{DASHBOARD_COPY.growth.title}</h2><p>{DASHBOARD_COPY.growth.subtitle}</p></div>
             <div className="admin-range-control" role="group" aria-label="Vendor growth range">
               {rangeOptions.map((option) => <button key={option} type="button" className={range === option ? "active" : ""} onClick={() => setRange(option)}>{option}d</button>)}
             </div>
           </div>
-          <LineChart data={trend} rangeLabel={`Last ${range} days`} />
+          <LineChart data={report.trend} rangeLabel={report.rangeLabel} emptyLabel={DASHBOARD_COPY.growth.empty} />
         </article>
 
-        <AttentionQueue items={data.attentionItems} />
+        <AttentionQueue items={report.attentionItems} />
 
         <article className="admin-panel admin-chart-panel admin-span-5">
-          <div className="admin-panel-header"><div><h2>AI content pipeline</h2><p>Persisted content outcomes</p></div><BrainCircuit size={17} className="admin-panel-heading-icon" /></div>
-          <PipelineChart data={data.aiPipeline} />
+          <div className="admin-panel-header"><div><h2>{DASHBOARD_COPY.pipeline.title}</h2><p>{DASHBOARD_COPY.pipeline.subtitle}</p></div><BrainCircuit size={17} className="admin-panel-heading-icon" /></div>
+          <PipelineChart data={report.aiPipeline} emptyLabel={DASHBOARD_COPY.pipeline.empty} />
         </article>
 
         <article className="admin-panel admin-chart-panel admin-span-4">
-          <div className="admin-panel-header"><div><h2>Vendor categories</h2><p>Current database mix</p></div><Store size={17} className="admin-panel-heading-icon" /></div>
-          <BarChart data={data.categoryBreakdown} />
+          <div className="admin-panel-header"><div><h2>{DASHBOARD_COPY.categories.title}</h2><p>{DASHBOARD_COPY.categories.subtitle}</p></div><Store size={17} className="admin-panel-heading-icon" /></div>
+          <BarChart data={report.categoryBreakdown} emptyLabel={DASHBOARD_COPY.categories.empty} />
         </article>
 
         <article className="admin-panel admin-chart-panel admin-span-3">
-          <div className="admin-panel-header"><div><h2>Source mix</h2><p>AI-imported records</p></div><BarChart3 size={17} className="admin-panel-heading-icon" /></div>
-          <BarChart data={data.sourceBreakdown} tone="teal" />
+          <div className="admin-panel-header"><div><h2>{DASHBOARD_COPY.sources.title}</h2><p>{DASHBOARD_COPY.sources.subtitle}</p></div><BarChart3 size={17} className="admin-panel-heading-icon" /></div>
+          <BarChart data={report.sourceBreakdown} tone="teal" emptyLabel={DASHBOARD_COPY.sources.empty} />
         </article>
 
-        <ActivityPanel vendors={data.recentVendors} processing={data.recentProcessing} />
+        <ActivityPanel rows={report.activityRows} />
       </section>
     </div>
   );

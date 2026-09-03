@@ -8,6 +8,7 @@
 import { supabase } from "../../supabase.js";
 import { downloadAndStorePhoto } from "../photoProviders/photoStorage.js";
 import { findDuplicatesFor } from "../vendorDuplicates.js";
+import { normaliseOperatingHours, normaliseVendorHoursFields } from "../vendorValidation.js";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -75,26 +76,30 @@ export async function findDuplicateVendors(vendorName, address = "", city = "", 
 // refused rather than silently overwritten — that's the one case where a
 // porting mistake could corrupt real, possibly CSV-imported, vendor data.
 export async function upsertAiVendor(row) {
+  const safeInsertRow = normaliseVendorHoursFields(row);
   const { data: matches, error: findErr } = await supabase
     .from("vendors")
     .select("id, source_video_url")
-    .eq("vendor_name", row.vendor_name);
+    .eq("vendor_name", safeInsertRow.vendor_name);
   if (findErr) throw new Error(findErr.message);
 
   if (!matches?.length) {
-    const { data, error } = await supabase.from("vendors").insert(row).select().single();
+    const { data, error } = await supabase.from("vendors").insert(safeInsertRow).select().single();
     if (error) throw new Error(error.message);
     return data;
   }
 
   const match = matches[0];
-  if (match.source_video_url !== row.source_video_url) {
+  if (match.source_video_url !== safeInsertRow.source_video_url) {
     throw new Error(
-      `vendor_name '${row.vendor_name}' already exists from a different source (${match.source_video_url || "CSV import"}); refusing to overwrite`
+      `vendor_name '${safeInsertRow.vendor_name}' already exists from a different source (${match.source_video_url || "CSV import"}); refusing to overwrite`
     );
   }
 
-  const { data, error } = await supabase.from("vendors").update(row).eq("id", match.id).select().single();
+  // A rerun that extracts no valid hours must not erase a value an admin
+  // corrected after the first AI import.
+  const safeUpdateRow = normaliseVendorHoursFields(row, { omitInvalid: true });
+  const { data, error } = await supabase.from("vendors").update(safeUpdateRow).eq("id", match.id).select().single();
   if (error) throw new Error(error.message);
   return data;
 }
@@ -111,6 +116,7 @@ export async function buildDraftVendorRow(job, extracted, summary) {
   const geo = await geocodeVendorAddress(vendorName, address, city, state);
   const platform = /tiktok/i.test(job.url || "") ? "TikTok" : "YouTube";
 
+  const operatingHours = normaliseOperatingHours(extracted.operating_hours_raw);
   return {
     vendor_name: vendorName,
     address: geo ? geo.formatted_address : address,
@@ -124,7 +130,8 @@ export async function buildDraftVendorRow(job, extracted, summary) {
     price_range: extracted.price_range ?? null,
     sentiment_score: extracted.sentiment_score ?? null,
     ai_review_summary: summary,
-    operating_hours_raw: extracted.operating_hours_raw ?? null,
+    operating_hours_raw: operatingHours,
+    operating_hours: operatingHours,
     source_video_url: job.url,
     source_platform: platform,
     status: "draft",

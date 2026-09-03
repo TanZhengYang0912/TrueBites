@@ -2894,40 +2894,11 @@
   .admin-kpi-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 6px;
     margin-top: 6px;
     color: var(--admin-muted);
     font-size: 11px;
   }
-
-  .admin-kpi-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--admin-muted);
-  }
-
-  .admin-kpi-action:hover { background: var(--admin-panel-soft); color: var(--admin-navy); }
-
-  .admin-sparkline {
-    position: absolute;
-    right: -2px;
-    bottom: 10px;
-    width: 82px;
-    height: 30px;
-    opacity: 0.75;
-  }
-
-  .admin-sparkline polyline { stroke: var(--admin-navy); stroke-width: 2.2; }
-  .admin-sparkline.success polyline { stroke: var(--admin-success-text); }
-  .admin-sparkline.warning polyline { stroke: var(--admin-warning-text); }
-  .admin-sparkline.accent polyline { stroke: #6858C7; }
 
   .admin-dashboard-grid {
     display: grid;
@@ -3412,6 +3383,10 @@
    Height alone was not enough: several controls were 44px tall but narrower,
    and the AI mode toggle had no rule at all after ai-module.css was deleted. */
 @layer components {
+  .admin-audit-log-export-error {
+    margin: -2px 0 14px;
+  }
+
   .mode-btn {
     display: inline-flex;
     min-height: 2.75rem;
