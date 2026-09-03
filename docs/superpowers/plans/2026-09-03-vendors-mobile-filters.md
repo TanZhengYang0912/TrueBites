@@ -33,7 +33,7 @@
 - Consumes: Existing `/admin/vendors2`, `getAdminVendors({page,pageSize,status,category,sort,q})`, duplicate groups and existing button handlers.
 - Produces: Styling hooks `vendor-filter-toolbar`, `vendor-filter-search`, `vendor-filter-controls`, `vendor-filter-view`, `vendor-filter-select`. No new JavaScript behavior or API.
 
-- [ ] **Step 1: Add browser tests and capture the pre-change non-phone baseline.**
+- [x] **Step 1: Add browser tests and capture the pre-change non-phone baseline.**
 
 Use the existing fixture shape in `vendor-actions-confirmation.spec.js`, with fake vendors (including a duplicate pair), no real image URLs, and path-based interception of every `/api/` request. All writes must be recorded and rejected. Return `{items,pagination:{page,pageSize,total,totalPages}}` for vendor GET, `{groups}` for duplicates, and empty ancillary admin data. Record GET parameters so tests verify the existing handlers still send the chosen search/category/status/sort. Keep API mocking at the network boundary, not the React components.
 
@@ -54,7 +54,7 @@ const exportButton = page.getByRole('button', { name: /Export PDF|Preparing PDF/
 
 For widths 768, 1280 and 1440, record these controls' bounding boxes plus computed font size, radius, padding, colors and shadow before implementation. Commit the numeric baseline as JSON using apply_patch. Retain before screenshots in the ignored output directory. Normal test execution must compare against the fixed baseline, never automatically overwrite it. Wait for data and `document.fonts.ready` before measurement, and neutralize hover/focus for consistent screenshots.
 
-- [ ] **Step 2: Run the phone test and confirm the expected red result.**
+- [x] **Step 2: Run the phone test and confirm the expected red result.**
 
 For each width 320, 390, 430, 767, validate the controls in visual order. Core assertion:
 
@@ -81,7 +81,7 @@ npx playwright test tests/responsive/vendor-mobile-filters.spec.js --grep 'phone
 
 Expected: FAIL on the existing inconsistent control geometry, not a fixture or navigation error. Record the actual failure in the task report before editing production files.
 
-- [ ] **Step 3: Apply the minimal phone-only CSS.**
+- [x] **Step 3: Apply the minimal phone-only CSS.**
 
 Add `import './vendorMobileFilters.css';` to the Vendors page. Prefix the existing toolbar outer div with `vendor-filter-toolbar`, search wrapper with `vendor-filter-search`, wrapped controls parent with `vendor-filter-controls`, List / Map outer div with `vendor-filter-view`, and each of the three select wrappers with `vendor-filter-select`. Preserve all existing classes, handlers and DOM order.
 
@@ -148,7 +148,7 @@ Create the following CSS (all declarations must stay inside the media query):
 }
 ```
 
-- [ ] **Step 4: Verify the real page interactions and geometry.**
+- [x] **Step 4: Verify the real page interactions and geometry.**
 
 Run all tests in the new suite. Include the four phone widths, three unchanged baseline widths, absence of duplicates with no empty gap, the longest existing category selected, List / Map state toggling and retained filter parameters, search/category/status/sort requests and page reset. Defer an intercepted export GET to assert Preparing PDF is disabled at the same dimensions, then release it and verify completion. Stub only external map network traffic as needed; do not change production map code. Capture the resulting phone screenshot and inspect it visually.
 
@@ -159,7 +159,7 @@ npx playwright test tests/responsive/vendor-mobile-filters.spec.js
 
 Expected: all passing; desktop numeric baselines unchanged; no backend write sent.
 
-- [ ] **Step 5: Run regressions, review and commit this task only.**
+- [x] **Step 5: Run regressions, review and commit this task only.**
 
 ```sh
 cd frontend
@@ -169,3 +169,15 @@ npm run build
 ```
 
 Run only one Playwright process at a time because the fixed test port is exclusive. Log any pre-existing build warnings separately. Review `git diff --check` and the exact task diff; stage only the four task files and commit after passing tests. Do not stage existing audit/review/global CSS changes or output files. Report RED/GREEN evidence, commands, screenshots, baseline provenance, changed files, commit and concerns. Controller performs independent spec/quality review and final verification before delivery.
+
+## Execution record — 2026-09-03
+
+- Implemented in `a6d6b16`; test hardening in `1b977d5`. Only the four task files changed; unrelated dirty files preserved.
+- TDD RED: four phone-width tests failed on the old 46px search wrapper against the required 52px. GREEN: eight focused tests passed.
+- Final controller regression at `1b977d5`: 43 browser tests passed (25.6s). The 158-test unit suite and production build passed; production code was unchanged by the test-only follow-up.
+- Exact numeric desktop geometry/styles at 768, 1280 and 1440px match the pre-edit baseline. Phone checks cover 320, 390, 430 and 767px, including full-width controls, typography, long-category selection, duplicate absence and pending-export dimensions.
+- Original before PNGs were overwritten by the first test harness version; they are not retained pre-edit evidence. The committed numeric baseline remains genuine and unchanged. Normal runs now write separate after PNGs.
+- Visual inspection: phone-390-after.png and desktop-1440-after.png. Local development service on port 5173 serves the new CSS.
+- luna_worker preflight, spec/quality review and scoped re-review passed after one test-only fix round; final whole-feature standards/spec review has zero findings.
+- Existing tool warnings remain: Vite main chunk exceeds 500kB; Playwright environment has both NO_COLOR and FORCE_COLOR. No new application build failure.
+- Kept branch `fix/user-navigation` in place. No push, merge, or real-data mutation.
