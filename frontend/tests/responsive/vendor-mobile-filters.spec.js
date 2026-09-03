@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const API = url => new URL(url).pathname.startsWith("/api/");
 const baselinePath = resolve("tests/responsive/vendor-mobile-filters-baseline.json");
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const vendor = (id, name, status, category = "Cafe / Dessert") => ({
   id,
@@ -40,11 +41,12 @@ async function setup(page, { width = 1440, includeDuplicates = true, deferExport
   await page.route(API, async route => {
     const request = route.request();
     const url = new URL(request.url());
-    if (request.method() !== "GET") {
+    if (MUTATING_METHODS.has(request.method())) {
       writes.push({ method: request.method(), path: url.pathname });
       await route.fulfill({ status: 405, json: { error: "Synthetic fixture rejects writes" } });
       return;
     }
+    if (request.method() !== "GET") return route.fulfill({ status: 204 });
     if (url.pathname === "/api/admin/vendors") {
       const params = Object.fromEntries(url.searchParams);
       calls.push(params);
@@ -105,6 +107,10 @@ async function geometry(locator) {
   });
 }
 
+function outerShape(box) {
+  return { x: box.x, width: box.width, height: box.height };
+}
+
 async function desktopSnapshot(page) {
   const toolbar = controls(page);
   return Object.fromEntries(await Promise.all(Object.entries({
@@ -122,14 +128,16 @@ for (const width of [768, 1280, 1440]) {
   test(`desktop toolbar preserves the captured ${width}px geometry and styles`, async ({ page }) => {
     await setup(page, { width });
     const actual = await desktopSnapshot(page);
-    await mkdir(resolve("responsive-output/vendor-mobile-filters"), { recursive: true });
-    await page.screenshot({ path: resolve(`responsive-output/vendor-mobile-filters/desktop-${width}-before.png`), fullPage: true, animations: "disabled" });
     if (process.env.CAPTURE_VENDOR_FILTERS_BASELINE) {
+      await mkdir(resolve("responsive-output/vendor-mobile-filters"), { recursive: true });
+      await page.screenshot({ path: resolve(`responsive-output/vendor-mobile-filters/desktop-${width}-before.png`), fullPage: true, animations: "disabled" });
       console.log(`VENDOR_FILTERS_BASELINE_${width}=${JSON.stringify(actual)}`);
       return;
     }
     const baseline = JSON.parse(await readFile(baselinePath, "utf8"));
     expect(actual).toEqual(baseline[String(width)]);
+    await mkdir(resolve("responsive-output/vendor-mobile-filters"), { recursive: true });
+    await page.screenshot({ path: resolve(`responsive-output/vendor-mobile-filters/desktop-${width}-after.png`), fullPage: true, animations: "disabled" });
   });
 }
 
@@ -171,6 +179,11 @@ test("filter requests, view state, export pending state, and no-duplicate spacin
   await expect.poll(() => state.calls.some(call => call.q === "draft")).toBeTruthy();
   await expect(page.getByText("Page 1 / 3", { exact: true })).toBeVisible();
   await toolbar.category.selectOption("Nyonya / Peranakan");
+  const selectedCategoryBox = await toolbar.category.boundingBox();
+  const selectedStatusBox = await toolbar.status.boundingBox();
+  expect(selectedCategoryBox.height).toBeCloseTo(52, 0);
+  expect(selectedCategoryBox.x).toBeCloseTo(selectedStatusBox.x, 0);
+  expect(selectedCategoryBox.width).toBeCloseTo(selectedStatusBox.width, 0);
   await toolbar.status.selectOption("active");
   await toolbar.sort.selectOption("az");
   await expect.poll(() => state.calls.filter(call => call.pageSize === "10").at(-1)).toMatchObject({ page: "1", q: "draft", category: "Nyonya / Peranakan", status: "active", sort: "az" });
@@ -178,10 +191,20 @@ test("filter requests, view state, export pending state, and no-duplicate spacin
   await expect(toolbar.map).toHaveAttribute("aria-pressed", "true");
   await toolbar.list.click();
   await expect(toolbar.list).toHaveAttribute("aria-pressed", "true");
+  const idleBox = await toolbar.exportButton.boundingBox();
+  const categoryBox = await toolbar.category.boundingBox();
+  expect(idleBox.height).toBeCloseTo(52, 0);
+  expect(idleBox.width).toBeCloseTo(categoryBox.width, 0);
   await toolbar.exportButton.click();
-  await expect(page.getByRole("button", { name: "Preparing PDF…", exact: true })).toBeDisabled();
+  const pending = page.getByRole("button", { name: "Preparing PDF…", exact: true });
+  await expect(pending).toBeDisabled();
+  expect(outerShape(await pending.boundingBox())).toEqual(outerShape(idleBox));
   state.releaseExport();
-  await expect(page.getByRole("button", { name: "Export PDF", exact: true })).toBeEnabled({ timeout: 15_000 });
+  const completed = page.getByRole("button", { name: "Export PDF", exact: true });
+  await expect(completed).toBeEnabled({ timeout: 15_000 });
+  await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight); });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  expect(outerShape(await completed.boundingBox())).toEqual(outerShape(idleBox));
   expect(state.writes).toEqual([]);
 
   await setup(page, { width: 390, includeDuplicates: false });
