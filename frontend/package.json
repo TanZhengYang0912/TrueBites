@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:unit": "node --test src/lib/*.test.mjs",
+    "test:unit": "node --test src/lib/*.test.mjs vercel-config.test.mjs",
     "test:responsive": "playwright test",
     "capture:baseline": "RESPONSIVE_OUTPUT=baseline playwright test",
     "capture:after": "RESPONSIVE_OUTPUT=after ASSERT_RESPONSIVE=1 playwright test"

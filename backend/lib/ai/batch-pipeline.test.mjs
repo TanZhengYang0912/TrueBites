@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { runBatchPipelines } from "./pipeline.js";
+
+// Importing the pipeline also initializes its Supabase client. These tests use
+// an injected runner, so only inert configuration is needed, never real keys.
+process.env.SUPABASE_URL = "http://127.0.0.1:1";
+process.env.SUPABASE_SERVICE_KEY = "ci-test-service-key";
+const { runBatchPipelines } = await import("./pipeline.js");
 
 test("batch processing does not serialize every video behind one slow pipeline", async () => {
   const source = await fs.readFile(new URL("./pipeline.js", import.meta.url), "utf8");

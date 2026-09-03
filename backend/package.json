@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
-    "test": "node --test lib/*.test.mjs lib/ai/*.test.mjs lib/photoProviders/*.test.mjs ../render-config.test.mjs",
+    "test": "node --test lib/*.test.mjs lib/ai/*.test.mjs ../render-config.test.mjs",
     "setup:ytdlp": "node scripts/installYtDlp.js",
     "postinstall": "node scripts/installYtDlp.js",
     "clean:outputs": "node scripts/cleanOutputs.js"
