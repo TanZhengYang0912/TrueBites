@@ -1,6 +1,40 @@
 # TrueBites — Restaurant Navigation
 
+[![CI](https://github.com/TanZhengYang0912/TrueBites/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TanZhengYang0912/TrueBites/actions/workflows/ci.yml)
+
 A self-pickup and dine-in restaurant discovery app with in-app map, route planning, and day/night mode.
+
+## Continuous Integration
+
+GitHub Actions runs the **CI** workflow on every branch push and pull request. It
+can also be started manually from **Actions → CI → Run workflow** once the workflow
+is on `main`. The two checks run on Ubuntu with Node.js 24:
+
+- **Backend tests** — backend unit tests and Render configuration tests.
+- **Frontend tests and build** — frontend unit tests, Vercel configuration tests,
+  and the Vite production build.
+
+These checks use the committed npm lockfiles and need no repository secrets or
+live Supabase, Google Maps, or Groq services. Backend dependencies are installed
+with `--ignore-scripts` because these unit tests do not run the video-processing
+binaries. The frontend build checks compilation; it does not deploy the app or
+validate production credentials. Browser/responsive tests remain a separate local
+suite (`npm run test:responsive` in `frontend`) and are not part of this workflow.
+
+Run the same checks locally with Node.js 24 in a clean checkout:
+
+```bash
+npm ci --prefix backend --ignore-scripts
+npm test --prefix backend
+npm ci --prefix frontend
+npm run test:unit --prefix frontend
+npm run build --prefix frontend
+```
+
+To require passing CI before merging, configure a branch ruleset for `main` under
+**Settings → Rules → Rulesets**, require a pull request and status checks, then
+select **Backend tests** and **Frontend tests and build** after their first run.
+Adding the workflow alone does not enforce merge protection.
 
 ## Contributors
 
