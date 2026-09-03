@@ -1,0 +1,78 @@
+/* Match the Vendors phone toolbar without changing tablet/desktop utilities. */
+@media (width < 768px) {
+  .admin-audit-log-toolbar {
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .audit-filter-search {
+    flex: none;
+    height: 52px;
+  }
+
+  .audit-filter-search input {
+    font-size: 14px;
+  }
+
+  .audit-filter-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .audit-filter-controls > *,
+  .audit-filter-select select {
+    width: 100%;
+    height: 52px;
+    min-width: 0;
+  }
+
+  .audit-filter-controls button,
+  .audit-filter-select select {
+    font-size: 14px;
+  }
+
+  .audit-filter-select select {
+    padding-left: 20px;
+    padding-right: 20px;
+    text-align: center;
+    text-align-last: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .audit-filter-select > div {
+    padding-right: 6px;
+  }
+
+  .audit-filter-select > div > svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .audit-filter-controls > button {
+    justify-content: center;
+  }
+
+  .audit-filter-clear {
+    grid-column: 1 / -1;
+  }
+
+  .audit-filter-export {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 6px;
+    line-height: 18px;
+  }
+
+  .audit-filter-export > svg {
+    flex-shrink: 0;
+  }
+
+  .audit-filter-export > span {
+    min-width: 0;
+    white-space: normal;
+  }
+}

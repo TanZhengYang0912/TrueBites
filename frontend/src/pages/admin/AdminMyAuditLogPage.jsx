@@ -1,32 +1,45 @@
 import { FileDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getMyActivity } from "../../api/admin";
+import AdminPagination from "../../components/admin/AdminPagination";
 import { formatAuditEntry } from "../../lib/auditLogReport";
 import { AUDIT_ENTITY_OPTIONS, AUDIT_PERIOD_OPTIONS, AUDIT_SORT_OPTIONS, createAuditLogQuery } from "../../lib/myAuditLogFilters";
 import { openMyAuditLogPdf } from "../../lib/myAuditLogExport";
 import { useSession } from "../../lib/SessionContext";
+import "./auditMobileFilters.css";
 
-const PAGE_SIZE = 25;
 const DEFAULT_FILTERS = Object.freeze({ q: "", entity: "all", period: "all", sort: "newest" });
-const queryKey = (query, page, accountId) => JSON.stringify([accountId || "", page, query.q, query.entity, query.from, query.to, query.sort]);
+const queryKey = (query, page, pageSize, accountId) => JSON.stringify([accountId || "", page, pageSize, query.q, query.entity, query.from, query.to, query.sort]);
 
-function Pagination({ pagination, onPageChange }) {
-  const { page, totalPages, total } = pagination;
-  return <div className="admin-pagination"><div className="admin-pagination-meta" aria-live="polite"><strong>{total}</strong> {total === 1 ? "entry" : "entries"}</div>{totalPages > 1 ? <div className="admin-pagination-controls">
-    <button type="button" className="admin-secondary-btn compact" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</button>
-    <span>Page {page} / {totalPages}</span>
-    <button type="button" className="admin-secondary-btn compact" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
-  </div> : null}</div>;
+function AuditFilterSelect({ label, value, options, onChange }) {
+  return <div className="audit-filter-select relative">
+    <select aria-label={label} className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={value} onChange={onChange}>
+      {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+    </div>
+  </div>;
 }
 
 // Read-only — every action the signed-in admin has personally taken.
 export default function AdminMyAuditLogPage() {
+  const [isPhoneFilters, setIsPhoneFilters] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(width < 768px)").matches
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(width < 768px)");
+    const update = () => setIsPhoneFilters(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const { session } = useSession();
   const accountId = session?.user?.id || "";
   const accountIdRef = useRef(accountId);
   accountIdRef.current = accountId;
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [applied, setApplied] = useState(() => ({ query: createAuditLogQuery(DEFAULT_FILTERS), page: 1 }));
+  const [applied, setApplied] = useState(() => ({ query: createAuditLogQuery(DEFAULT_FILTERS), page: 1, pageSize: 10 }));
   const [reload, setReload] = useState(0);
   const [data, setData] = useState({ items: [], pagination: { page: 1, totalPages: 1, total: 0 } });
   const [loadState, setLoadState] = useState({ status: "loading", readyKey: "", error: "" });
@@ -37,17 +50,17 @@ export default function AdminMyAuditLogPage() {
   const requestId = useRef(0);
   const exportGuard = useRef(false);
   const exportController = useRef(null);
-  const appliedKey = useMemo(() => queryKey(applied.query, applied.page, accountId), [applied, accountId]);
+  const appliedKey = useMemo(() => queryKey(applied.query, applied.page, applied.pageSize, accountId), [applied, accountId]);
 
   useEffect(() => () => window.clearTimeout(searchTimer.current), []);
   useEffect(() => {
     const id = ++requestId.current;
     const controller = new AbortController();
     const requestedAccountId = accountId;
-    const readyKey = queryKey(applied.query, applied.page, requestedAccountId);
+    const readyKey = queryKey(applied.query, applied.page, applied.pageSize, requestedAccountId);
     setData({ items: [], pagination: { page: applied.page, totalPages: 1, total: 0 } });
     setLoadState({ status: "loading", readyKey: "", error: "" });
-    getMyActivity({ page: applied.page, pageSize: PAGE_SIZE, ...applied.query, signal: controller.signal })
+    getMyActivity({ page: applied.page, pageSize: applied.pageSize, ...applied.query, signal: controller.signal })
       .then((payload) => {
         if (id !== requestId.current || requestedAccountId !== accountIdRef.current) return;
         setData(payload);
@@ -64,7 +77,7 @@ export default function AdminMyAuditLogPage() {
     exportController.current = null;
   }, [accountId]);
 
-  const applyFilters = (next) => setApplied({ query: createAuditLogQuery(next), page: 1 });
+  const applyFilters = (next) => setApplied((current) => ({ ...current, query: createAuditLogQuery(next), page: 1 }));
   const updateSearch = (event) => {
     const next = { ...filters, q: event.target.value.slice(0, 100) };
     setFilters(next);
@@ -106,15 +119,20 @@ export default function AdminMyAuditLogPage() {
     }
   }
 
-  return <section className="admin-vendors-page">
-    <div className="admin-audit-log-toolbar">
-      <button type="button" className="admin-secondary-btn compact admin-audit-log-export" onClick={handleExport} disabled={exportDisabled}><FileDown size={14} />{exporting ? "Preparing PDF…" : "Export PDF"}</button>
-      <div className="admin-audit-log-filters">
-        <label className="admin-audit-log-field admin-audit-log-search">Search<Search size={15} aria-hidden="true" /><input type="search" maxLength={100} value={filters.q} onChange={updateSearch} placeholder="Search action, entity, or full UUID" /></label>
-        <label className="admin-audit-log-field">Entity<select value={filters.entity} onChange={(event) => updateFilter("entity", event.target.value)}>{AUDIT_ENTITY_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label className="admin-audit-log-field">Time range<select value={filters.period} onChange={(event) => updateFilter("period", event.target.value)}>{AUDIT_PERIOD_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label className="admin-audit-log-field">Sort order<select value={filters.sort} onChange={(event) => updateFilter("sort", event.target.value)}>{AUDIT_SORT_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
-        {filtersActive ? <button type="button" className="admin-secondary-btn compact" onClick={clearFilters}>Clear filters</button> : null}
+  const clearControl = filtersActive ? <button key="clear" type="button" className="audit-filter-clear inline-flex h-10 items-center rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm hover:bg-gray-50" onClick={clearFilters}>Clear filters</button> : null;
+  const exportControl = <button key="export" type="button" className="audit-filter-export inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60" onClick={handleExport} disabled={exportDisabled}><FileDown size={16} aria-hidden="true" /><span>{exporting ? "Preparing PDF…" : "Export PDF"}</span></button>;
+
+  return <section className="admin-vendors-page flex flex-col gap-6">
+    <div className="admin-audit-log-toolbar flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="audit-filter-search flex h-10 w-full min-w-0 flex-1 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-sm focus-within:border-gray-300 focus-within:ring-1 focus-within:ring-gray-300 max-lg:h-11 xl:max-w-2xl">
+        <Search size={16} className="shrink-0 text-gray-400" aria-hidden="true" />
+        <input aria-label="Search" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400" type="search" maxLength={100} value={filters.q} onChange={updateSearch} placeholder="Search action, entity, or full UUID" />
+      </div>
+      <div className="audit-filter-controls flex flex-wrap items-center gap-3">
+        <AuditFilterSelect label="Entity" value={filters.entity} options={AUDIT_ENTITY_OPTIONS} onChange={(event) => updateFilter("entity", event.target.value)} />
+        <AuditFilterSelect label="Time range" value={filters.period} options={AUDIT_PERIOD_OPTIONS} onChange={(event) => updateFilter("period", event.target.value)} />
+        <AuditFilterSelect label="Sort order" value={filters.sort} options={AUDIT_SORT_OPTIONS} onChange={(event) => updateFilter("sort", event.target.value)} />
+        {isPhoneFilters ? [exportControl, clearControl] : [clearControl, exportControl]}
       </div>
     </div>
     {loadState.status === "error" ? <div className="admin-feedback error" role="alert">{loadState.error} <button type="button" className="admin-link-btn" onClick={() => setReload((value) => value + 1)}>Retry</button></div> : null}
@@ -124,6 +142,6 @@ export default function AdminMyAuditLogPage() {
         const row = formatAuditEntry(entry);
         return <tr key={row.id ?? entry.id}><td>{row.when}</td><td>{row.action}</td><td>{row.entity}</td></tr>;
       }) : <tr><td colSpan="3"><div className="admin-empty-state" role="status">{filtersActive ? "No activity matches your filters." : "No recorded activity yet."}</div></td></tr>}
-    </tbody></table></div>{isReady ? <Pagination pagination={data.pagination} onPageChange={(page) => setApplied((current) => ({ ...current, page }))} /> : null}</section>
+    </tbody></table></div>{isReady ? <AdminPagination pagination={data.pagination} pageSize={applied.pageSize} onPageChange={(page) => setApplied((current) => ({ ...current, page }))} onPageSizeChange={(pageSize) => setApplied((current) => ({ ...current, pageSize, page: 1 }))} itemLabel="entries" ariaLive /> : null}</section>
   </section>;
 }

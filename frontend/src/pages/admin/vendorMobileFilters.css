@@ -47,10 +47,22 @@
   }
 
   .vendor-filter-select select {
-    padding-left: 8px;
-    padding-right: 32px;
+    /* Symmetric space keeps native selected text centered in the whole pill. */
+    padding-left: 20px;
+    padding-right: 20px;
+    text-align: center;
+    text-align-last: center;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .vendor-filter-select > div {
+    padding-right: 6px;
+  }
+
+  .vendor-filter-select > div > svg {
+    width: 12px;
+    height: 12px;
   }
 
   .vendor-filter-controls > button {

@@ -1,0 +1,647 @@
+{
+  "768": {
+    "all": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 57,
+        "y": 190.6875,
+        "width": 678,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 16,
+        "y": 251.6875,
+        "width": 195,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 223,
+        "y": 251.6875,
+        "width": 145,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 380,
+        "y": 251.6875,
+        "width": 141,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 533,
+        "y": 251.6875,
+        "width": 133.359375,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ],
+    "suspension_appeal": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 57,
+        "y": 190.6875,
+        "width": 678,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 16,
+        "y": 251.6875,
+        "width": 195,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 223,
+        "y": 251.6875,
+        "width": 145,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 380,
+        "y": 251.6875,
+        "width": 141,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Clear filters",
+        "x": 533,
+        "y": 251.6875,
+        "width": 112.90625,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 16,
+        "y": 307.6875,
+        "width": 133.359375,
+        "height": 44,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ]
+  },
+  "1280": {
+    "all": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 321,
+        "y": 111.6875,
+        "width": 243.640625,
+        "height": 20,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 597.640625,
+        "y": 101.6875,
+        "width": 195,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 804.640625,
+        "y": 101.6875,
+        "width": 145,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 961.640625,
+        "y": 101.6875,
+        "width": 141,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 1114.640625,
+        "y": 101.6875,
+        "width": 133.359375,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ],
+    "suspension_appeal": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 321,
+        "y": 111.6875,
+        "width": 118.734375,
+        "height": 20,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 472.734375,
+        "y": 101.6875,
+        "width": 195,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 679.734375,
+        "y": 101.6875,
+        "width": 145,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 836.734375,
+        "y": 101.6875,
+        "width": 141,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Clear filters",
+        "x": 989.734375,
+        "y": 101.6875,
+        "width": 112.90625,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 1114.640625,
+        "y": 101.6875,
+        "width": 133.359375,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ]
+  },
+  "1920": {
+    "all": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 321,
+        "y": 111.6875,
+        "width": 614,
+        "height": 20,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 1165.640625,
+        "y": 101.6875,
+        "width": 195,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 1372.640625,
+        "y": 101.6875,
+        "width": 145,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 1529.640625,
+        "y": 101.6875,
+        "width": 141,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 1682.640625,
+        "y": 101.6875,
+        "width": 133.359375,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ],
+    "suspension_appeal": [
+      {
+        "tag": "INPUT",
+        "label": "Search",
+        "x": 321,
+        "y": 111.6875,
+        "width": 614,
+        "height": 20,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "paddingLeft": "0px",
+          "paddingRight": "0px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Entity",
+        "x": 1040.734375,
+        "y": 101.6875,
+        "width": 195,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Time range",
+        "x": 1247.734375,
+        "y": 101.6875,
+        "width": 145,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "SELECT",
+        "label": "Sort order",
+        "x": 1404.734375,
+        "y": 101.6875,
+        "width": 141,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "40px",
+          "textAlign": "start",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Clear filters",
+        "x": 1557.734375,
+        "y": 101.6875,
+        "width": 112.90625,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Export PDF",
+        "x": 1682.640625,
+        "y": 101.6875,
+        "width": 133.359375,
+        "height": 40,
+        "style": {
+          "fontSize": "14px",
+          "fontWeight": "600",
+          "lineHeight": "20px",
+          "paddingLeft": "16px",
+          "paddingRight": "16px",
+          "textAlign": "center",
+          "textAlignLast": "auto",
+          "borderRadius": "3.35544e+07px",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        }
+      }
+    ]
+  }
+}

@@ -95,7 +95,7 @@ test('my audit log exposes an Export PDF button above the table', async ({ page 
 test('exports every personal page from page two and captures a searchable PDF', async ({ page }) => {
   const { entries, requests } = await setup(page);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(page.getByRole('cell', { name: /entity-26/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /entity-11/ })).toBeVisible();
 
   const popupPromise = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
@@ -111,7 +111,7 @@ test('exports every personal page from page two and captures a searchable PDF', 
     '/api/admin/me/activity',
   ]);
   expect(activityPaths.every(({ path }) => path === '/api/admin/me/activity')).toBeTruthy();
-  expect(activityRequests(requests, 25).map(({ page: requestedPage }) => Number(requestedPage))).toEqual([1, 2]);
+  expect(activityRequests(requests, 10).map(({ page: requestedPage }) => Number(requestedPage))).toEqual([1, 2]);
   expect(activityRequests(requests, 100).map(({ page: requestedPage }) => Number(requestedPage))).toEqual([1, 2]);
   await mkdir(resolve('responsive-output/my-audit-log-pdf'), { recursive: true });
   await writeFile(resolve('responsive-output/my-audit-log-pdf/audit-log-125.pdf'), bytes);

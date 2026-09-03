@@ -202,6 +202,46 @@ async function expectTabOrder(page, first, following) {
   }
 }
 
+for (const width of [320, 390, 430, 767]) {
+  test(`phone select labels are centered with room for the chevron at ${width}px`, async ({ page }) => {
+    await setup(page, { width });
+    const toolbar = controls(page);
+    for (const select of [toolbar.category, toolbar.status, toolbar.sort]) {
+      await expect(select).toHaveCSS("text-align", "center");
+      await expect(select).toHaveCSS("text-align-last", "center");
+      const metrics = await select.evaluate(element => {
+        const style = getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        const arrow = element.parentElement.querySelector("svg").getBoundingClientRect();
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return {
+          left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight),
+          width: element.clientWidth,
+          labelWidth: context.measureText(element.selectedOptions[0].text).width,
+          center: box.x + box.width / 2, arrowLeft: arrow.left,
+          arrowCenterY: arrow.y + arrow.height / 2, centerY: box.y + box.height / 2,
+        };
+      });
+      expect(metrics.left).toBe(metrics.right);
+      expect(metrics.labelWidth).toBeLessThanOrEqual(metrics.width - metrics.left - metrics.right);
+      expect(metrics.center + metrics.labelWidth / 2 + 2).toBeLessThanOrEqual(metrics.arrowLeft);
+      expect(metrics.arrowCenterY).toBeCloseTo(metrics.centerY, 0);
+    }
+    // The longest category retains its full native option without widening a phone column.
+    await toolbar.category.selectOption("Nyonya / Peranakan");
+    await expect(toolbar.category).toHaveValue("Nyonya / Peranakan");
+    await expect(toolbar.category).toHaveCSS("text-overflow", "ellipsis");
+    expect((await toolbar.category.boundingBox()).width).toBeCloseTo((await toolbar.status.boundingBox()).width, 0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    if ([320, 390].includes(width)) {
+      await mkdir(resolve("responsive-output/vendor-mobile-filters"), { recursive: true });
+      await page.screenshot({ path: resolve(`responsive-output/vendor-mobile-filters/phone-centered-long-${width}.png`), fullPage: true, animations: "disabled" });
+    }
+  });
+}
+
 async function expectActionDomOrder(page, order) {
   await expect.poll(() => page.locator(".vendor-filter-controls > .vendor-filter-duplicates, .vendor-filter-controls > .vendor-filter-export").evaluateAll(elements =>
     elements.map(element => element.classList.contains("vendor-filter-export") ? "export" : "duplicates")

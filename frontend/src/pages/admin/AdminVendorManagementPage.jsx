@@ -10,6 +10,7 @@ import Toast from "../../components/engagement/Toast";
 import ImageLightbox from "../../components/engagement/ImageLightbox";
 import PhotoDiscoveryPanel from "../../components/admin/PhotoDiscoveryPanel";
 import AdminVendorMap from "../../components/admin/AdminVendorMap";
+import AdminPagination from "../../components/admin/AdminPagination";
 import VendorLocationPicker from "../../components/admin/VendorLocationPicker";
 import ConfirmDialog from "../../components/admin/ConfirmDialog";
 import { useToast } from "../../lib/useToast";
@@ -35,8 +36,6 @@ const COLUMN_SORTS = {
   category: ["cat_az", "cat_za"],
   status: ["status", "status_desc"],
 };
-
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 // Mirrors MAX_GALLERY_IMAGES in backend/lib/vendorValidation.js — the server
 // is the real enforcement point, this just keeps the "Add" tile from
@@ -205,34 +204,6 @@ const FORM_COMPARE_KEYS = [
 
 function formFieldsEqual(a, b) {
   return FORM_COMPARE_KEYS.every((key) => (a[key] ?? "") === (b[key] ?? ""));
-}
-
-function Pagination({ pagination, pageSize, onPageChange, onPageSizeChange }) {
-  const { page, totalPages, total } = pagination;
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
-  return (
-    <div className="admin-pagination">
-      <div className="admin-pagination-meta">
-        Showing <strong>{from}–{to}</strong> of <strong>{total}</strong> vendors
-      </div>
-      <div className="admin-pagination-controls">
-        <label className="admin-page-size">
-          Rows
-          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}>
-            {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
-        <button type="button" className="admin-secondary-btn compact" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          Previous
-        </button>
-        <span>Page {page} / {totalPages}</span>
-        <button type="button" className="admin-secondary-btn compact" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-          Next
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function FieldError({ message }) {
@@ -2024,7 +1995,7 @@ export default function AdminVendorManagementPage() {
           </tbody>
         </table>
         </div>
-        <Pagination
+        <AdminPagination
           pagination={data.pagination}
           pageSize={pageSize}
           onPageChange={handlePageChange}
