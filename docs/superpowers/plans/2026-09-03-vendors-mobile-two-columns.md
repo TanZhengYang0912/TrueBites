@@ -33,7 +33,7 @@
 - Consumes existing `controls(page)`, `setup(page, options)`, geometry helpers and GET-only fixture; preserve interception across every `/api/` origin and mutation rejection.
 - Produces `isPhoneFilters` view-only boolean and keyed `exportControl`/`duplicatesControl` elements; no new API or business state.
 
-- [ ] **Step 1: Confirm baseline and write failing tests before implementation.**
+- [x] **Step 1: Confirm baseline and write failing tests before implementation.**
 
 Run the existing focused suite first. Then replace the four phone single-column cases with the following geometry core, retaining font, height, overflow, List/Map and screenshot checks:
 
@@ -66,7 +66,7 @@ Add native Tab tests (no positive tabindex): focus search, then Tab through List
 
 Run `cd frontend && npx playwright test tests/responsive/vendor-mobile-filters.spec.js`. Expected RED from paired y/width and/or phone Tab order against the current single-column production UI; report actual failure before changing production code.
 
-- [ ] **Step 2: Implement the minimal view-only change.**
+- [x] **Step 2: Implement the minimal view-only change.**
 
 Inside the page add breakpoint state and an effect, using the same exact query as CSS:
 
@@ -118,7 +118,7 @@ Inside the existing phone-only media block change/add:
 
 Retain every other mobile dimension and non-phone utility. If measured text does not fit at 320px, adjust only phone padding/wrapping, never the required font size, outer height, or two-column widths.
 
-- [ ] **Step 3: Verify behavior and desktop preservation.**
+- [x] **Step 3: Verify behavior and desktop preservation.**
 
 ```sh
 cd frontend
@@ -130,6 +130,18 @@ npm run build
 
 Expected: focused and combined browser suites pass, 158 existing unit tests pass, build succeeds (existing chunk warning may remain). Keep Playwright runs serial because port 5174 is exclusive. Parent inspects 320/390 screenshots. No desktop baseline update permitted: unchanged exact geometry and styles must pass at 768/1280/1440. Confirm no real API writes and responsive subscription cleanup.
 
-- [ ] **Step 4: Self-review, commit only the three task files, then independent review.**
+- [x] **Step 4: Self-review, commit only the three task files, then independent review.**
 
 Run `git diff --check`; inspect exact task diff, ensure all unrelated dirty changes remain untouched. Commit only the three task files with `fix(admin): pair mobile vendor filters`. Write task report with RED/GREEN commands/output, screenshots, changed files, commit and concerns. Controller runs bounded luna_worker review, final verification, and records results without pushing or merging.
+
+## Execution record — 2026-09-03
+
+- Implementation committed as `5cfac4d` (`fix(admin): pair mobile vendor filters`), following plan commit `ed587fe`.
+- TDD: original focused suite 8 passed; new paired-layout tests first failed as expected (3 passed / 8 failed); final focused suite 11 passed.
+- Measured 320px label fit required phone-only select left padding of 8px instead of the proposed 12px. A regression assertion verifies the default All Categories label fits without changing font size or column width.
+- Controller independently reran the combined browser suites: 46 passed; unit suite: 158 passed; production build passed. Existing Vite >500kB chunk warning remains.
+- Desktop geometry/style baselines passed at 768, 1280 and 1440px. Baseline JSON SHA256 remains `807c285c1a380ebc5b20aa549c33a74edb65c034cfaec1b54d6680cbf5ce8438`.
+- Phone tests cover 320, 390, 430 and 767px, keyboard order, resizing with filter values retained, no-duplicates layout and pending export geometry. Controller visually checked the final 320/390px screenshots.
+- Independent luna_worker spec/quality review approved; final whole-feature review approved at `5cfac4d`, no actionable findings. Additional 320px long-selected-category coverage is optional, not an observed defect (long selection is covered at 390px and mobile selects share truncation CSS).
+- Preview artifacts: `frontend/responsive-output/vendor-mobile-filters/phone-two-column-320-after.png` and `phone-two-column-390-after.png`.
+- Only the three scoped implementation/test files were committed for the feature. Unrelated working-tree changes are preserved. Current `fix/user-navigation` branch retained; no push or merge.
