@@ -107,10 +107,6 @@ async function geometry(locator) {
   });
 }
 
-function outerShape(box) {
-  return { x: box.x, width: box.width, height: box.height };
-}
-
 async function desktopSnapshot(page) {
   const toolbar = controls(page);
   return Object.fromEntries(await Promise.all(Object.entries({
@@ -142,36 +138,160 @@ for (const width of [768, 1280, 1440]) {
 }
 
 for (const width of [320, 390, 430, 767]) {
-  test(`phone controls form an aligned single-column toolbar at ${width}px`, async ({ page }) => {
+  test(`phone controls form the approved two-column toolbar at ${width}px`, async ({ page }) => {
     await setup(page, { width });
     const toolbar = controls(page);
-    const ordered = [toolbar.searchBox, toolbar.view, toolbar.category, toolbar.status, toolbar.sort, toolbar.duplicates, toolbar.exportButton];
-    const boxes = await Promise.all(ordered.map(control => control.boundingBox()));
-    for (const [index, box] of boxes.entries()) {
-      expect(box.height).toBeCloseTo(52, 0);
-      expect(box.x).toBeCloseTo(boxes[0].x, 0);
-      expect(box.width).toBeCloseTo(boxes[0].width, 0);
-      if (index) expect(box.y - boxes[index - 1].y - boxes[index - 1].height).toBeCloseTo(12, 0);
+    const box = Object.fromEntries(await Promise.all(
+      ["searchBox", "view", "category", "status", "sort", "duplicates", "exportButton"]
+        .map(async name => [name, await toolbar[name].boundingBox()])
+    ));
+    for (const name of ["searchBox", "view", "duplicates"]) {
+      expect(box[name].x).toBeCloseTo(box.searchBox.x, 0);
+      expect(box[name].width).toBeCloseTo(box.searchBox.width, 0);
     }
+    for (const [left, right] of [["category", "status"], ["sort", "exportButton"]]) {
+      expect(box[left].y).toBeCloseTo(box[right].y, 0);
+      expect(box[left].width).toBeCloseTo(box[right].width, 0);
+      expect(box[right].x - box[left].x - box[left].width).toBeCloseTo(12, 0);
+      expect(box[left].width * 2 + 12).toBeCloseTo(box.searchBox.width, 0);
+    }
+    expect(box.sort.x).toBeCloseTo(box.category.x, 0);
+    expect(box.exportButton.x).toBeCloseTo(box.status.x, 0);
+    for (const [previous, next] of [["searchBox", "view"], ["view", "category"], ["category", "sort"], ["sort", "duplicates"]]) {
+      expect(box[next].y - box[previous].y - box[previous].height).toBeCloseTo(12, 0);
+    }
+    for (const value of Object.values(box)) expect(value.height).toBeCloseTo(52, 0);
     const listBox = await toolbar.list.boundingBox();
     const mapBox = await toolbar.map.boundingBox();
     expect(listBox.width).toBeCloseTo(mapBox.width, 0);
     expect(listBox.height).toBeGreaterThanOrEqual(44);
-    expect(listBox.x).toBeGreaterThanOrEqual(boxes[0].x);
-    expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(boxes[0].x + boxes[0].width);
+    expect(listBox.x).toBeGreaterThanOrEqual(box.searchBox.x);
+    expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(box.searchBox.x + box.searchBox.width);
     for (const control of [toolbar.search, toolbar.category, toolbar.status, toolbar.sort, toolbar.duplicates, toolbar.exportButton, toolbar.list, toolbar.map]) {
       await expect(control).toHaveCSS("font-size", "14px");
     }
+    if (width === 320) {
+      const defaultCategory = await toolbar.category.evaluate(select => {
+        const style = getComputedStyle(select);
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return {
+          label: select.selectedOptions[0].text,
+          labelWidth: context.measureText(select.selectedOptions[0].text).width,
+          contentWidth: select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        };
+      });
+      expect(defaultCategory.label).toBe("All Categories");
+      expect(defaultCategory.labelWidth).toBeLessThanOrEqual(defaultCategory.contentWidth);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-    if (width === 390) {
+    if ([320, 390].includes(width)) {
       await mkdir(resolve("responsive-output/vendor-mobile-filters"), { recursive: true });
-      await page.screenshot({ path: resolve("responsive-output/vendor-mobile-filters/phone-390-after.png"), fullPage: true, animations: "disabled" });
+      await page.screenshot({ path: resolve(`responsive-output/vendor-mobile-filters/phone-two-column-${width}-after.png`), fullPage: true, animations: "disabled" });
     }
   });
 }
 
-test("filter requests, view state, export pending state, and no-duplicate spacing retain their behavior", async ({ page }) => {
-  const state = await setup(page, { width: 390, deferExport: true });
+async function expectTabOrder(page, first, following) {
+  await first.focus();
+  await expect(first).toBeFocused();
+  for (const control of following) {
+    await page.keyboard.press("Tab");
+    await expect(control).toBeFocused();
+  }
+}
+
+async function expectActionDomOrder(page, order) {
+  await expect.poll(() => page.locator(".vendor-filter-controls > .vendor-filter-duplicates, .vendor-filter-controls > .vendor-filter-export").evaluateAll(elements =>
+    elements.map(element => element.classList.contains("vendor-filter-export") ? "export" : "duplicates")
+  )).toEqual(order);
+}
+
+test("native phone tab order follows visual action order without positive tabindex", async ({ page }) => {
+  await setup(page, { width: 390 });
+  const toolbar = controls(page);
+  await expectTabOrder(page, toolbar.search, [toolbar.list, toolbar.map, toolbar.category, toolbar.status, toolbar.sort, toolbar.exportButton, toolbar.duplicates]);
+  expect(await page.locator("[tabindex]").evaluateAll(elements => elements.filter(element => Number(element.getAttribute("tabindex")) > 0).length)).toBe(0);
+});
+
+test("desktop, phone, then desktop preserves filter values, native control count, and each action order", async ({ page }) => {
+  await setup(page, { width: 1440 });
+  const toolbar = controls(page);
+  await toolbar.category.selectOption("Nyonya / Peranakan");
+  await toolbar.status.selectOption("active");
+  await toolbar.sort.selectOption("az");
+  const controlCount = await page.locator(".vendor-filter-controls input, .vendor-filter-controls button, .vendor-filter-controls select").count();
+  await expectActionDomOrder(page, ["duplicates", "export"]);
+  await expectTabOrder(page, toolbar.search, [toolbar.list, toolbar.map, toolbar.category, toolbar.status, toolbar.sort, toolbar.duplicates, toolbar.exportButton]);
+
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await expectActionDomOrder(page, ["export", "duplicates"]);
+  await expect(toolbar.category).toHaveValue("Nyonya / Peranakan");
+  await expect(toolbar.status).toHaveValue("active");
+  await expect(toolbar.sort).toHaveValue("az");
+  expect(await page.locator(".vendor-filter-controls input, .vendor-filter-controls button, .vendor-filter-controls select").count()).toBe(controlCount);
+  await expectTabOrder(page, toolbar.search, [toolbar.list, toolbar.map, toolbar.category, toolbar.status, toolbar.sort, toolbar.exportButton, toolbar.duplicates]);
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expectActionDomOrder(page, ["duplicates", "export"]);
+  await expect(toolbar.category).toHaveValue("Nyonya / Peranakan");
+  await expect(toolbar.status).toHaveValue("active");
+  await expect(toolbar.sort).toHaveValue("az");
+  expect(await page.locator(".vendor-filter-controls input, .vendor-filter-controls button, .vendor-filter-controls select").count()).toBe(controlCount);
+  await expectTabOrder(page, toolbar.search, [toolbar.list, toolbar.map, toolbar.category, toolbar.status, toolbar.sort, toolbar.duplicates, toolbar.exportButton]);
+});
+
+function textRect(locator) {
+  return locator.evaluate(element => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const rect = range.getBoundingClientRect();
+    const button = element.closest("button").getBoundingClientRect();
+    return {
+      x: rect.x - button.x,
+      y: rect.y - button.y,
+      right: rect.right - button.x,
+      bottom: rect.bottom - button.y,
+      buttonWidth: button.width,
+      buttonHeight: button.height,
+    };
+  });
+}
+
+function expectTextContained(rect) {
+  expect(rect.x).toBeGreaterThanOrEqual(0);
+  expect(rect.y).toBeGreaterThanOrEqual(0);
+  expect(rect.right).toBeLessThanOrEqual(rect.buttonWidth);
+  expect(rect.bottom).toBeLessThanOrEqual(rect.buttonHeight);
+}
+
+test("320px pending export retains half-width geometry and contained labels", async ({ page }) => {
+  const state = await setup(page, { width: 320, deferExport: true });
+  const toolbar = controls(page);
+  const sortBox = await toolbar.sort.boundingBox();
+  const idle = await toolbar.exportButton.boundingBox();
+  expect(idle.height).toBeCloseTo(52, 0);
+  expect(idle.width).toBeCloseTo(sortBox.width, 0);
+  expect(idle.y).toBeCloseTo(sortBox.y, 0);
+  expectTextContained(await textRect(toolbar.exportButton.locator("span")));
+  await toolbar.exportButton.click();
+  const pending = page.getByRole("button", { name: "Preparing PDF…", exact: true });
+  await expect(pending).toBeDisabled();
+  const pendingBox = await pending.boundingBox();
+  expect(pendingBox.height).toBeCloseTo(52, 0);
+  expect(pendingBox.width).toBeCloseTo(sortBox.width, 0);
+  expect(pendingBox.y).toBeCloseTo(sortBox.y, 0);
+  expectTextContained(await textRect(pending.locator("span")));
+  state.releaseExport();
+  const completed = page.getByRole("button", { name: "Export PDF", exact: true });
+  await expect(completed).toBeEnabled({ timeout: 15_000 });
+  expectTextContained(await textRect(completed.locator("span")));
+  expect(state.writes).toEqual([]);
+});
+
+test("filter requests, view state, and no-duplicate spacing retain their behavior", async ({ page }) => {
+  const state = await setup(page, { width: 390 });
   const toolbar = controls(page);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByText("Page 2 / 3", { exact: true })).toBeVisible();
@@ -182,7 +302,7 @@ test("filter requests, view state, export pending state, and no-duplicate spacin
   const selectedCategoryBox = await toolbar.category.boundingBox();
   const selectedStatusBox = await toolbar.status.boundingBox();
   expect(selectedCategoryBox.height).toBeCloseTo(52, 0);
-  expect(selectedCategoryBox.x).toBeCloseTo(selectedStatusBox.x, 0);
+  expect(selectedCategoryBox.y).toBeCloseTo(selectedStatusBox.y, 0);
   expect(selectedCategoryBox.width).toBeCloseTo(selectedStatusBox.width, 0);
   await toolbar.status.selectOption("active");
   await toolbar.sort.selectOption("az");
@@ -191,20 +311,6 @@ test("filter requests, view state, export pending state, and no-duplicate spacin
   await expect(toolbar.map).toHaveAttribute("aria-pressed", "true");
   await toolbar.list.click();
   await expect(toolbar.list).toHaveAttribute("aria-pressed", "true");
-  const idleBox = await toolbar.exportButton.boundingBox();
-  const categoryBox = await toolbar.category.boundingBox();
-  expect(idleBox.height).toBeCloseTo(52, 0);
-  expect(idleBox.width).toBeCloseTo(categoryBox.width, 0);
-  await toolbar.exportButton.click();
-  const pending = page.getByRole("button", { name: "Preparing PDF…", exact: true });
-  await expect(pending).toBeDisabled();
-  expect(outerShape(await pending.boundingBox())).toEqual(outerShape(idleBox));
-  state.releaseExport();
-  const completed = page.getByRole("button", { name: "Export PDF", exact: true });
-  await expect(completed).toBeEnabled({ timeout: 15_000 });
-  await page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight); });
-  await page.evaluate(() => new Promise(requestAnimationFrame));
-  expect(outerShape(await completed.boundingBox())).toEqual(outerShape(idleBox));
   expect(state.writes).toEqual([]);
 
   await setup(page, { width: 390, includeDuplicates: false });
@@ -212,5 +318,9 @@ test("filter requests, view state, export pending state, and no-duplicate spacin
   await expect(withoutDuplicates.duplicates).toHaveCount(0);
   const sortBox = await withoutDuplicates.sort.boundingBox();
   const exportBox = await withoutDuplicates.exportButton.boundingBox();
-  expect(exportBox.y - sortBox.y - sortBox.height).toBeCloseTo(12, 0);
+  expect(exportBox.y).toBeCloseTo(sortBox.y, 0);
+  expect(exportBox.width).toBeCloseTo(sortBox.width, 0);
+  expect(exportBox.x - sortBox.x - sortBox.width).toBeCloseTo(12, 0);
+  const controlsBox = await page.locator(".vendor-filter-controls").boundingBox();
+  expect(controlsBox.y + controlsBox.height).toBeCloseTo(exportBox.y + exportBox.height, 0);
 });

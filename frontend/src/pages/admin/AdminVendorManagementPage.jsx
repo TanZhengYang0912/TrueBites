@@ -1263,6 +1263,17 @@ export default function AdminVendorManagementPage() {
   const [viewMode, setViewMode] = useState("list");
   const [mapVendors, setMapVendors] = useState([]);
   const [mapLoading, setMapLoading] = useState(false);
+  const [isPhoneFilters, setIsPhoneFilters] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(width < 768px)").matches
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(width < 768px)");
+    const update = () => setIsPhoneFilters(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const loadDuplicates = () =>
     getAdminVendorDuplicates()
@@ -1761,6 +1772,25 @@ export default function AdminVendorManagementPage() {
     resetToFirstPage();
   };
 
+  const duplicatesControl = duplicateGroups.length > 0 ? (
+    <button key="duplicates" type="button" className="vendor-filter-duplicates inline-flex h-10 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 shadow-sm transition-colors hover:bg-amber-100" onClick={() => setShowDuplicatesPanel(true)}>
+      <AlertTriangle size={16} />
+      {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
+    </button>
+  ) : null;
+  const exportControl = (
+    <button
+      key="export"
+      type="button"
+      className="vendor-filter-export inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60"
+      onClick={handleExportVendors}
+      disabled={exportingVendors}
+    >
+      <FileDown size={16} />
+      <span>{exportingVendors ? "Preparing PDF…" : "Export PDF"}</span>
+    </button>
+  );
+
   const content = (
     <section className="flex flex-col gap-6">
       <div className="vendor-filter-toolbar flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -1821,22 +1851,9 @@ export default function AdminVendorManagementPage() {
             </div>
           </div>
 
-          {duplicateGroups.length > 0 && (
-            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 shadow-sm transition-colors hover:bg-amber-100" onClick={() => setShowDuplicatesPanel(true)}>
-              <AlertTriangle size={16} />
-              {duplicateGroups.length} possible duplicate{duplicateGroups.length > 1 ? "s" : ""}
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-60"
-            onClick={handleExportVendors}
-            disabled={exportingVendors}
-          >
-            <FileDown size={16} />
-            {exportingVendors ? "Preparing PDF…" : "Export PDF"}
-          </button>
+          {isPhoneFilters
+            ? [exportControl, duplicatesControl]
+            : [duplicatesControl, exportControl]}
         </div>
       </div>
 

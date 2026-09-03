@@ -23,10 +23,15 @@
 
   .vendor-filter-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     width: 100%;
     min-width: 0;
+  }
+
+  .vendor-filter-view,
+  .vendor-filter-duplicates {
+    grid-column: 1 / -1;
   }
 
   .vendor-filter-controls > *,
@@ -39,6 +44,13 @@
   .vendor-filter-controls button,
   .vendor-filter-select select {
     font-size: 14px;
+  }
+
+  .vendor-filter-select select {
+    padding-left: 8px;
+    padding-right: 32px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .vendor-filter-controls > button {
@@ -54,5 +66,17 @@
     min-width: 0;
     height: 44px;
     justify-content: center;
+  }
+
+  .vendor-filter-export {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 6px;
+    line-height: 18px;
+  }
+
+  .vendor-filter-export > span {
+    min-width: 0;
+    white-space: normal;
   }
 }
