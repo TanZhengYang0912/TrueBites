@@ -83,12 +83,22 @@ async function stubDiscoveryApis(page, { vendors = VENDORS, geolocation = "succe
   }, geolocation);
 }
 
-test("desktop discovery filters start open and update the result set", async ({ page }) => {
+// The panel starts collapsed on every load, desktop included — a refresh
+// should always land tidy. Tests that exercise the controls inside it open
+// it first rather than asserting the now-removed "open by default" behaviour.
+async function openFilters(page) {
+  const region = page.getByTestId("filters-region");
+  if (await region.isHidden()) await page.getByTestId("filters-toggle").click();
+  await expect(region).toBeVisible();
+}
+
+test("desktop discovery filters start closed and open to update the result set", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByTestId("filters-region")).toBeVisible();
+  await expect(page.getByTestId("filters-region")).toBeHidden();
+  await openFilters(page);
   await expect(page.getByTestId("advanced-filters")).toContainText("3 places found");
   await page.getByTestId("filter-rating").selectOption("4.5");
   await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
@@ -114,12 +124,14 @@ test("filters persist when switching between List and Map", async ({ page }) => 
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await openFilters(page);
 
   await page.getByTestId("filter-price").selectOption("10-20");
   await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page).toHaveURL(/\/map\?view=map$/);
   await page.getByRole("tab", { name: "Vendors" }).click();
+  await openFilters(page);
   await expect(page.getByTestId("filter-price")).toHaveValue("10-20");
   await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
   await page.getByRole("button", { name: "List", exact: true }).click();
@@ -131,6 +143,7 @@ test("distance controls are unavailable before a location exists", async ({ page
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await openFilters(page);
 
   await expect(page.getByTestId("filter-distance")).toBeDisabled();
   await expect(page.getByTestId("advanced-filters")).toContainText("Set your location to filter by distance");
@@ -141,6 +154,7 @@ test("hours, open-now and Clear all stay deterministic", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await openFilters(page);
 
   await page.getByTestId("filter-hours").selectOption("breakfast");
   await expect(page.getByTestId("advanced-filters")).toContainText("2 places found");
@@ -160,6 +174,7 @@ test("changing and clearing filters resets pagination to page one", async ({ pag
   await stubDiscoveryApis(page, { vendors: PAGED_VENDORS });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await openFilters(page);
 
   await page.getByRole("button", { name: "Page 2" }).click();
   await expect(page.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
@@ -177,6 +192,7 @@ test("a successful location enables distance filtering in the Map sidebar", asyn
 
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("tab", { name: "Vendors" }).click();
+  await openFilters(page);
   await expect(page.getByTestId("filter-distance")).toBeEnabled();
   await page.getByTestId("filter-distance").selectOption("1");
   await expect(page.getByTestId("advanced-filters")).toContainText("2 places found");
@@ -189,6 +205,7 @@ test("Melaka-centre fallback does not enable user-distance controls", async ({ p
 
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("tab", { name: "Vendors" }).click();
+  await openFilters(page);
   await expect(page.getByTestId("filter-distance")).toBeDisabled();
   await expect(page.getByTestId("advanced-filters")).toContainText("Set your location");
 });

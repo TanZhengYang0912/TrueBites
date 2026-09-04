@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { supabase } from "./supabaseClient";
 import { SessionProvider, useSession } from "./lib/SessionContext";
 import { isAdmin } from "./lib/roles";
-import LandingPage    from "./pages/LandingPage";
 import MapPage        from "./pages/MapPage";
 import LoginPage      from "./pages/LoginPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
@@ -126,8 +125,11 @@ export default function App() {
       <TripFab />
       <AuthGate>
         <Routes>
-          {/* Editorial landing — the new front door */}
-          <Route path="/"          element={<LandingPage />} />
+          {/* Discovery is the front door now — the editorial landing page was
+              replaced by a "Welcome" slideshow popup shown once on first
+              visit (see components/discovery/WelcomeSlideshow.jsx). Both
+              paths render the same page so a bookmarked "/" keeps working. */}
+          <Route path="/"          element={<MapPage />} />
 
           {/* Discovery app */}
           <Route path="/map"       element={<MapPage />} />
@@ -171,7 +173,7 @@ export default function App() {
             <Route path="account" element={<AdminAccountPage />} />
           </Route>
 
-          {/* Unknown paths → landing (not /map) */}
+          {/* Unknown paths → Discover */}
           <Route path="*"          element={<Navigate to="/" replace />} />
         </Routes>
       </AuthGate>

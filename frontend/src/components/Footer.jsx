@@ -9,9 +9,7 @@ const LINKS = [
 ];
 
 // Shared footer for the discovery app's scrolling pages (Dashboard,
-// Engagement, Profile, Login). The landing page keeps its own richer
-// LandingFooter (components/landing/LandingFooter.jsx) — this one is a
-// lighter reuse of the same visual language for the rest of the app.
+// Engagement, Profile, Login).
 export default function Footer() {
   return (
     <footer className="bg-forest px-4 py-12 md:px-6 md:py-16 xl:px-10">

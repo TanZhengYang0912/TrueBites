@@ -13,7 +13,7 @@ test("customer suggestion routes and dashboard CTA are wired", () => {
   assert.match(app, /path=\"\/suggestions\"/);
   assert.match(app, /path=\"\/suggestions\/new\"/);
   assert.match(dashboard, /navigate\(\"\/suggestions\/new\"\)/);
-  assert.match(dashboard, /Suggest a Hidden Gem|hidden gem/i);
+  assert.match(dashboard, /Community discoveries/i);
 });
 
 test("customer suggestion pages do not call the AI service directly", () => {

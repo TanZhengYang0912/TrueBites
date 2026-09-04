@@ -1,8 +1,8 @@
 // One representative food photo per cuisine category — the last-resort cover
 // image for a vendor with no real storefront/gallery photo of its own (every
 // free discovery source — Mapillary, Overpass, Wikimedia — came up empty).
-// Sourced from Wikimedia Commons, same convention as lib/landingImages.js,
-// so licensing/attribution stays consistent across the app.
+// Sourced from Wikimedia Commons, same convention used elsewhere in the app
+// (e.g. WelcomeSlideshow's images), so licensing/attribution stays consistent.
 //
 // This is a deliberate, narrower exception to vendorDisplay.js's usual "never
 // show a stand-in as if it were the real thing" rule: a same-category dish
