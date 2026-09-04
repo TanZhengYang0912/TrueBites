@@ -12,11 +12,12 @@ import Footer from "../components/Footer";
 import { COUNTRY_CODES, DEFAULT_COUNTRY, splitStoredPhone } from "../lib/countryCodes";
 
 // Profile action buttons — full width on every screen, 44px minimum height.
-const ACTION_OUTLINE = "min-h-11 w-full rounded-md border-[1.5px] border-forest bg-white px-4 text-sm font-medium text-forest";
-const ACTION_MUTED = "min-h-11 w-full rounded-md border border-sand bg-white px-4 text-sm font-medium text-forest";
-const ACTION_DANGER = "min-h-11 w-full rounded-md border-[1.5px] border-[#D64545] bg-white px-4 text-[13.5px] font-medium text-[#D64545]";
-const ROW_CANCEL = "min-h-11 flex-1 rounded-md border border-sand bg-white px-4 text-[13.5px] font-medium text-ink";
-const ROW_CONFIRM = "min-h-11 flex-1 rounded-md bg-forest px-4 text-[13.5px] font-semibold text-white";
+const ACTION_OUTLINE = "min-h-11 w-full rounded-full border-[1.5px] border-forest bg-forest px-4 text-sm font-medium text-white";
+const ACTION_MUTED = "min-h-11 w-full rounded-full border border-sand bg-white px-4 text-sm font-medium text-forest";
+const ACTION_LOGOUT = "min-h-11 w-full rounded-full border border-[#D64545] bg-[#D64545] px-4 text-sm font-medium text-white";
+const ACTION_DANGER = "min-h-11 w-full rounded-full border-[1.5px] border-[#111111] bg-[#111111] px-4 text-[13.5px] font-medium text-white";
+const ROW_CANCEL = "min-h-11 flex-1 rounded-full border border-sand bg-white px-4 text-[13.5px] font-medium text-ink";
+const ROW_CONFIRM = "min-h-11 flex-1 rounded-full bg-forest px-4 text-[13.5px] font-semibold text-white";
 
 function parseDob(iso) {
   if (!iso) return null;
@@ -391,7 +392,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <button onClick={handleLogout} className={`mb-6 ${ACTION_MUTED}`}>
+            <button onClick={handleLogout} className={`mb-6 ${ACTION_LOGOUT}`}>
               Log out
             </button>
 

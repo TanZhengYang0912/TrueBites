@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
 
 // Transparent over the hero, transitions to solid chalk on scroll.
-// Logo: TRUEBITES (Playfair) + MELAKA · MALAYSIA sub-label (Inter caps).
+// Logo: TRUEBITES (Inter) + MELAKA · MALAYSIA sub-label (Inter caps).
 // PLAN VISIT → /map is the only primary action.
 const NAV_BASE =
   "fixed inset-x-0 top-0 z-[100] flex min-h-16 items-center justify-between px-5 py-3 transition-colors md:px-12";

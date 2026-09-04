@@ -133,8 +133,8 @@ for (const [routeName, route] of routes) {
       }
       await page.setViewportSize(viewport);
       await page.goto(route, { waitUntil: "domcontentloaded" });
-      // Playfair and Inter load over the network; screenshotting before they
-      // settle captures fallback metrics and shifts every text box.
+      // Inter loads over the network; screenshotting before it
+      // settles captures fallback metrics and shifts every text box.
       await page.evaluate(() => document.fonts.ready);
       // Landing photography comes from Wikimedia Commons at 1600px wide. Without
       // waiting for decode, image-heavy routes screenshot half-empty and the

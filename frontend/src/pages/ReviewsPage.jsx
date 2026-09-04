@@ -199,16 +199,16 @@ export default function ReviewsPage() {
                   value={reviewSearch}
                   onChange={(event) => setReviewSearch(event.target.value)}
                   placeholder="Search by place or review text"
-                  className="min-h-11 w-full rounded-md border border-sand bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-forest"
+                  className="min-h-11 w-full rounded-full border border-sand bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-forest"
                 />
               </div>
-              <select value={reviewRating} onChange={(event) => setReviewRating(event.target.value)} aria-label="Filter by rating" className="min-h-11 shrink-0 rounded-md border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest">
+              <select value={reviewRating} onChange={(event) => setReviewRating(event.target.value)} aria-label="Filter by rating" className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest">
                 <option value="all">All ratings</option>
                 {[5, 4, 3, 2, 1].map((rating) => (
                   <option key={rating} value={rating}>{rating} star{rating > 1 ? "s" : ""}</option>
                 ))}
               </select>
-              <select value={reviewSort} onChange={(event) => setReviewSort(event.target.value)} aria-label="Sort reviews" className="min-h-11 shrink-0 rounded-md border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest">
+              <select value={reviewSort} onChange={(event) => setReviewSort(event.target.value)} aria-label="Sort reviews" className="min-h-11 shrink-0 rounded-full border border-sand bg-white px-3 text-[12.5px] text-ink outline-none focus:border-forest">
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
                 <option value="highest">Highest rated</option>

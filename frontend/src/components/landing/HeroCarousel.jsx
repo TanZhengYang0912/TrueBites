@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { HERO_SLIDES } from "../../lib/landingImages";
 
 // 4-slide full-bleed hero carousel.
-// - Giant "MELAKA" Playfair wordmark (always visible)
+// - Giant "MELAKA" Inter wordmark (always visible)
 // - Per-slide: terracotta eyebrow caption + short description
 // - Persistent "600 Years of Culture, Heritage & Flavour" italic tagline
 // - "SCROLL TO EXPLORE" label + "01/4" counter + dot pagination

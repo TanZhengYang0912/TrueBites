@@ -513,6 +513,7 @@ export default function MapPage() {
           onFilters={updateFilters}
           onClearFilters={clearFilters}
           hasLocation={distanceOrigin != null}
+          onRequestLocation={() => locateMe()}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
@@ -745,6 +746,7 @@ export default function MapPage() {
                 onFilters={updateFilters}
                 onClearFilters={clearFilters}
                 hasLocation={distanceOrigin != null}
+                onRequestLocation={() => locateMe()}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}

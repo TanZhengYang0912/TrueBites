@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Search, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import AdvancedFilters from "./discovery/AdvancedFilters";
@@ -26,6 +26,7 @@ export default function Dashboard({
   onFilters,
   onClearFilters,
   hasLocation,
+  onRequestLocation,
   loading,
   loadError,
   onRetryLoad,
@@ -143,9 +144,9 @@ export default function Dashboard({
                   <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">
                     A local guide to Melaka
                   </p>
-                  <h1 className="m-0 max-w-[760px] font-display text-[clamp(32px,4vw,54px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
-                    Hidden gems,{" "}
-                    <span className="italic text-forest">authentic flavours</span>
+                  <h1 className="m-0 max-w-[760px] font-display text-[clamp(25.6px,3.2vw,43.2px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
+                    Welcome to Melaka...{" "}
+                    <span className="italic text-forest">Jom MAKAN!</span>
                   </h1>
                   <p className="mb-0 mt-3 text-sm text-muted">
                     {vendors.length} places waiting to be discovered
@@ -156,31 +157,33 @@ export default function Dashboard({
                 type="button"
                 data-testid="community-discoveries-cta"
                 onClick={requireAuth(() => navigate("/suggestions/new"))}
-                className="group flex min-h-16 w-full items-center justify-between gap-3 border border-forest/20 bg-forest px-4 py-3 text-left text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
+                className="mesh-glass-cta group flex min-h-16 w-full items-center justify-between gap-3 rounded-full px-6 py-3 text-left text-forest transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={17} /></span>
+                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-white/50">
+                    <img src="/assets/vendor.png" alt="" aria-hidden="true" className="h-full w-full object-cover" />
+                  </span>
                   <span className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Community discoveries</span>
-                    <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-forest/70">Community discoveries</span>
+                    <span className="mt-0.5 block font-display text-lg font-semibold leading-tight">Know a place? Add it here now!</span>
                   </span>
                 </span>
                 <span className="hidden items-center gap-1 text-sm font-bold sm:flex">
-                  <span>Share it</span>
+                  <span>Share</span>
                   <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
                 </span>
                 <ArrowRight size={16} aria-hidden="true" className="shrink-0 sm:hidden" />
               </button>
             </div>
 
-            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center">
+            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center py-1.5">
               <Search size={18} className="absolute left-3.5 text-muted" />
               <input
                 value={filters.search}
                 onChange={(event) => onFilters({ search: event.target.value })}
                 placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
                 aria-label="Search places"
-                className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
+                className="search-shine min-h-12 w-full rounded-full pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197]"
               />
             </label>
 
@@ -192,6 +195,7 @@ export default function Dashboard({
                 vendors={vendors}
                 resultCount={filteredVendors.length}
                 hasLocation={hasLocation}
+                onRequestLocation={onRequestLocation}
               />
             </div>
 

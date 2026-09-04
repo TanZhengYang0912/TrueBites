@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import TrueBitesLogo from "./TrueBitesLogo";
 
 const LINKS = [
   { label: "About Us", to: "/about" },
@@ -19,7 +18,7 @@ export default function Footer() {
       <div className="mx-auto flex max-w-[1360px] flex-col gap-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div>
-            <TrueBitesLogo size="footer" tone="light" />
+            <img src="/assets/truebites-logo-footer.jpg" alt="TrueBites" className="h-11 w-auto object-contain" />
             <div className="mt-3.5 font-body text-xs uppercase tracking-[1.1px] text-terracotta-light">
               Official Food Discovery Platform · Melaka Tourism
             </div>

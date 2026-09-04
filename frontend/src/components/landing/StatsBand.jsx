@@ -1,4 +1,4 @@
-// Forest band with three Playfair stat numbers (600+ / 14 / UNESCO).
+// Forest band with three Inter stat numbers (600+ / 14 / UNESCO).
 // Two columns on phones with the last stat spanning the full width; three
 // across from md. The hairline dividers come from the grid gap showing through.
 const STATS = [

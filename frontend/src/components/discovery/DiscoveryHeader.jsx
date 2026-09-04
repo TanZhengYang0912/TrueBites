@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import TrueBitesLogo from "../TrueBitesLogo";
 import NotificationBell from "./NotificationBell";
 
 // Shared customer header for discovery and map surfaces. Search lives in the
@@ -40,12 +39,12 @@ export default function DiscoveryHeader({
   return (
     <header className="sticky top-0 z-30 flex min-h-[72px] flex-wrap items-center gap-2 border-b border-sand bg-chalk/95 px-4 py-2 font-body backdrop-blur lg:flex-nowrap lg:gap-6 md:px-10">
       <Link
-        to="/"
-        aria-label="Back to TrueBites home"
-        title="Back to home"
+        to="/map"
+        aria-label="Back to Discover"
+        title="Back to Discover"
         className="flex shrink-0 items-center no-underline"
       >
-        <TrueBitesLogo size="header" />
+        <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-8 w-auto object-contain md:h-9" />
       </Link>
 
       <nav

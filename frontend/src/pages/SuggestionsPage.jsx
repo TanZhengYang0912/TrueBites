@@ -104,13 +104,13 @@ export default function SuggestionsPage() {
           eyebrow="Your community discoveries"
           title="My suggestions"
           description="Keep track of the places and creators you have shared. Every recommendation is checked by our admin team before it is published."
-          action={<button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded bg-forest px-4 text-sm font-semibold text-white">Make a suggestion</button>}
+          action={<button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 shrink-0 rounded-full bg-forest px-4 text-sm font-semibold text-white">Make a suggestion</button>}
         />
 
         <div className="no-scrollbar mb-7 flex snap-x items-center gap-2 overflow-x-auto scroll-smooth pb-2" data-testid="suggestion-filter-rail">
           <div className="flex shrink-0 items-center gap-2" role="group" aria-label="Filter by suggestion type">
             {TYPE_FILTERS.map(([type, label]) => (
-              <button key={type} type="button" aria-label={`${label} ${counts.types[type] || 0}`} aria-pressed={activeType === type} onClick={() => { setActiveType(type); setPage(1); }} className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px] font-semibold transition-colors ${activeType === type ? "border-forest bg-forest text-white" : "border-sand bg-white text-forest hover:border-forest"}`}>
+              <button key={type} type="button" aria-label={`${label} ${counts.types[type] || 0}`} aria-pressed={activeType === type} onClick={() => { setActiveType(type); setPage(1); }} className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors ${activeType === type ? "border-forest bg-forest text-white" : "border-sand bg-white text-forest hover:border-forest"}`}>
                 {label}
                 <span className={activeType === type ? "text-white/80" : "text-muted"}>{counts.types[type] || 0}</span>
               </button>
@@ -127,7 +127,7 @@ export default function SuggestionsPage() {
                 aria-label={`${tab} ${counts.statuses[tab] || 0}`}
                 aria-pressed={activeTab === tab}
                 onClick={() => { setActiveTab(tab); setPage(1); }}
-                className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px] font-semibold capitalize transition-colors ${activeTab === tab ? "border-forest bg-forest text-white" : "border-sand bg-white text-forest hover:border-forest"}`}
+                className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold capitalize transition-colors ${activeTab === tab ? "border-forest bg-forest text-white" : "border-sand bg-white text-forest hover:border-forest"}`}
               >
                 {tab}
                 <span className={activeTab === tab ? "text-white/80" : "text-muted"}>{counts.statuses[tab] || 0}</span>
@@ -156,7 +156,7 @@ export default function SuggestionsPage() {
                 ? "Know a stall, kopitiam, or food creator that deserves more attention?"
                 : `You don't have any ${emptyFilterCopy} at the moment.`}
             </p>
-            {activeTab === "all" && activeType === "all" && <button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 rounded-lg bg-forest px-4 text-sm font-semibold text-white">Make a suggestion</button>}
+            {activeTab === "all" && activeType === "all" && <button type="button" onClick={() => navigate("/suggestions/new")} className="min-h-11 rounded-full bg-forest px-4 text-sm font-semibold text-white">Make a suggestion</button>}
           </div>
         )}
 

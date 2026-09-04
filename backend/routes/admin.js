@@ -13,6 +13,7 @@ import {
 } from "../lib/vendorValidation.js";
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
 import { logActivity } from "../lib/auditLog.js";
+import { notifyNewVendor } from "../lib/notify.js";
 import { isSuspended } from "../lib/suspension.js";
 import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
@@ -394,14 +395,16 @@ router.patch("/vendors/:id", async (req, res) => {
   // actually result from this patch — existing fields overridden by
   // whatever this request also changes — so a save that fixes the gap in
   // the same request is never falsely blocked.
+  let wasActive = false;
   if (clean.status === "active") {
     const { data: current, error: findErr } = await supabase
       .from("vendors")
-      .select("vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
+      .select("status, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
       .eq("id", id)
       .maybeSingle();
     if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
     if (!current) return res.status(404).json({ error: "Vendor not found" });
+    wasActive = current.status === "active";
     const issues = vendorActivationIssues({ ...current, ...clean });
     if (issues.length) {
       return res.status(400).json({
@@ -439,6 +442,9 @@ router.patch("/vendors/:id", async (req, res) => {
       } catch (syncError) {
         console.error("vendor suggestion publish sync failed:", syncError.message);
       }
+      // Only a genuine draft/suspended → active transition is news; saving an
+      // already-active vendor again must not spam the feed.
+      if (!wasActive) await notifyNewVendor(data);
     }
     await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
     res.json(data);

@@ -5,13 +5,17 @@ import {
   Circle,
   Clock3,
   MapPin,
+  Navigation,
   RotateCcw,
   SlidersHorizontal,
   Star,
   Tags,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
+import Toast from "../engagement/Toast";
+import { useToast } from "../../lib/useToast";
 import {
   CATEGORY_FILTERS,
   MORE_CATEGORY_OPTIONS,
@@ -53,7 +57,7 @@ const DISTANCE_OPTIONS = [
   { value: "10", label: "Within 10 km" },
 ];
 
-const CONTROL = "min-h-11 w-full appearance-none rounded border border-sand bg-white px-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
+const CONTROL = "min-h-11 w-full appearance-none rounded-full border border-sand bg-white px-4 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
 
 function countFor(vendors, key) {
   return vendors.filter((vendor) => categoryMatches(vendor, key)).length;
@@ -88,6 +92,7 @@ function FilterSelect({
   value,
   onChange,
   disabled = false,
+  onDisabledClick,
   "data-testid": testId,
 }) {
   return (
@@ -117,6 +122,17 @@ function FilterSelect({
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
           aria-hidden="true"
         />
+        {/* A disabled <select> swallows its own click events, so an overlay
+            button is the only way to explain why the control is dead. */}
+        {disabled && onDisabledClick && (
+          <button
+            type="button"
+            data-testid={testId ? `${testId}-locked` : undefined}
+            onClick={(event) => { event.preventDefault(); onDisabledClick(); }}
+            aria-label={`${label} filter is disabled — enable your location`}
+            className="absolute inset-0 z-10 cursor-pointer rounded-full"
+          />
+        )}
       </span>
     </label>
   );
@@ -129,20 +145,33 @@ export default function AdvancedFilters({
   vendors = [],
   resultCount = 0,
   hasLocation = false,
+  onRequestLocation,
   compact = false,
 }) {
   const [expanded, setExpanded] = useState(() => (
     typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
   ));
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const [toast, notify] = useToast();
   const regionId = useId();
   const active = filtersActive(filters);
+
+  function promptForLocation() {
+    notify("We don't know where you are! Kindly enable your location for given pop-up");
+    setLocationPromptOpen(true);
+  }
+
+  function enableLocation() {
+    setLocationPromptOpen(false);
+    onRequestLocation?.();
+  }
 
   return (
     <section
       data-testid="advanced-filters"
       className={compact
-        ? "rounded-lg border border-sand bg-chalk/45 p-3"
-        : "rounded border border-sand bg-white p-4 shadow-[0_1px_0_rgba(64,84,74,0.03)] md:p-5"}
+        ? "filter-glass rounded-lg p-3"
+        : "filter-glass rounded p-4 md:p-5"}
     >
       <div className={compact
         ? "flex flex-col gap-3"
@@ -234,6 +263,7 @@ export default function AdvancedFilters({
           options={DISTANCE_OPTIONS}
           value={hasLocation ? filters.distance : "any"}
           disabled={!hasLocation}
+          onDisabledClick={promptForLocation}
           onChange={(distance) => onChange({ distance })}
         />
 
@@ -245,7 +275,7 @@ export default function AdvancedFilters({
             role="switch"
             aria-checked={filters.openNow}
             onClick={() => onChange({ openNow: !filters.openNow })}
-            className="flex min-h-11 w-full items-center justify-between rounded border border-sand bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-forest"
+            className="flex min-h-11 w-full items-center justify-between rounded-full border border-sand bg-white px-4 text-sm font-medium text-ink transition-colors hover:border-forest"
           >
             <span>Open now</span>
             <span
@@ -277,6 +307,56 @@ export default function AdvancedFilters({
       >
         <strong className="font-semibold text-forest">{resultCount}</strong> places found
       </p>
+
+      {locationPromptOpen && (
+        <div
+          onClick={() => setLocationPromptOpen(false)}
+          className="fixed inset-0 z-[1100] flex items-end justify-center bg-forest/60 p-0 animate-backdrop-in sm:items-center sm:p-5"
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-[340px] rounded-t-2xl bg-white p-4 shadow-[0_20px_60px_rgba(64,84,74,0.35)] animate-modal-in sm:rounded-2xl"
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="m-0 flex items-center gap-2 font-display text-[17px] text-forest">
+                <Navigation size={17} strokeWidth={1.8} aria-hidden="true" />
+                Enable location
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLocationPromptOpen(false)}
+                aria-label="Close"
+                className="grid size-11 place-items-center text-muted"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mb-4 text-[13px] leading-5 text-muted">
+              Distance filtering needs to know where you are. Allow location access in the
+              browser prompt to sort and filter places by how close they are to you.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLocationPromptOpen(false)}
+                className="min-h-11 flex-1 rounded-lg border border-sand text-[13.5px] font-semibold text-muted"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                data-testid="enable-location"
+                onClick={enableLocation}
+                className="min-h-11 flex-1 rounded-lg bg-forest text-[13.5px] font-semibold text-white"
+              >
+                Enable location
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toast toast={toast} />
     </section>
   );
 }
