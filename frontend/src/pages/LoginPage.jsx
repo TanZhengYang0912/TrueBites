@@ -7,7 +7,6 @@ import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
 import PasswordField from "../components/PasswordField";
-import TrueBitesLogo from "../components/TrueBitesLogo";
 import { isAdmin } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
 
@@ -173,7 +172,7 @@ export default function LoginPage() {
     <div className={AUTH_PAGE}>
       <div className={AUTH_STACK}>
         <Link to="/" aria-label="Back to TrueBites home">
-          <TrueBitesLogo />
+          <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-14 w-auto object-contain" />
         </Link>
         <h1 className="m-0 text-center font-display text-[clamp(24px,7vw,32px)] font-bold leading-tight text-ink">
           One step closer for a
