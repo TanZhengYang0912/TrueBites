@@ -3433,7 +3433,7 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
 }
 
-/* Community discoveries CTA — a frosted-glass pill lit by a pink/blue/green
+/* Community discoveries CTA — a frosted-glass pill lit by a red/blue/yellow
    mesh of soft radial blooms. The shine "border" is the classic two-layer
    background trick: the fill gradient paints the padding-box, a rotating
    conic gradient paints the border-box beneath it, so the sliver of border
@@ -3446,12 +3446,12 @@
     isolation: isolate;
     border: 1.5px solid transparent;
     background:
-      radial-gradient(120% 150% at 8% -10%, rgba(255, 158, 205, 0.55), transparent 55%),
+      radial-gradient(120% 150% at 8% -10%, rgba(255, 107, 107, 0.55), transparent 55%),
       radial-gradient(130% 150% at 95% -20%, rgba(122, 178, 255, 0.5), transparent 58%),
-      radial-gradient(140% 160% at 15% 120%, rgba(120, 214, 170, 0.5), transparent 60%),
+      radial-gradient(140% 160% at 15% 120%, rgba(255, 209, 102, 0.55), transparent 60%),
       radial-gradient(120% 140% at 100% 110%, rgba(255, 255, 255, 0.55), transparent 55%),
       linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18)),
-      conic-gradient(from 0deg, #ff9ecd, #7ab2ff, #78d6aa, #ffffff, #ff9ecd);
+      conic-gradient(from 0deg, #ff6b6b, #7ab2ff, #ffd166, #ffffff, #ff6b6b);
     background-origin: border-box;
     background-clip: padding-box, padding-box, padding-box, padding-box, padding-box, border-box;
     backdrop-filter: blur(18px) saturate(160%);

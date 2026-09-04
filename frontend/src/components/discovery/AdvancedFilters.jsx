@@ -148,9 +148,9 @@ export default function AdvancedFilters({
   onRequestLocation,
   compact = false,
 }) {
-  const [expanded, setExpanded] = useState(() => (
-    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
-  ));
+  // Collapsed on every fresh load, desktop included — the panel used to open
+  // by default on wider screens, but a refresh should always start tidy.
+  const [expanded, setExpanded] = useState(false);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [toast, notify] = useToast();
   const regionId = useId();

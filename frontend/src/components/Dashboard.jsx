@@ -199,6 +199,11 @@ export default function Dashboard({
               />
             </div>
 
+            <div className="mb-8 flex flex-col items-center gap-1.5">
+              <span className="font-body text-2xl font-light tracking-wide text-ink">Discover</span>
+              <img src="/assets/melaka-skyline.png" alt="" aria-hidden="true" className="w-44 object-contain" />
+            </div>
+
             {loading && vendors.length === 0 ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: PAGE_SIZE }).map((_, i) => <VendorCardSkeleton key={i} />)}
