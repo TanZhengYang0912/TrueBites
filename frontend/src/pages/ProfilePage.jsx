@@ -85,7 +85,7 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     setLoggingOut(true);
     await supabase.auth.signOut();
-    navigate("/map", { replace: true });
+    navigate("/discover", { replace: true });
   };
 
   function startEditing() {
@@ -154,7 +154,7 @@ export default function ProfilePage() {
     try {
       await deleteAccount(session.access_token);
       await supabase.auth.signOut();
-      navigate("/map", { replace: true });
+      navigate("/discover", { replace: true });
     } catch (err) {
       setDeleteError(err.message || "Failed to delete account.");
       setDeleting(false);
@@ -282,7 +282,7 @@ export default function ProfilePage() {
       <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-chalk px-4 py-8 font-body text-ink sm:py-10">
       <div className="relative mx-auto w-full max-w-[560px] rounded-2xl border border-sand bg-white p-5 text-left shadow-[0_18px_48px_rgba(32,42,53,0.09)] sm:p-8">
         <div className="mb-7 flex items-center justify-between">
-          <button onClick={() => navigate("/map")} className="grid size-11 place-items-center text-xl text-forest">
+          <button onClick={() => navigate("/discover")} className="grid size-11 place-items-center text-xl text-forest">
             ←
           </button>
           <h2 className="m-0 text-xl font-bold text-ink">My Profile</h2>

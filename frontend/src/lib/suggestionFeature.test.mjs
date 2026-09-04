@@ -65,7 +65,7 @@ test("AI route is redirected away from customers and admin suggestions has its o
   const app = read("App.jsx");
   const admin = read("pages/admin/AdminSuggestionsPage.jsx");
   assert.match(app, /location\.pathname === \"\/ai\"/);
-  assert.match(app, /path=\"\/ai\" element={<Navigate to=\"\/map\"/);
+  assert.match(app, /path=\"\/ai\" element={<Navigate to=\"\/discover\"/);
   assert.match(app, /path=\"suggestions\" element={<AdminSuggestionsPage \/>}/);
   assert.match(admin, /getAdminSuggestions/);
 });

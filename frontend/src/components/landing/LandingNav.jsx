@@ -32,7 +32,7 @@ export default function LandingNav() {
 
       <div className="flex items-center gap-2">
         <Link
-          to="/map"
+          to="/discover"
           className={solid
             ? "flex min-h-11 items-center justify-center rounded-3xl border-[1.5px] border-forest bg-forest px-6 font-body text-xs font-semibold uppercase tracking-[1px] text-white no-underline transition-colors hover:bg-forest-light motion-reduce:transition-none"
             : "flex min-h-11 items-center justify-center rounded-3xl border-[1.5px] border-forest bg-forest px-6 font-body text-xs font-semibold uppercase tracking-[1px] text-white no-underline transition-colors hover:bg-forest-light md:border-white/70 motion-reduce:transition-none"}

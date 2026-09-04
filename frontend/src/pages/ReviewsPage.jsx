@@ -170,7 +170,6 @@ export default function ReviewsPage() {
     <>
       <DiscoveryPageShell
         headerProps={{
-          onOpenMap: () => navigate("/map?view=map"),
           session,
           userEmail,
           initials,
@@ -178,11 +177,10 @@ export default function ReviewsPage() {
           avatarUrl,
           savedCount: bookmarks.length,
           activeSection: "reviews",
-          onOpenDiscover: () => navigate("/map"),
           onLogin: () => navigate("/login"),
           onSignUp: () => navigate("/login"),
           onOpenProfile: () => navigate("/profile"),
-          onOpenVendor: (id) => navigate(`/map?vendor=${id}`),
+          onOpenVendor: (id) => navigate(`/discover?vendor=${id}`),
         }}
       >
         <DiscoveryPageIntro

@@ -174,7 +174,6 @@ export default function SavedPage() {
     <>
       <DiscoveryPageShell
       headerProps={{
-        onOpenMap: () => navigate("/map?view=map"),
         session,
         userEmail,
         initials,
@@ -182,11 +181,10 @@ export default function SavedPage() {
         avatarUrl,
         savedCount: bookmarks.length,
         activeSection: "saved",
-        onOpenDiscover: () => navigate("/map"),
         onLogin: () => navigate("/login"),
         onSignUp: () => navigate("/login"),
         onOpenProfile: () => navigate("/profile"),
-        onOpenVendor: (id) => navigate(`/map?vendor=${id}`),
+        onOpenVendor: (id) => navigate(`/discover?vendor=${id}`),
       }}
       >
         <DiscoveryPageIntro

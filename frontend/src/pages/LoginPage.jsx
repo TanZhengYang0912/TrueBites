@@ -126,8 +126,16 @@ export default function LoginPage() {
           setPassword("");
         }
       } else {
+        // Admin accounts sign in through the admin portal only. This is the
+        // mirror of the check in AdminLoginPage.jsx, which signs out any
+        // non-admin who authenticates there.
+        if (isAdmin({ user: data.user })) {
+          await supabase.auth.signOut();
+          setErrorMsg("This is an admin account. Please sign in through the admin portal.");
+          return;
+        }
         logActivity("auth.login");
-        navigate("/map", { replace: true });
+        navigate("/discover", { replace: true });
       }
     } catch (err) {
       setLoading(false);
@@ -153,19 +161,18 @@ export default function LoginPage() {
     setErrorMsg("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/map` },
+      options: { redirectTo: `${window.location.origin}/discover` },
     });
     if (error) setErrorMsg(error.message);
   }
 
-  // Already logged-in customers go back to the app. Keep the form available to
-  // admins so they can switch into a customer account without first finding a
-  // separate sign-out flow.
+  // Signed-in customers go back to the app. Admins never reach this line —
+  // AuthGate redirects them to /admin before this page renders.
   // Waits for the session context's initial read (and any Google OAuth code
   // exchange it's resolving) before deciding — otherwise a fast redirect back
   // from Google can render this page as logged-out for a frame.
-  if (!sessionLoading && session && !justSignedUp && !isAdmin(session)) {
-    navigate("/map", { replace: true });
+  if (!sessionLoading && session && !justSignedUp) {
+    navigate("/discover", { replace: true });
     return null;
   }
 
@@ -284,7 +291,7 @@ export default function LoginPage() {
             </>
           )}
 
-          <button className={AUTH_LINK} onClick={() => navigate("/map")}>
+          <button className={AUTH_LINK} onClick={() => navigate("/discover")}>
             Return to main page
           </button>
         </div>

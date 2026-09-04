@@ -117,7 +117,7 @@ export default function AdminLayout() {
     "User Moderation": "View customer accounts and their activity history",
     "My Audit Log": "Everything you've personally done in the admin console",
     "Platform Settings": "Platform configuration and preferences",
-    Account: "Your account details and password",
+    Account: "Your account details",
   };
 
   return (

@@ -22,7 +22,6 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
       <DiscoveryHeader
-        onOpenMap={() => navigate("/map?view=map")}
         session={session}
         userEmail={userEmail}
         initials={initials}
@@ -30,18 +29,17 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
         avatarUrl={avatarUrl}
         savedCount={0}
         activeSection={null}
-        onOpenDiscover={() => navigate("/map")}
         onLogin={() => navigate("/login")}
         onSignUp={() => navigate("/login")}
         onOpenProfile={() => navigate("/profile")}
-        onOpenVendor={(id) => navigate(`/map?vendor=${id}`)}
+        onOpenVendor={(id) => navigate(`/discover?vendor=${id}`)}
       />
 
       <main className="mx-auto w-full max-w-[1360px] px-4 pb-16 pt-8 md:px-6 md:pb-18 md:pt-12 xl:px-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <p className="mb-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">{eyebrow}</p>
           <Link
-            to="/map"
+            to="/discover"
             className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-muted transition-colors hover:text-forest"
           >
             ← Back to Discover

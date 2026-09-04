@@ -104,12 +104,12 @@ export default function OnboardingPage() {
     });
     setSaving(false);
     if (error) { setErrorMsg(error.message); return; }
-    navigate("/map", { replace: true });
+    navigate("/discover", { replace: true });
   }
 
   // Onboarding is optional — leave without saving anything.
   function skip() {
-    navigate("/map", { replace: true });
+    navigate("/discover", { replace: true });
   }
 
   return (

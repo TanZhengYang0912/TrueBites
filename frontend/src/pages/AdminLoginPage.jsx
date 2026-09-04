@@ -49,12 +49,6 @@ export default function AdminLoginPage() {
 
       setLoading(false);
       logActivity("auth.login");
-
-      if (data.user?.user_metadata?.must_change_password) {
-        navigate("/admin-set-password", { replace: true });
-        return;
-      }
-
       navigate("/admin", { replace: true });
     } catch (err) {
       setLoading(false);
@@ -66,15 +60,9 @@ export default function AdminLoginPage() {
   if (initializing) return null;
 
   // Already logged in as an admin — send them straight to the console.
-  if (session) {
-    if (isAdmin(session)) {
-      if (session.user?.user_metadata?.must_change_password) {
-        navigate("/admin-set-password", { replace: true });
-      } else {
-        navigate("/admin", { replace: true });
-      }
-      return null;
-    }
+  if (session && isAdmin(session)) {
+    navigate("/admin", { replace: true });
+    return null;
   }
 
   return (
@@ -108,7 +96,7 @@ export default function AdminLoginPage() {
 
           {errorMsg && <p className={AUTH_ERROR}>{errorMsg}</p>}
 
-          <button className={AUTH_LINK} onClick={() => navigate("/map")}>
+          <button className={AUTH_LINK} onClick={() => navigate("/discover")}>
             Go to main page instead
           </button>
         </div>

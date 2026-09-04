@@ -11,10 +11,6 @@ const NAV_LINK = "inline-flex min-h-11 min-w-11 items-center justify-center gap-
 const NAV_IDLE = `${NAV_LINK} text-muted hover:text-forest`;
 const NAV_ACTIVE = `${NAV_LINK} text-forest`;
 
-const TOGGLE = "inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold";
-const TOGGLE_ACTIVE = `${TOGGLE} bg-white text-forest shadow-sm`;
-const TOGGLE_IDLE = `${TOGGLE} text-muted`;
-
 const AVATAR = "grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-forest text-sm font-semibold text-white";
 
 function HeaderAvatar({ avatarUrl, initials }) {
@@ -31,10 +27,8 @@ function HeaderAvatar({ avatarUrl, initials }) {
 }
 
 export default function DiscoveryHeader({
-  onOpenMap,
   session, userEmail, initials, firstName, avatarUrl, onLogin, onOpenProfile, onSignUp,
-  onOpenDiscover, activeSection = "discover", savedCount = 0,
-  mapActive = false,
+  activeSection = "discover", savedCount = 0,
   onOpenVendor,
 }) {
   return (
@@ -52,14 +46,22 @@ export default function DiscoveryHeader({
         className="order-3 flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:order-none lg:w-auto lg:overflow-visible"
         aria-label="Primary navigation"
       >
-        <button
-          type="button"
+        <Link
+          to="/discover"
           className={activeSection === "discover" ? NAV_ACTIVE : NAV_IDLE}
-          onClick={() => onOpenDiscover?.()}
           aria-current={activeSection === "discover" ? "page" : undefined}
         >
-          Discover
-        </button>
+          <LayoutGrid size={14} strokeWidth={1.7} />
+          <span>Discover</span>
+        </Link>
+        <Link
+          to="/map"
+          className={activeSection === "map" ? NAV_ACTIVE : NAV_IDLE}
+          aria-current={activeSection === "map" ? "page" : undefined}
+        >
+          <MapIcon size={14} strokeWidth={1.7} />
+          <span>Map</span>
+        </Link>
         <a
           href="/saved"
           className={activeSection === "saved" ? NAV_ACTIVE : NAV_IDLE}
@@ -89,24 +91,6 @@ export default function DiscoveryHeader({
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="flex items-center rounded-lg bg-sand/40 p-0.5" aria-label="View mode">
-          {mapActive ? (
-            <>
-              <button type="button" className={TOGGLE_IDLE} onClick={onOpenDiscover}>
-                <LayoutGrid size={14} /> <span className="hidden sm:inline">List</span>
-              </button>
-              <span className={TOGGLE_ACTIVE}><MapIcon size={14} /> <span className="hidden sm:inline">Map</span></span>
-            </>
-          ) : (
-            <>
-              <span className={TOGGLE_ACTIVE}><LayoutGrid size={14} /> <span className="hidden sm:inline">List</span></span>
-              <button type="button" className={TOGGLE_IDLE} onClick={onOpenMap}>
-                <MapIcon size={14} /> <span className="hidden sm:inline">Map</span>
-              </button>
-            </>
-          )}
-        </div>
-
         {session ? (
           <>
             <NotificationBell onOpenVendor={onOpenVendor} />

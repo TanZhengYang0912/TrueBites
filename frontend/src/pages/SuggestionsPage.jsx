@@ -93,9 +93,7 @@ export default function SuggestionsPage() {
           avatarUrl: meta.avatar_url || "",
           activeSection: "suggestions",
           savedCount,
-          onOpenDiscover: () => navigate("/map"),
           onOpenProfile: () => navigate("/profile"),
-          onOpenMap: () => navigate("/map?view=map"),
           onLogin: () => navigate("/login"),
           onSignUp: () => navigate("/login"),
         }}

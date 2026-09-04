@@ -31,7 +31,6 @@ export default function Dashboard({
   onRetryLoad,
   bookmarks,
   onToggleBookmark,
-  onOpenMap,
   tripVendorIds,
   onAddStop,
   onVendorUpdated,
@@ -101,11 +100,9 @@ export default function Dashboard({
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
       <DiscoveryHeader
-        onOpenMap={onOpenMap}
         session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl} savedCount={bookmarked.length}
         onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
         activeSection="discover"
-        onOpenDiscover={() => navigate("/map")}
         onSignUp={() => navigate("/login")}
         onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
