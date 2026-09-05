@@ -97,17 +97,6 @@ function FilterSelect({ label, icon: Icon, options, value, onChange, "data-testi
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
           aria-hidden="true"
         />
-        {/* A disabled <select> swallows its own click events, so an overlay
-            button is the only way to explain why the control is dead. */}
-        {disabled && onDisabledClick && (
-          <button
-            type="button"
-            data-testid={testId ? `${testId}-locked` : undefined}
-            onClick={(event) => { event.preventDefault(); onDisabledClick(); }}
-            aria-label={`${label} filter is disabled — enable your location`}
-            className="absolute inset-0 z-10 cursor-pointer rounded-full"
-          />
-        )}
       </span>
     </label>
   );
