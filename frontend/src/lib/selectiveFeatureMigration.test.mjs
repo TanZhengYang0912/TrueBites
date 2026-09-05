@@ -10,10 +10,9 @@ const login = read("pages/LoginPage.jsx");
 const profile = read("pages/ProfilePage.jsx");
 const reset = read("pages/ResetPasswordPage.jsx");
 const adminLogin = read("pages/AdminLoginPage.jsx");
-const adminPassword = read("pages/SetAdminPasswordPage.jsx");
 const vendorAdmin = read("pages/admin/AdminVendorManagementPage.jsx");
 
-for (const source of [login, reset, adminLogin, adminPassword]) {
+for (const source of [login, reset, adminLogin]) {
   assert.match(source, /PasswordField/, "password pages should share PasswordField");
 }
 

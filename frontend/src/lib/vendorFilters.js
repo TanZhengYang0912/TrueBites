@@ -18,7 +18,6 @@ export const DEFAULT_VENDOR_FILTERS = Object.freeze({
   price: "all",
   hours: "any",
   rating: "any",
-  distance: "any",
   openNow: false,
 });
 
@@ -85,12 +84,6 @@ export function matchesFilters(vendor, filters = {}, { now = new Date() } = {}) 
     const rating = finiteNumber(vendor.average_rating);
     const minimumRating = finiteNumber(active.rating);
     if (!Number.isFinite(rating) || !Number.isFinite(minimumRating) || rating < minimumRating) return false;
-  }
-
-  if (active.distance !== "any") {
-    const distance = finiteNumber(vendor.distKm);
-    const maximumDistance = finiteNumber(active.distance);
-    if (!Number.isFinite(distance) || !Number.isFinite(maximumDistance) || distance > maximumDistance) return false;
   }
 
   return true;

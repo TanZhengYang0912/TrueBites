@@ -2,7 +2,8 @@
 // Login / register UI backed directly by Supabase Auth (no custom Express routes).
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
@@ -59,14 +60,37 @@ const TAB_ACTIVE = `${TAB} border-forest bg-forest text-white`;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, loading: sessionLoading } = useSession();
-  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot" — always opens on Sign In
+  const [searchParams] = useSearchParams();
+  // Opens on Log In unless the caller asked for the signup tab. Read once as
+  // the initial state — after that the tabs own the mode, so editing the URL
+  // by hand mid-session does not yank the form out from under the user.
+  const [mode, setMode] = useState(
+    searchParams.get("mode") === "signup" ? "signup" : "signin",
+  ); // "signin" | "signup" | "forgot"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [justSignedUp, setJustSignedUp] = useState(false);
+
+  // Prefer the page the visitor came from; fall back to /discover when this is
+  // the first entry in the router session (a bookmark, a shared link, or a
+  // redirect back from Google). React Router stamps that first entry's key
+  // "default" — window.history.length would also count other sites visited in
+  // the same tab, so going back could leave TrueBites entirely.
+  function goBack() {
+    if (mode === "forgot") {
+      setMode("signin");
+      setErrorMsg("");
+      setInfoMsg("");
+      return;
+    }
+    if (location.key !== "default") navigate(-1);
+    else navigate("/discover");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -125,8 +149,16 @@ export default function LoginPage() {
           setPassword("");
         }
       } else {
+        // Admin accounts sign in through the admin portal only. This is the
+        // mirror of the check in AdminLoginPage.jsx, which signs out any
+        // non-admin who authenticates there.
+        if (isAdmin({ user: data.user })) {
+          await supabase.auth.signOut();
+          setErrorMsg("This is an admin account. Please sign in through the admin portal.");
+          return;
+        }
         logActivity("auth.login");
-        navigate("/map", { replace: true });
+        navigate("/discover", { replace: true });
       }
     } catch (err) {
       setLoading(false);
@@ -152,28 +184,40 @@ export default function LoginPage() {
     setErrorMsg("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/map` },
+      options: { redirectTo: `${window.location.origin}/discover` },
     });
     if (error) setErrorMsg(error.message);
   }
 
-  // Already logged-in customers go back to the app. Keep the form available to
-  // admins so they can switch into a customer account without first finding a
-  // separate sign-out flow.
+  // Signed-in customers go back to the app. Admins never reach this line —
+  // AuthGate redirects them to /admin before this page renders.
   // Waits for the session context's initial read (and any Google OAuth code
   // exchange it's resolving) before deciding — otherwise a fast redirect back
   // from Google can render this page as logged-out for a frame.
-  if (!sessionLoading && session && !justSignedUp && !isAdmin(session)) {
-    navigate("/map", { replace: true });
+  if (!sessionLoading && session && !justSignedUp) {
+    navigate("/discover", { replace: true });
     return null;
   }
 
   return (
     <div className={AUTH_PAGE}>
       <div className={AUTH_STACK}>
-        <Link to="/" aria-label="Back to TrueBites home">
-          <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-14 w-auto object-contain" />
-        </Link>
+        <div className="flex w-full items-center">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Go back"
+            className="grid size-11 shrink-0 place-items-center rounded-full text-forest hover:bg-white"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex flex-1 justify-center">
+            <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-14 w-auto object-contain" />
+          </div>
+          {/* Balances the arrow so the logo centres without a negative margin —
+              an -ml-11 wrapper overlaps the arrow and swallows its clicks. */}
+          <div className="size-11 shrink-0" aria-hidden="true" />
+        </div>
         <h1 className="m-0 text-center font-display text-[clamp(24px,7vw,32px)] font-bold leading-tight text-ink">
           One step closer for a
           <br />
@@ -194,7 +238,7 @@ export default function LoginPage() {
                   setInfoMsg("");
                 }}
               >
-                Sign In
+                Log In
               </button>
               <button
                 className={mode === "signup" ? TAB_ACTIVE : TAB_IDLE}
@@ -207,7 +251,7 @@ export default function LoginPage() {
                   setInfoMsg("");
                 }}
               >
-                Create Account
+                Sign Up
               </button>
             </div>
           )}
@@ -254,7 +298,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? "Please wait…" : mode === "signup" ? "+ Create Account" : "Sign In"}
+                {loading ? "Please wait…" : mode === "signup" ? "Sign Up" : "Log In"}
               </button>
             </form>
           )}
@@ -264,12 +308,6 @@ export default function LoginPage() {
               Forgot password?
             </button>
           )}
-          {mode === "forgot" && (
-            <button className={AUTH_LINK} onClick={() => { setMode("signin"); setErrorMsg(""); setInfoMsg(""); }}>
-              Back to Sign In
-            </button>
-          )}
-
           {errorMsg && <p className={AUTH_ERROR}>{errorMsg}</p>}
           {infoMsg && <p className={AUTH_INFO}>{infoMsg}</p>}
 
@@ -283,9 +321,6 @@ export default function LoginPage() {
             </>
           )}
 
-          <button className={AUTH_LINK} onClick={() => navigate("/map")}>
-            Return to main page
-          </button>
         </div>
       </div>
     </div>

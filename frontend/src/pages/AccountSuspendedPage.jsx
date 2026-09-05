@@ -57,7 +57,7 @@ export default function AccountSuspendedPage() {
           <p>Good news — your account isn't currently suspended.</p>
           <button
             type="button"
-            onClick={() => navigate("/map")}
+            onClick={() => navigate("/discover")}
             className="w-fit rounded-md bg-forest px-4 py-2.5 text-sm font-semibold text-white"
           >
             Back to Discover

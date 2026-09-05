@@ -39,7 +39,7 @@ export default function SuggestionStatusCard({ suggestion, onEdit }) {
         <span>Submitted {new Date(suggestion.created_at).toLocaleDateString()}</span>
         <a href={sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-forest underline underline-offset-2">{sourceLabel}</a>
         {suggestion.status === "needs_info" && <button type="button" onClick={onEdit} className="font-semibold text-amber-700 underline underline-offset-2">Edit suggestion</button>}
-        {suggestion.status === "published" && suggestion.vendor_id && <a href={`/map?vendor=${suggestion.vendor_id}`} className="font-semibold text-forest underline underline-offset-2">View vendor</a>}
+        {suggestion.status === "published" && suggestion.vendor_id && <a href={`/discover?vendor=${suggestion.vendor_id}`} className="font-semibold text-forest underline underline-offset-2">View vendor</a>}
       </div>
     </article>
   );

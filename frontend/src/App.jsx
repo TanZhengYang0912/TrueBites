@@ -6,7 +6,6 @@ import { isAdmin } from "./lib/roles";
 import MapPage        from "./pages/MapPage";
 import LoginPage      from "./pages/LoginPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
-import SetAdminPasswordPage from "./pages/SetAdminPasswordPage";
 import ProfilePage    from "./pages/ProfilePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -32,7 +31,6 @@ import AdminUserModerationPage         from "./pages/admin/AdminUserModerationPa
 import AdminUserActivityPage           from "./pages/admin/AdminUserActivityPage";
 import AdminMyAuditLogPage             from "./pages/admin/AdminMyAuditLogPage";
 import AdminAccountPage                from "./pages/admin/AdminAccountPage";
-import AdminViewingBar                 from "./components/AdminViewingBar";
 import TripFab                         from "./components/TripFab";
 import { DISABLE_AUTH } from "./lib/testMode";
 import { randomDisplayName } from "./lib/randomName";
@@ -41,7 +39,7 @@ import { randomDisplayName } from "./lib/randomName";
 // discovery map; login-only features (engagement hub, profile) stay gated and
 // redirect guests to /login. Admins may browse everything a guest can.
 const AUTH_PUBLIC_PATHS = [
-  "/", "/map", "/login", "/onboarding", "/wsdasabi123&admin-login", "/admin-set-password", "/reset-password",
+  "/", "/discover", "/map", "/login", "/onboarding", "/wsdasabi123&admin-login", "/reset-password",
   "/about", "/terms", "/guidelines", "/contact", "/careers",
 ];
 
@@ -83,17 +81,28 @@ function AuthGate({ children }) {
 
     const admin = isAdmin(session);
 
-    // Customers (non-admins) can never enter the admin console. Admins can go
-    // anywhere — including browsing the public site like a guest.
+    // A signed-in admin belongs in the console. To browse the customer site
+    // they sign out first — there is no "view as admin" mode any more.
+    // /reset-password is the one exception so a recovery link can still
+    // land; ResetPasswordPage rejects admins itself, so that link never
+    // becomes a passwordless way into the console.
+    if (admin
+        && !location.pathname.startsWith("/admin")
+        && location.pathname !== "/reset-password") {
+      navigate("/admin", { replace: true });
+      return;
+    }
+
+    // Customers (non-admins) can never enter the admin console.
     if (!admin && (location.pathname === "/admin" || location.pathname.startsWith("/admin/"))) {
-      navigate("/map", { replace: true });
+      navigate("/discover", { replace: true });
       return;
     }
 
     // AI processing is an admin-only surface. Customers can contribute a
     // source video through /suggestions, but they never get the processor UI.
     if (!admin && (location.pathname === "/ai" || location.pathname === "/vendors")) {
-      navigate("/map", { replace: true });
+      navigate("/discover", { replace: true });
       return;
     }
 
@@ -121,7 +130,6 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <SessionProvider>
-      <AdminViewingBar />
       <TripFab />
       <AuthGate>
         <Routes>
@@ -132,10 +140,14 @@ export default function App() {
           <Route path="/"          element={<MapPage />} />
 
           {/* Discovery app */}
+          {/* One component, two addresses. MapPage picks the view from the
+              path: /discover renders the list, /map renders the pin map.
+              They share vendors, filters, bookmarks and trip state, so they
+              are deliberately not separate components. */}
+          <Route path="/discover"  element={<MapPage />} />
           <Route path="/map"       element={<MapPage />} />
           <Route path="/login"     element={<LoginPage />} />
           <Route path="/wsdasabi123&admin-login" element={<AdminLoginPage />} />
-          <Route path="/admin-set-password" element={<SetAdminPasswordPage />} />
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
@@ -147,7 +159,7 @@ export default function App() {
           <Route path="/engagement" element={<LegacyEngagementRedirect />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/suggestions/new" element={<SuggestionFormPage />} />
-          <Route path="/ai" element={<Navigate to="/map" replace />} />
+          <Route path="/ai" element={<Navigate to="/discover" replace />} />
           <Route path="/account-suspended" element={<AccountSuspendedPage />} />
 
           {/* Static info pages, linked from the footer */}

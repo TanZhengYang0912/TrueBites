@@ -18,13 +18,15 @@ test("saved and reviews are owned by separate page components", () => {
   assert.equal(fs.existsSync(path.join(here, "..", "pages", "EngagementPage.jsx")), false);
 });
 
-test("customer page navigation uses native page loads without tab decoration", () => {
+test("customer page navigation uses guarded router links without tab decoration", () => {
   const header = src("components/discovery/DiscoveryHeader.jsx");
 
-  assert.match(header, /<a\s+href="\/saved"/s);
-  assert.match(header, /<a\s+href="\/reviews"/s);
-  assert.match(header, /<a\s+href="\/suggestions"/s);
-  assert.doesNotMatch(header, /to="\/(?:saved|reviews|suggestions)"/);
+  assert.match(header, /<Link\s+to="\/saved"/s);
+  assert.match(header, /<Link\s+to="\/reviews"/s);
+  assert.match(header, /<Link\s+to="\/suggestions"/s);
+  assert.match(header, /onClick=\{goGated\("\/saved"\)\}/);
+  assert.match(header, /onClick=\{goGated\("\/reviews"\)\}/);
+  assert.match(header, /onClick=\{goGated\("\/suggestions"\)\}/);
   assert.match(header, /aria-current=.*"page"/s);
   assert.doesNotMatch(header, /const NAV_ACTIVE = `\$\{NAV_LINK\}[^`]*(?:bg-|after:|border-b)/);
 });

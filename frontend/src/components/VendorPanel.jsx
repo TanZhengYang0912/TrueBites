@@ -1,4 +1,4 @@
-import { Plus, Eye, EyeOff, Search } from "lucide-react";
+import { Plus, Eye, EyeOff } from "lucide-react";
 import AdvancedFilters from "./discovery/AdvancedFilters";
 import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDisplay";
 
@@ -9,7 +9,7 @@ const RADII = [1, 2, 5, "all"];
 // predicate decides which pins the map draws — see the pin rule in MapPage.
 export default function VendorPanel({
   vendors, filteredVendors, nearby,
-  filters, onFilters, onClearFilters, hasLocation, onRequestLocation,
+  filters, onFilters, onClearFilters,
   radiusKm, onRadiusChange,
   showAllVendors, onToggleAllVendors,
   onAddStop, onSelectNearby,
@@ -17,26 +17,12 @@ export default function VendorPanel({
 }) {
   return (
     <>
-      <label className="relative mb-2.5 flex items-center">
-        <Search size={15} strokeWidth={1.8} className="absolute left-2.5 text-muted" />
-        <input
-          value={filters.search}
-          onChange={(e) => onFilters({ search: e.target.value })}
-          placeholder="Search Nasi Lemak, Jonker…"
-          aria-label="Search vendors"
-          className="min-h-11 w-full rounded-full border border-sand bg-white pl-8 pr-2.5 text-[12.5px] text-ink outline-none focus:border-forest"
-        />
-      </label>
-
       <AdvancedFilters
         compact
         filters={filters}
         onChange={onFilters}
         onClear={onClearFilters}
         vendors={vendors}
-        resultCount={filteredVendors.length}
-        hasLocation={hasLocation}
-        onRequestLocation={onRequestLocation}
       />
 
       {/* Radius. "All" is the escape hatch from the distance limit — the eye

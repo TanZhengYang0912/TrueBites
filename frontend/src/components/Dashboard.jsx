@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Info, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import AdvancedFilters from "./discovery/AdvancedFilters";
@@ -27,14 +27,11 @@ export default function Dashboard({
   filters,
   onFilters,
   onClearFilters,
-  hasLocation,
-  onRequestLocation,
   loading,
   loadError,
   onRetryLoad,
   bookmarks,
   onToggleBookmark,
-  onOpenMap,
   tripVendorIds,
   onAddStop,
   onVendorUpdated,
@@ -113,12 +110,10 @@ export default function Dashboard({
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
       <DiscoveryHeader
-        onOpenMap={onOpenMap}
         session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl} savedCount={bookmarked.length}
         onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
         activeSection="discover"
-        onOpenDiscover={() => navigate("/map")}
-        onSignUp={() => navigate("/login")}
+        onSignUp={() => navigate("/login?mode=signup")}
         onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
 
@@ -196,26 +191,12 @@ export default function Dashboard({
               </button>
             </div>
 
-            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center py-1.5">
-              <Search size={18} className="absolute left-3.5 text-muted" />
-              <input
-                value={filters.search}
-                onChange={(event) => onFilters({ search: event.target.value })}
-                placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
-                aria-label="Search places"
-                className="search-shine min-h-12 w-full rounded-full pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197]"
-              />
-            </label>
-
             <div className="mb-8">
               <AdvancedFilters
                 filters={filters}
                 onChange={onFilters}
                 onClear={onClearFilters}
                 vendors={vendors}
-                resultCount={filteredVendors.length}
-                hasLocation={hasLocation}
-                onRequestLocation={onRequestLocation}
               />
             </div>
 

@@ -5,6 +5,7 @@ import PasswordField from "../components/PasswordField";
 import TrueBitesLogo from "../components/TrueBitesLogo";
 import { AUTH_PAGE, AUTH_STACK, AUTH_CARD, AUTH_INPUT, AUTH_PRIMARY, AUTH_ERROR } from "./LoginPage";
 import { logActivity } from "../lib/activityLog";
+import { isAdmin } from "../lib/roles";
 
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
@@ -14,6 +15,7 @@ const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [linkInvalid, setLinkInvalid] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,11 +26,26 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let settled = false;
+
+    // Admin passwords are set only with backend/scripts/setAdminPassword.js.
+    // A recovery link must not let an admin set their own password, and must
+    // not become a passwordless way into the console — so an admin session
+    // arriving here is signed straight back out.
+    const accept = (session) => {
+      settled = true;
+      if (isAdmin(session)) {
+        supabase.auth.signOut();
+        setBlocked(true);
+        return;
+      }
+      setReady(true);
+    };
+
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) { settled = true; setReady(true); }
+      if (data.session) accept(data.session);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) { settled = true; setReady(true); }
+      if (event === "PASSWORD_RECOVERY" || session) accept(session);
     });
     // If no recovery session materialises, the link was invalid or expired.
     const timer = setTimeout(() => { if (!settled) setLinkInvalid(true); }, 4000);
@@ -55,6 +72,23 @@ export default function ResetPasswordPage() {
     logActivity("auth.password_reset");
     setDone(true);
     if (fromProfile) setTimeout(() => navigate("/profile", { replace: true }), 1500);
+  }
+
+  if (blocked) {
+    return (
+      <div className={AUTH_PAGE}>
+        <div className="w-full max-w-[420px] rounded-2xl border border-sand bg-white p-5 text-center shadow-[0_18px_48px_rgba(32,42,53,0.09)] sm:p-8">
+          <h2 className="mb-2 mt-0 font-display text-[22px] text-ink">Password reset unavailable</h2>
+          <p className="mb-5 mt-0 text-[13.5px] text-muted">
+            Admin passwords cannot be reset from the website. Contact whoever holds the
+            project&rsquo;s Supabase service key to have yours changed.
+          </p>
+          <button className={AUTH_PRIMARY} onClick={() => navigate("/", { replace: true })}>
+            Return to home
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (linkInvalid) {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { getRestaurants, getTrip } from "../api";
 import { useSession } from "../lib/SessionContext";
-import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder, getAccountStatus } from "../api/engagement";
+import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
 import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
@@ -15,6 +15,8 @@ import DirectionsRenderer from "../components/DirectionsRenderer";
 import TransitLayer from "../components/TransitLayer";
 import Dashboard from "../components/Dashboard";
 import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
+import GuestPrompt from "../components/discovery/GuestPrompt";
+import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
@@ -60,7 +62,10 @@ function FocusOnUser({ pos }) {
 export default function MapPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = searchParams.get("view") === "map" ? "map" : "dashboard";     // "dashboard" | "map"
+  const location = useLocation();
+  // One component serves both addresses: /map is the pin map, /discover (and
+  // anything else that routes here) is the list.
+  const view = location.pathname === "/map" ? "map" : "dashboard";           // "dashboard" | "map"
   const focusVendorId = searchParams.get("vendor");
   // Consumed once by the Dashboard's detail modal, then dropped so a refresh
   // or a back-navigation doesn't reopen it.
@@ -77,6 +82,8 @@ export default function MapPage() {
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
   const [folders, setFolders] = useState([]);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [detailVendor, setDetailVendor] = useState(null);
   const bookmarks = new Set(bookmarkRows.map((r) => r.vendor_id));
   const [focusVendor, setFocusVendor] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -112,7 +119,6 @@ export default function MapPage() {
   const [transitLegs, setTransitLegs] = useState([]);    // itinerary legs (TRANSIT)
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
-  const [accountStatus, setAccountStatus] = useState(null);
   const [mapError, setMapError] = useState("");
 
   useEffect(() => {
@@ -156,27 +162,6 @@ export default function MapPage() {
       if (window.gm_authFailure === mapAuthFailure) window.gm_authFailure = previousAuthFailure;
     };
   }, []);
-
-  // Suspended customers can still sign in and browse (see backend/lib/suspension.js)
-  // but shouldn't be able to use the interactive map/trip planner — checked
-  // on every visit, not just at sign-in, since a suspension applied mid-session
-  // doesn't invalidate the token that's already loaded.
-  useEffect(() => {
-    if (!session) { setAccountStatus(null); return; }
-    let active = true;
-    getAccountStatus().then((status) => { if (active) setAccountStatus(status); }).catch(() => {});
-    return () => { active = false; };
-  }, [session]);
-
-  // Defense in depth against openMapNearby's guard — covers a direct URL
-  // edit, a stale bookmark, or browser back/forward landing on ?view=map.
-  useEffect(() => {
-    if (view === "map" && accountStatus?.suspended) {
-      notify("Your account is suspended — the map isn't available right now.", true);
-      setSearchParams({}, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, accountStatus]);
 
   // Load vendors (Supabase, sorted from Melaka centre as a default reference).
   // Failures are surfaced two ways: a toast (transient) and vendorsError
@@ -357,7 +342,9 @@ export default function MapPage() {
   // Un-saving is a plain delete; saving opens the folder picker (rendered by
   // each view below) so the vendor lands somewhere the user chose.
   function toggleBookmark(id) {
-    if (!session && !ENGAGEMENT_TEST_MODE) { navigate("/login"); return; }
+    // Same contract as Dashboard.jsx's requireAuth: explain why, in place,
+    // instead of discarding the map the visitor was looking at.
+    if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }
     if (bookmarks.has(id)) {
       removeBookmark(id)
         .then(() => { refreshBookmarks(); notify("Vendor removed from bookmarks."); })
@@ -418,7 +405,6 @@ export default function MapPage() {
       () => {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
-        setFilters((current) => ({ ...current, distance: "any" }));
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
           notify("Couldn't get your location — showing Melaka centre instead.", true);
@@ -427,38 +413,31 @@ export default function MapPage() {
     );
   }
 
-  // Entry point for the Dashboard's "Map" tab — jump to the map centred on the
-  // user. Which pins render is the radius toggle's job, not this function's.
-  function openMapNearby() {
-    if (accountStatus?.suspended) {
-      notify("Your account is suspended — the map isn't available right now.", true);
-      return;
-    }
-    // Enter the map immediately. Geolocation permission can remain pending
-    // indefinitely, so navigation must not wait for either GPS callback.
-    setFocusVendor(null);
-    setSelected(null);
-    setSearchParams({ view: "map" });
-    const focusOn = (pos) => {
-      setUserPos(pos);
-      setDistanceOrigin(pos);
-      setLocateTarget(pos);
-    };
-    if (distanceOrigin) { focusOn(distanceOrigin); return; }
+  // Centre the map on the user the first time they arrive at /map. This used
+  // to run inside the header's Map toggle; with Map as a plain link there is
+  // no click handler left to hang it on. Guarded on distanceOrigin so it asks
+  // for permission once per session, not on every visit.
+  useEffect(() => {
+    if (view !== "map" || distanceOrigin) return;
     navigator.geolocation.getCurrentPosition(
-      (p) => focusOn({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (p) => {
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setUserPos(pos);
+        setDistanceOrigin(pos);
+        setLocateTarget(pos);
+      },
       () => {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
-        setFilters((current) => ({ ...current, distance: "any" }));
         setLocateTarget(MELAKA_CENTER);
         notify("Couldn't get your location — showing vendors near Melaka centre.", true);
       }
     );
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   function backToDashboard() {
-    setSearchParams({}, { replace: true });
+    navigate("/discover", { replace: true });
   }
 
   const profileMeta = session?.user?.user_metadata || {};
@@ -511,14 +490,11 @@ export default function MapPage() {
           filters={filters}
           onFilters={updateFilters}
           onClearFilters={clearFilters}
-          hasLocation={distanceOrigin != null}
-          onRequestLocation={() => locateMe()}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
           bookmarks={bookmarks}
           onToggleBookmark={toggleBookmark}
-          onOpenMap={openMapNearby}
           tripVendorIds={new Set(trip.filter((s) => !s.isMe).map((s) => s.id))}
           onAddStop={addStop}
           focusVendorId={focusVendorId}
@@ -536,6 +512,7 @@ export default function MapPage() {
             onCreateFolder={createFolderAndSave}
           />
         )}
+        <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
         <Toast toast={toast} />
       </>
     );
@@ -639,6 +616,7 @@ export default function MapPage() {
                 userPos={userPos}
                 onSelect={setSelected}
                 onAddStop={addStop}
+                onViewDetails={setDetailVendor}
                 tripOrder={vendorStopOrder}
                 userStopNumber={meIndex >= 0 ? meIndex + 1 : null}
                 selectedId={selected?.id}
@@ -664,15 +642,15 @@ export default function MapPage() {
         </GMap>
 
         {!mapFullscreen && (
-          <div className="absolute inset-x-0 top-0 z-10">
+          <div className="absolute inset-x-0 top-0 z-30">
+            {/* This wrapper is the header's stacking context, so it must sit above
+                MapPanel (z-20) and the fullscreen control (z-10). */}
             <DiscoveryHeader
               session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl}
               savedCount={bookmarks.size}
               onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
-              onSignUp={() => navigate("/login")}
-              activeSection={null}
-              mapActive
-              onOpenDiscover={backToDashboard}
+              onSignUp={() => navigate("/login?mode=signup")}
+              activeSection="map"
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
             />
           </div>
@@ -744,8 +722,6 @@ export default function MapPage() {
                 filters={filters}
                 onFilters={updateFilters}
                 onClearFilters={clearFilters}
-                hasLocation={distanceOrigin != null}
-                onRequestLocation={() => locateMe()}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}
@@ -768,6 +744,21 @@ export default function MapPage() {
             onCreateFolder={createFolderAndSave}
           />
         )}
+        {detailVendor && (
+          <VendorDetailModal
+            key={detailVendor.id}
+            vendor={detailVendor}
+            inTrip={vendorStopOrder.has(detailVendor.id)}
+            bookmarked={bookmarks.has(detailVendor.id)}
+            onToggleBookmark={toggleBookmark}
+            onAddStop={addStop}
+            onClose={() => setDetailVendor(null)}
+            onVendorUpdated={(vendorId, patch) => {
+              setDetailVendor((current) => (current && current.id === vendorId ? { ...current, ...patch } : current));
+            }}
+          />
+        )}
+        <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
         <Toast toast={toast} />
       </div>
     </APIProvider>

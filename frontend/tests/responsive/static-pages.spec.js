@@ -40,7 +40,7 @@ for (const [viewportName, viewport] of viewports) {
 
       const backToDiscover = page.getByRole("link", { name: /Back to Discover/ });
       await expect(backToDiscover).toBeVisible();
-      await expect(backToDiscover).toHaveAttribute("href", "/map");
+      await expect(backToDiscover).toHaveAttribute("href", "/discover");
 
       if (viewportName === "desktop") {
         const mainBox = await page.locator("main").boundingBox();

@@ -30,7 +30,7 @@ test.describe("discovery navigation", () => {
       contentType: "application/json",
       body: NEARBY_FIXTURE.body,
     }));
-    await page.goto("/map", { waitUntil: "domcontentloaded" });
+    await page.goto("/discover", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /Welcome to Melaka/i })).toBeVisible();
     const nextPage = page.getByRole("button", { name: "Next page" });
     await expect(nextPage).toBeVisible();
