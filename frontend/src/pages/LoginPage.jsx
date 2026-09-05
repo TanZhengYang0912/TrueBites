@@ -206,9 +206,12 @@ export default function LoginPage() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="-ml-11 flex flex-1 justify-center">
+          <div className="flex flex-1 justify-center">
             <TrueBitesLogo />
           </div>
+          {/* Balances the arrow so the logo centres without a negative margin —
+              an -ml-11 wrapper overlaps the arrow and swallows its clicks. */}
+          <div className="size-11 shrink-0" aria-hidden="true" />
         </div>
         <h1 className="m-0 text-center font-display text-[clamp(24px,7vw,32px)] font-bold leading-tight text-ink">
           One step closer for a
