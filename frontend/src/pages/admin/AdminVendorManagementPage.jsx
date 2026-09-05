@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, FileDown, ImagePlus, List, MapPinned, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Check, FileDown, ImagePlus, List, MapPinned, Maximize2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
@@ -243,6 +243,10 @@ function ImageDropzone({ form, onFileChange, disabled }) {
   const [dragOver, setDragOver] = useState(false);
   const [imageError, setImageError] = useState("");
   const [objectUrl, setObjectUrl] = useState(null);
+  // Click-to-enlarge for the current cover — separate from the dropzone's
+  // own click (which opens the file picker to replace it), same idea as
+  // GalleryManager's own lightbox below.
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!form.imageFile) { setObjectUrl(null); return; }
@@ -291,7 +295,25 @@ function ImageDropzone({ form, onFileChange, disabled }) {
           style={{ display: "none" }}
         />
         {preview ? (
-          <img src={preview} alt="Storefront preview" className="admin-dropzone-preview" />
+          <>
+            <img src={preview} alt="Storefront preview" className="admin-dropzone-preview" />
+            <button
+              type="button"
+              className="admin-dropzone-expand"
+              onClick={(e) => {
+                // Sits inside the same clickable dropzone <div> (whose own
+                // click opens the file picker to replace the cover) — stop
+                // that from also firing when the admin just wants a closer
+                // look at the current one.
+                e.stopPropagation();
+                e.preventDefault();
+                setPreviewOpen(true);
+              }}
+              aria-label="View full-size cover photo"
+            >
+              <Maximize2 size={13} />
+            </button>
+          </>
         ) : (
           <div className="admin-dropzone-empty">
             <ImagePlus size={18} />
@@ -300,6 +322,7 @@ function ImageDropzone({ form, onFileChange, disabled }) {
         )}
       </div>
       <FieldError message={imageError} />
+      <ImageLightbox src={previewOpen ? preview : null} onClose={() => setPreviewOpen(false)} />
     </label>
   );
 }
@@ -397,13 +420,15 @@ function GalleryManager({ vendorId, images, disabled, pendingDeletes, onChange, 
                   // upload <input> below) — without preventDefault, clicking
                   // a plain, non-form-control child like this <img> also
                   // forwards the click to that input and pops the OS file
-                  // picker. Always prevent that; only actually open the
-                  // preview in View mode (`disabled`) — Edit mode has no
-                  // click-to-preview.
+                  // picker. Always prevent that, then open the enlarge
+                  // preview — used to be View-mode only, back when there was
+                  // a separate read-only View screen; now that Edit is the
+                  // only way to open a vendor, this is the only place left to
+                  // click-to-enlarge a gallery photo at all.
                   e.preventDefault();
-                  if (disabled) setPreviewUrl(url);
+                  setPreviewUrl(url);
                 }}
-                style={{ cursor: disabled ? "zoom-in" : "default" }}
+                style={{ cursor: "zoom-in" }}
               />
               {!disabled && (
                 pending ? (
@@ -876,6 +901,9 @@ function AddVendorModal({ onClose, onCreated, notify }) {
   // actually committed in doSave, right after creation succeeds.
   const [stagedCover, setStagedCover] = useState(null);
   const [stagedGallery, setStagedGallery] = useState([]);
+  // Click-to-enlarge for the cover preview below, once the vendor's been
+  // created — same idea as ImageDropzone's own expand button in step 1.
+  const [coverPreviewOpen, setCoverPreviewOpen] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -1027,7 +1055,17 @@ function AddVendorModal({ onClose, onCreated, notify }) {
               <span>Cover Photo</span>
               <div className="admin-dropzone" style={{ cursor: "default" }}>
                 {coverUrl ? (
-                  <img src={coverUrl} alt="Cover" className="admin-dropzone-preview" />
+                  <>
+                    <img src={coverUrl} alt="Cover" className="admin-dropzone-preview" />
+                    <button
+                      type="button"
+                      className="admin-dropzone-expand"
+                      onClick={() => setCoverPreviewOpen(true)}
+                      aria-label="View full-size cover photo"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
+                  </>
                 ) : (
                   <div className="admin-dropzone-empty">
                     <ImagePlus size={18} />
@@ -1036,6 +1074,7 @@ function AddVendorModal({ onClose, onCreated, notify }) {
                 )}
               </div>
             </label>
+            <ImageLightbox src={coverPreviewOpen ? coverUrl : null} onClose={() => setCoverPreviewOpen(false)} />
 
             <PhotoDiscoveryPanel
               vendorId={createdVendor.id}
