@@ -12,7 +12,7 @@ import {
 
 const MUTED = "#69717A";
 const CARD_FOOTER = "flex h-11 shrink-0 items-center gap-1.5 overflow-hidden rounded-b border border-t-0 border-sand bg-chalk px-3 text-[11px] text-muted";
-const PILL = "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px]";
+const PILL = "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px]";
 
 export function FolderPill({ label, count, active, onClick, onDelete }) {
   return (

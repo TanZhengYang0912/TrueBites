@@ -621,8 +621,12 @@ router.delete("/engagement/reviews/:id/vote", async (req, res) => {
 });
 
 // ── Notifications ───────────────────────────────────────────────────────────
-// Newly published vendors. Capped server-side so a large backfill can never
-// return hundreds of rows to a dropdown that shows fifteen.
+// A dedicated event feed (see supabase/migrations/202609040001_notifications.sql)
+// rather than deriving "what's new" from vendors.status — that couldn't tell
+// a fresh activation from a re-save and could only ever mean one thing.
+// Ordered newest-first and capped so a large backfill can never return
+// hundreds of rows to a dropdown that shows fifteen; older events still exist
+// in the table for history, they just fall off the visible queue.
 
 const NOTIFICATION_LIMIT = 15;
 
@@ -630,12 +634,10 @@ router.get("/notifications", async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const { data: vendors, error } = await supabase
-    .from("vendors")
-    .select("id, vendor_name, cuisine_types, published_at")
-    .eq("status", "active")
-    .not("published_at", "is", null)
-    .order("published_at", { ascending: false })
+  const { data: events, error } = await supabase
+    .from("notifications")
+    .select("id, type, vendor_id, payload, created_at")
+    .order("created_at", { ascending: false })
     .limit(NOTIFICATION_LIMIT);
   if (error) return res.status(500).json({ error: "database query failed", details: error.message });
 
@@ -646,15 +648,16 @@ router.get("/notifications", async (req, res) => {
     .maybeSingle();
   if (readErr) return res.status(500).json({ error: "database query failed", details: readErr.message });
 
-  // The column is vendor_name; the customer UI reads `name` everywhere else
-  // (see /restaurants/nearby in map.js). Match that rather than leaking the
-  // database's column name into a third shape.
+  // published_at kept as the field name so the unread-watermark logic in
+  // lib/notifications.js (frontend) doesn't need to know it's now an event
+  // timestamp rather than a vendor column.
   res.json({
-    notifications: vendors.map((v) => ({
-      id: v.id,
-      name: v.vendor_name,
-      cuisine_types: v.cuisine_types,
-      published_at: v.published_at,
+    notifications: events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      vendor_id: e.vendor_id,
+      ...e.payload,
+      published_at: e.created_at,
     })),
     lastSeenAt: readRow?.last_seen_at || null,
     readIds: readRow?.read_ids || [],

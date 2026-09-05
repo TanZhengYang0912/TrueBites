@@ -22,8 +22,6 @@ const DISCOVERY_LINKERS = [
   "../App.jsx",
   "../components/Dashboard.jsx",
   "../components/StaticPageLayout.jsx",
-  "../components/landing/LocalGemsCta.jsx",
-  "../components/landing/LandingNav.jsx",
   "../pages/SuggestionsPage.jsx",
   "../pages/ReviewsPage.jsx",
   "../pages/SavedPage.jsx",

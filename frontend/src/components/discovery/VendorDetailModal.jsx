@@ -198,8 +198,8 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
               onClick={() => onAddStop(vendor)}
               disabled={inTrip}
               className={inTrip
-                ? "min-h-11 flex-1 rounded-[10px] border-[1.5px] border-sand bg-chalk px-4 text-[14.5px] font-semibold text-forest"
-                : "min-h-11 flex-1 rounded-[10px] border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"}
+                ? "min-h-11 flex-1 rounded-full border-[1.5px] border-sand bg-chalk px-4 text-[14.5px] font-semibold text-forest"
+                : "min-h-11 flex-1 rounded-full border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"}
             >
               {inTrip ? "✓ Already in Your Trip" : "+ Add to Trip"}
             </button>

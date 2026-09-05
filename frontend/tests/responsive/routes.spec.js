@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 const routes = [
-  ["landing", "/"],
+  ["home", "/"],
   ["map", "/map?view=map"],
   ["ai", "/ai"],
   ["login", "/login"],
@@ -133,11 +133,11 @@ for (const [routeName, route] of routes) {
       }
       await page.setViewportSize(viewport);
       await page.goto(route, { waitUntil: "domcontentloaded" });
-      // Playfair and Inter load over the network; screenshotting before they
-      // settle captures fallback metrics and shifts every text box.
+      // Inter loads over the network; screenshotting before it
+      // settles captures fallback metrics and shifts every text box.
       await page.evaluate(() => document.fonts.ready);
-      // Landing photography comes from Wikimedia Commons at 1600px wide. Without
-      // waiting for decode, image-heavy routes screenshot half-empty and the
+      // Some routes pull photography from Wikimedia Commons. Without waiting
+      // for decode, image-heavy routes screenshot half-empty and the
       // before/after comparison turns into noise.
       await page.evaluate(() => Promise.all(
         Array.from(document.images)

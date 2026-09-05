@@ -10,7 +10,9 @@ import {
   Tags,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
+import Toast from "../engagement/Toast";
 import {
   CATEGORY_FILTERS,
   MORE_CATEGORY_OPTIONS,
@@ -42,7 +44,7 @@ const RATING_OPTIONS = [
   { value: "4.5", label: "4.5+" },
 ];
 
-const CONTROL = "min-h-11 w-full appearance-none rounded border border-sand bg-white px-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
+const CONTROL = "min-h-11 w-full appearance-none rounded-full border border-sand bg-white px-4 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
 
 function countFor(vendors, key) {
   return vendors.filter((vendor) => categoryMatches(vendor, key)).length;
@@ -95,6 +97,17 @@ function FilterSelect({ label, icon: Icon, options, value, onChange, "data-testi
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
           aria-hidden="true"
         />
+        {/* A disabled <select> swallows its own click events, so an overlay
+            button is the only way to explain why the control is dead. */}
+        {disabled && onDisabledClick && (
+          <button
+            type="button"
+            data-testid={testId ? `${testId}-locked` : undefined}
+            onClick={(event) => { event.preventDefault(); onDisabledClick(); }}
+            aria-label={`${label} filter is disabled — enable your location`}
+            className="absolute inset-0 z-10 cursor-pointer rounded-full"
+          />
+        )}
       </span>
     </label>
   );
@@ -123,8 +136,8 @@ export default function AdvancedFilters({
     <section
       data-testid="advanced-filters"
       className={compact
-        ? "rounded-lg border border-sand bg-chalk/45 p-3"
-        : "rounded border border-sand bg-white p-4 shadow-[0_1px_0_rgba(64,84,74,0.03)] md:p-5"}
+        ? "filter-glass rounded-lg p-3"
+        : "filter-glass rounded p-4 md:p-5"}
     >
       <div className={compact
         ? "flex flex-col gap-2.5"
@@ -236,7 +249,7 @@ export default function AdvancedFilters({
             role="switch"
             aria-checked={filters.openNow}
             onClick={() => onChange({ openNow: !filters.openNow })}
-            className="flex min-h-11 w-full items-center justify-between rounded border border-sand bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-forest"
+            className="flex min-h-11 w-full items-center justify-between rounded-full border border-sand bg-white px-4 text-sm font-medium text-ink transition-colors hover:border-forest"
             >
               <span>Open now</span>
               <span

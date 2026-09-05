@@ -167,7 +167,7 @@ export default function NotificationBell({ onOpenVendor }) {
                       : "mt-1.5 size-1.5 shrink-0 rounded-full bg-transparent"}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium text-ink">{item.name}</span>
+                    <span className="block truncate text-[12.5px] font-medium text-ink">{notificationText(item)}</span>
                     <span className="block text-[11px] text-muted">
                       {[categoryLabel(item), relativeDay(item.published_at)].filter(Boolean).join(" · ")}
                     </span>
@@ -190,6 +190,16 @@ export default function NotificationBell({ onOpenVendor }) {
       )}
     </div>
   );
+}
+
+// Keyed by `type` so a future notification kind (suggestion approved, price
+// changed, ...) gets its own phrasing without touching the dropdown markup.
+function notificationText(item) {
+  switch (item.type) {
+    case "new_vendor":
+    default:
+      return `New restaurant: ${item.name}!`;
+  }
 }
 
 // "2 days ago" without pulling in a date library for one label.

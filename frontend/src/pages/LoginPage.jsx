@@ -8,7 +8,6 @@ import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
 import PasswordField from "../components/PasswordField";
-import TrueBitesLogo from "../components/TrueBitesLogo";
 import { isAdmin } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
 
@@ -213,7 +212,7 @@ export default function LoginPage() {
             <ArrowLeft size={20} />
           </button>
           <div className="flex flex-1 justify-center">
-            <TrueBitesLogo />
+            <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-14 w-auto object-contain" />
           </div>
           {/* Balances the arrow so the logo centres without a negative margin —
               an -ml-11 wrapper overlaps the arrow and swallows its clicks. */}

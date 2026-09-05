@@ -221,9 +221,11 @@ export default function SavedPage() {
               ) : (
                 <button
                   onClick={() => setCreatingFolder(true)}
-                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-md border border-dashed border-sand px-3 text-[12.5px] text-muted"
+                  aria-label="New folder"
+                  title="New folder"
+                  className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-sand bg-white px-3 text-[13px] text-forest"
                 >
-                  <Plus size={13} /> New folder
+                  <Plus size={13} />
                 </button>
               )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import AdvancedFilters from "./discovery/AdvancedFilters";
@@ -8,12 +8,14 @@ import VendorCard from "./discovery/VendorCard";
 import VendorCardSkeleton from "./discovery/VendorCardSkeleton";
 import VendorDetailModal from "./discovery/VendorDetailModal";
 import GuestPrompt from "./discovery/GuestPrompt";
+import WelcomeSlideshow from "./discovery/WelcomeSlideshow";
 import Footer from "./Footer";
 import { pageNumbers, paginate } from "../lib/pagination";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { customerSession } from "../lib/roles";
 import { getAccountStatus } from "../api/engagement";
 import { humanizeDuration } from "../lib/suspension";
+import { hasSeenWelcome, markWelcomeSeen } from "../lib/welcomePrefs";
 
 const PAGE_SIZE = 12;
 
@@ -42,8 +44,17 @@ export default function Dashboard({
   const [detailVendor, setDetailVendor] = useState(null);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [accountStatus, setAccountStatus] = useState(null);
+  // First-visit "what is TrueBites" popup — replaces the old landing page at
+  // "/". Lazy-init reads localStorage once instead of flashing the popup
+  // open on every render before the effect below can close it.
+  const [showWelcome, setShowWelcome] = useState(() => !hasSeenWelcome());
   const navigate = useNavigate();
   const bookmarked = vendors.filter((v) => bookmarks.has(v.id));
+
+  function closeWelcome() {
+    markWelcomeSeen();
+    setShowWelcome(false);
+  }
 
   // Checked on every visit rather than only at sign-in — a ban blocks future
   // sign-ins but doesn't revoke an already-issued session token, so a
@@ -139,9 +150,18 @@ export default function Dashboard({
                   <p className="mb-3 mt-0 text-[11px] font-bold uppercase tracking-[0.14em] text-terracotta">
                     A local guide to Melaka
                   </p>
-                  <h1 className="m-0 max-w-[760px] font-display text-[clamp(32px,4vw,54px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
-                    Hidden gems,{" "}
-                    <span className="italic text-forest">authentic flavours</span>
+                  <h1 className="m-0 max-w-[760px] font-display text-[clamp(25.6px,3.2vw,43.2px)] font-medium leading-[1.05] tracking-[-0.04em] text-ink">
+                    Welcome to Melaka...{" "}
+                    <span className="italic text-forest">Jom MAKAN!</span>{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowWelcome(true)}
+                      aria-label="Show welcome introduction"
+                      title="Show welcome introduction"
+                      className="relative -top-2 inline-grid size-4 shrink-0 place-items-center align-top text-muted transition-colors hover:text-forest"
+                    >
+                      <Info size={14} strokeWidth={2} />
+                    </button>
                   </h1>
                   <p className="mb-0 mt-3 text-sm text-muted">
                     {vendors.length} places waiting to be discovered
@@ -152,17 +172,19 @@ export default function Dashboard({
                 type="button"
                 data-testid="community-discoveries-cta"
                 onClick={requireAuth(() => navigate("/suggestions/new"))}
-                className="group flex min-h-16 w-full items-center justify-between gap-3 border border-forest/20 bg-forest px-4 py-3 text-left text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
+                className="mesh-glass-cta group flex min-h-16 w-full items-center justify-between gap-3 rounded-full px-6 py-3 text-left text-forest transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2"
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/12"><Lightbulb size={17} /></span>
+                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-white/50">
+                    <img src="/assets/vendor.png" alt="" aria-hidden="true" className="h-full w-full object-cover" />
+                  </span>
                   <span className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Community discoveries</span>
-                    <span className="mt-0.5 block font-display text-lg leading-tight">Know a hidden gem in Melaka?</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-forest/70">Community discoveries</span>
+                    <span className="mt-0.5 block font-display text-lg font-semibold leading-tight">Know a place? Add it here now!</span>
                   </span>
                 </span>
                 <span className="hidden items-center gap-1 text-sm font-bold sm:flex">
-                  <span>Share it</span>
+                  <span>Share</span>
                   <ArrowRight size={16} aria-hidden="true" className="shrink-0" />
                 </span>
                 <ArrowRight size={16} aria-hidden="true" className="shrink-0 sm:hidden" />
@@ -176,6 +198,11 @@ export default function Dashboard({
                 onClear={onClearFilters}
                 vendors={vendors}
               />
+            </div>
+
+            <div className="mb-8 flex flex-col items-center gap-1.5">
+              <span className="font-body text-2xl font-light tracking-wide text-ink">Discover</span>
+              <img src="/assets/melaka-skyline.png" alt="" aria-hidden="true" className="w-44 object-contain" />
             </div>
 
             {loading && vendors.length === 0 ? (
@@ -226,6 +253,8 @@ export default function Dashboard({
       )}
 
       <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
+
+      {showWelcome && <WelcomeSlideshow onClose={closeWelcome} />}
     </div>
   );
 }
