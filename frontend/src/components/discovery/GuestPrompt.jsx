@@ -31,7 +31,7 @@ export default function GuestPrompt({ open, onClose }) {
           className="mx-auto mb-2.5 h-9 w-9 object-contain drop-shadow-[0_6px_6px_rgba(32,42,53,0.25)]"
         />
         <div className="mb-5 font-display text-lg font-bold leading-snug text-forest">
-          Sign in for a more personalized experience.
+          Log in for a more personalized experience.
         </div>
 
         <button

@@ -178,7 +178,7 @@ export default function ReviewsPage() {
           savedCount: bookmarks.length,
           activeSection: "reviews",
           onLogin: () => navigate("/login"),
-          onSignUp: () => navigate("/login"),
+          onSignUp: () => navigate("/login?mode=signup"),
           onOpenProfile: () => navigate("/profile"),
           onOpenVendor: (id) => navigate(`/discover?vendor=${id}`),
         }}

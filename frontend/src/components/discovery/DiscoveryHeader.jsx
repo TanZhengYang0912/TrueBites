@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
@@ -31,6 +31,27 @@ export default function DiscoveryHeader({
   activeSection = "discover", savedCount = 0,
   onOpenVendor,
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Same dismissal contract as NotificationBell: outside click and Escape.
+  // A menu that traps the page is worse than no menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onPointerDown(event) {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    }
+    function onKeyDown(event) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   return (
     <header className="sticky top-0 z-30 flex min-h-[72px] flex-wrap items-center gap-2 border-b border-sand bg-chalk/95 px-4 py-2 font-body backdrop-blur lg:flex-nowrap lg:gap-6 md:px-10">
       <Link
@@ -105,22 +126,42 @@ export default function DiscoveryHeader({
             </button>
           </>
         ) : (
-          <div className="flex items-center gap-2">
+          <div ref={menuRef} className="relative">
             <button
               type="button"
-              onClick={onSignUp}
-              className="inline-flex min-h-11 items-center rounded-md border border-forest px-3 text-[13px] font-semibold text-forest"
-            >
-              Sign up
-            </button>
-            <button
-              type="button"
-              onClick={onLogin}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Account"
               className="grid size-11 shrink-0 place-items-center rounded-full border border-sand text-forest"
-              aria-label="Open sign in"
             >
               <UserRound size={16} />
             </button>
+
+            {menuOpen && (
+              <div
+                role="menu"
+                aria-label="Account"
+                className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-sand bg-white shadow-[0_10px_34px_rgba(64,84,74,0.22)]"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onLogin}
+                  className="flex min-h-11 w-full items-center px-3 text-left text-[13px] font-semibold text-forest hover:bg-chalk"
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onSignUp}
+                  className="flex min-h-11 w-full items-center border-t border-sand px-3 text-left text-[13px] font-semibold text-forest hover:bg-chalk"
+                >
+                  Sign Up
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

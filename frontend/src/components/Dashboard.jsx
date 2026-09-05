@@ -103,7 +103,7 @@ export default function Dashboard({
         session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl} savedCount={bookmarked.length}
         onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
         activeSection="discover"
-        onSignUp={() => navigate("/login")}
+        onSignUp={() => navigate("/login?mode=signup")}
         onOpenVendor={(id) => setDetailVendor(vendors.find((v) => v.id === id) || null)}
       />
 

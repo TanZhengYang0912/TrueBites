@@ -30,7 +30,7 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
         savedCount={0}
         activeSection={null}
         onLogin={() => navigate("/login")}
-        onSignUp={() => navigate("/login")}
+        onSignUp={() => navigate("/login?mode=signup")}
         onOpenProfile={() => navigate("/profile")}
         onOpenVendor={(id) => navigate(`/discover?vendor=${id}`)}
       />

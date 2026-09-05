@@ -2,7 +2,8 @@
 // Login / register UI backed directly by Supabase Auth (no custom Express routes).
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
@@ -60,14 +61,31 @@ const TAB_ACTIVE = `${TAB} border-forest bg-forest text-white`;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, loading: sessionLoading } = useSession();
-  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "forgot" — always opens on Sign In
+  const [searchParams] = useSearchParams();
+  // Opens on Log In unless the caller asked for the signup tab. Read once as
+  // the initial state — after that the tabs own the mode, so editing the URL
+  // by hand mid-session does not yank the form out from under the user.
+  const [mode, setMode] = useState(
+    searchParams.get("mode") === "signup" ? "signup" : "signin",
+  ); // "signin" | "signup" | "forgot"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [justSignedUp, setJustSignedUp] = useState(false);
+
+  // Prefer the page the visitor came from; fall back to /discover when this is
+  // the first entry in the router session (a bookmark, a shared link, or a
+  // redirect back from Google). React Router stamps that first entry's key
+  // "default" — window.history.length would also count other sites visited in
+  // the same tab, so going back could leave TrueBites entirely.
+  function goBack() {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/discover");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -179,9 +197,19 @@ export default function LoginPage() {
   return (
     <div className={AUTH_PAGE}>
       <div className={AUTH_STACK}>
-        <Link to="/" aria-label="Back to TrueBites home">
-          <TrueBitesLogo />
-        </Link>
+        <div className="flex w-full items-center">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Go back"
+            className="grid size-11 shrink-0 place-items-center rounded-full text-forest hover:bg-white"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="-ml-11 flex flex-1 justify-center">
+            <TrueBitesLogo />
+          </div>
+        </div>
         <h1 className="m-0 text-center font-display text-[clamp(24px,7vw,32px)] font-bold leading-tight text-ink">
           One step closer for a
           <br />
@@ -202,7 +230,7 @@ export default function LoginPage() {
                   setInfoMsg("");
                 }}
               >
-                Sign In
+                Log In
               </button>
               <button
                 className={mode === "signup" ? TAB_ACTIVE : TAB_IDLE}
@@ -215,7 +243,7 @@ export default function LoginPage() {
                   setInfoMsg("");
                 }}
               >
-                Create Account
+                Sign Up
               </button>
             </div>
           )}
@@ -262,7 +290,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? "Please wait…" : mode === "signup" ? "+ Create Account" : "Sign In"}
+                {loading ? "Please wait…" : mode === "signup" ? "Sign Up" : "Log In"}
               </button>
             </form>
           )}
@@ -274,7 +302,7 @@ export default function LoginPage() {
           )}
           {mode === "forgot" && (
             <button className={AUTH_LINK} onClick={() => { setMode("signin"); setErrorMsg(""); setInfoMsg(""); }}>
-              Back to Sign In
+              Back to Log In
             </button>
           )}
 
@@ -291,9 +319,6 @@ export default function LoginPage() {
             </>
           )}
 
-          <button className={AUTH_LINK} onClick={() => navigate("/discover")}>
-            Return to main page
-          </button>
         </div>
       </div>
     </div>

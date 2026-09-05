@@ -182,7 +182,7 @@ export default function SavedPage() {
         savedCount: bookmarks.length,
         activeSection: "saved",
         onLogin: () => navigate("/login"),
-        onSignUp: () => navigate("/login"),
+        onSignUp: () => navigate("/login?mode=signup"),
         onOpenProfile: () => navigate("/profile"),
         onOpenVendor: (id) => navigate(`/discover?vendor=${id}`),
       }}

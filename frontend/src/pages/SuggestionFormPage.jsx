@@ -56,7 +56,7 @@ export default function SuggestionFormPage() {
         activeSection: "suggestions",
         onOpenProfile: () => navigate("/profile"),
         onLogin: () => navigate("/login"),
-        onSignUp: () => navigate("/login"),
+        onSignUp: () => navigate("/login?mode=signup"),
       }}
     >
       <DiscoveryPageIntro

@@ -642,7 +642,7 @@ export default function MapPage() {
               session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl}
               savedCount={bookmarks.size}
               onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
-              onSignUp={() => navigate("/login")}
+              onSignUp={() => navigate("/login?mode=signup")}
               activeSection="map"
               onOpenVendor={(id) => setSearchParams({ vendor: id })}
             />
