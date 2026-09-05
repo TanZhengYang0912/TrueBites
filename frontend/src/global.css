@@ -2038,12 +2038,40 @@
   }
 
   .admin-dropzone {
+    position: relative;
     border: 1.5px dashed var(--admin-border);
     border-radius: 10px;
     background: var(--admin-panel-soft);
     cursor: pointer;
     transition: border-color 140ms, background 140ms;
     overflow: hidden;
+  }
+
+  .admin-dropzone-expand {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(23, 33, 43, 0.65);
+    color: #fff;
+    cursor: zoom-in;
+    opacity: 0;
+    transition: background-color 140ms, opacity 140ms;
+  }
+
+  /* Same reveal-on-hover/focus convention as .admin-gallery-thumb-remove. */
+  .admin-dropzone:hover .admin-dropzone-expand,
+  .admin-dropzone-expand:focus-visible {
+    opacity: 1;
+  }
+
+  .admin-dropzone-expand:hover {
+    background: var(--admin-navy);
   }
 
   .admin-dropzone:hover {

@@ -237,8 +237,8 @@ router.post("/suggestions/:id/publish", async (req, res) => {
     if (suggestion.status !== "draft_created" || !suggestion.vendor_id) return res.status(409).json({ error: "Create a draft vendor before publishing." });
 
     // The AI extraction fills in what it could from the video; fields it
-    // couldn't (phone, price range, precise hours, ...) are commonly still
-    // blank at this point. Publishing sets the vendor live on the public
+    // couldn't (price range, precise hours, a cover photo, ...) are commonly
+    // still blank at this point. Publishing sets the vendor live on the public
     // site, so the same completeness bar as every other "make it active"
     // action applies here — an admin should complete these in Edit Vendor
     // before Publish, not discover the listing is half-empty after the fact.
