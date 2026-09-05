@@ -43,7 +43,6 @@ test("exports the complete default filter contract", () => {
     price: "all",
     hours: "any",
     rating: "any",
-    distance: "any",
     openNow: false,
   });
   assert.equal(DEFAULT_VENDOR_SORT, "relevant");
@@ -153,13 +152,10 @@ test("hours fall back to the legacy field when the raw value is malformed", () =
   assert.deepEqual(hoursStatus(vendor, instant), { isOpen: true, label: "09:00 am – 10:00 pm" });
 });
 
-test("rating and distance require known values when active", () => {
+test("rating requires a known value when active", () => {
   assert.equal(matchesFilters(COMPLETE, { rating: "4.5" }), true);
   assert.equal(matchesFilters(COMPLETE, { rating: "5" }), false);
-  assert.equal(matchesFilters(COMPLETE, { distance: "2" }), true);
-  assert.equal(matchesFilters(COMPLETE, { distance: "1" }), false);
   assert.equal(matchesFilters({ ...COMPLETE, average_rating: null }, { rating: "3" }), false);
-  assert.equal(matchesFilters({ ...COMPLETE, distKm: undefined }, { distance: "2" }), false);
 });
 
 test("all active filters combine with AND", () => {
@@ -170,7 +166,6 @@ test("all active filters combine with AND", () => {
     price: "10-20",
     hours: "dinner",
     rating: "4.5",
-    distance: "2",
   }), true);
   assert.equal(matchesFilters(COMPLETE, {
     search: "cendol",

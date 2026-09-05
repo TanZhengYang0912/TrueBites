@@ -1,13 +1,13 @@
 import { useEffect, useRef, useCallback } from "react";
 import {
   AdvancedMarker,
-  Pin,
   InfoWindow,
   useAdvancedMarkerRef,
   useMap,
 } from "@vis.gl/react-google-maps";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { MAP_COLORS } from "../lib/mapColors";
+import { vendorGallery, FOOD_PHOTO_POSITION } from "../lib/vendorDisplay";
 
 // Keep clustered vendors visually consistent with the rest of TrueBites.
 // Google Maps' built-in renderer switches between blue and red based on local
@@ -43,10 +43,59 @@ export function createBrandClusterRenderer() {
   };
 }
 
+function HawkerStallPin({ selected = false, stopNum = null }) {
+  const numbered = stopNum !== null && stopNum !== undefined;
+  const fill = selected || numbered ? MAP_COLORS.terracotta : MAP_COLORS.forest;
+
+  return (
+    <svg
+      width={selected ? 53 : 46}
+      height={selected ? 67 : 58}
+      viewBox="0 0 46 58"
+      aria-hidden="true"
+      focusable="false"
+      className="drop-shadow-md"
+    >
+      <path
+        d="M23 2C11.4 2 2 11.1 2 22.4c0 14 21 33.2 21 33.2s21-19.2 21-33.2C44 11.1 34.6 2 23 2Z"
+        fill={fill}
+        stroke="#FFFDF8"
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+      {numbered ? (
+        <text
+          x="23"
+          y="22"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#FFFDF8"
+          fontFamily="Arial, sans-serif"
+          fontSize={Number(stopNum) >= 10 ? "12" : "15"}
+          fontWeight="700"
+        >
+          {stopNum}
+        </text>
+      ) : (
+        <>
+          <path d="M13.5 18.5h19l-2.6-5.2H16.1l-2.6 5.2Z" fill="#FFFDF8" />
+          <path
+            d="M15.8 20.5v10.2h14.4V20.5M20.2 30.7v-6h5.6v6"
+            fill="none"
+            stroke="#FFFDF8"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
+    </svg>
+  );
+}
+
 // Renders vendor pins with clustering, plus numbered pins for trip stops and a
 // "you are here" marker. Vendor data comes from Supabase: { id, name, address,
 // latitude, longitude }.
-function VendorMarker({ vendor, position, stopNum, isSelected, isApproximate, onSelect, onOpenChange, onMarkerChange }) {
+function VendorMarker({ vendor, position, stopNum, isSelected, onSelect, onOpenChange, onMarkerChange }) {
   const [markerRef, marker] = useAdvancedMarkerRef();
   const excludeFromCluster = Boolean(stopNum) || isSelected;
 
@@ -63,18 +112,12 @@ function VendorMarker({ vendor, position, stopNum, isSelected, isApproximate, on
       onClick={() => { onOpenChange(vendor.id); onSelect(vendor); }}
       zIndex={isSelected ? 999 : undefined}
     >
-      <Pin
-        background={isSelected ? MAP_COLORS.danger : stopNum ? MAP_COLORS.terracotta : isApproximate ? MAP_COLORS.warning : MAP_COLORS.success}
-        glyphColor="#fff"
-        borderColor="#fff"
-        scale={isSelected ? 1.5 : 1}
-        glyph={stopNum ? String(stopNum) : isSelected ? undefined : isApproximate ? "?" : ""}
-      />
+      <HawkerStallPin selected={isSelected} stopNum={stopNum} />
     </AdvancedMarker>
   );
 }
 
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
+export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
@@ -144,10 +187,6 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
     <>
       {vendors.map((v) => {
         const stopNum = tripOrder?.get(v.id);
-        // AI-extracted vendors that only had a city/state (no street address) get
-        // geocoded to a city centroid, not the real spot — the question-mark pin
-        // flags that uncertainty without obscuring the entire map with ranges.
-        const isApproximate = v.location_precision === "city_level" || v.location_precision === "unknown";
         const isSelected = v.id === selectedId;
         const pos = displayPosition(v);
         return (
@@ -157,7 +196,6 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
             position={pos}
             stopNum={stopNum}
             isSelected={isSelected}
-            isApproximate={isApproximate}
             onSelect={onSelect}
             onOpenChange={onOpenChange}
             onMarkerChange={setClusterMarker}
@@ -175,23 +213,24 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
               onCloseClick={() => onOpenChange(null)}
             >
               <div className="max-w-[220px] font-body">
+                <img
+                  src={vendorGallery(v)[0]}
+                  alt=""
+                  loading="lazy"
+                  className="mb-2 block h-[110px] w-full rounded-md object-cover"
+                  style={{ objectPosition: FOOD_PHOTO_POSITION }}
+                />
                 <strong className="break-words">{v.name}</strong>
                 {v.address && <div className="my-0.5 break-words text-xs text-[#555]">{v.address}</div>}
-                {(v.location_precision === "city_level" || v.location_precision === "unknown") && (
-                  <div className="my-0.5 text-[11px] text-[#b35c00]">
-                    ⚠️ Approximate location — exact address not confirmed
-                  </div>
+                {onViewDetails && (
+                  <button
+                    type="button"
+                    onClick={() => onViewDetails(v)}
+                    className="mt-2 inline-flex min-h-11 items-center rounded-md bg-forest px-3 text-xs text-white"
+                  >
+                    View details
+                  </button>
                 )}
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    `${v.name} ${v.latitude},${v.longitude}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex min-h-11 items-center rounded bg-forest px-3 text-xs text-white no-underline"
-                >
-                  View details ↗
-                </a>
                 {onAddStop && (
                   <button
                     onClick={() => onAddStop(v)}
@@ -207,7 +246,7 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
             </InfoWindow>
           ))}
 
-      {/* While it's a trip stop, "Your location" is drawn as the same numbered
+      {/* While it's a trip stop, "Your location" is drawn as the same numbered Hawker Stall
           pin as every other stop — a differently-shaped marker in the middle of
           a numbered route reads as a different kind of thing. It falls back to
           the pulsing dot only once removed from the trip, where it means
@@ -215,7 +254,7 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, t
       {userPos && (
         <AdvancedMarker position={userPos} title="You are here">
           {userStopNumber
-            ? <Pin background={MAP_COLORS.terracotta} glyphColor="#fff" borderColor="#fff" glyph={String(userStopNumber)} />
+            ? <HawkerStallPin stopNum={userStopNumber} />
             : <div className="user-loc-dot" />}
         </AdvancedMarker>
       )}

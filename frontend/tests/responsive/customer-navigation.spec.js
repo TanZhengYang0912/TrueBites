@@ -39,7 +39,7 @@ test("legacy engagement URLs redirect to their dedicated pages", async ({ page }
   await expect(page).toHaveURL(/\/reviews$/);
 });
 
-test("primary customer navigation uses dedicated page links", async ({ page }) => {
+test("primary customer navigation uses guarded client-side page links", async ({ page }) => {
   await stubCustomerApis(page);
   await page.goto("/saved", { waitUntil: "networkidle" });
 
@@ -62,7 +62,7 @@ test("primary customer navigation uses dedicated page links", async ({ page }) =
   });
   await reviewsLink.click();
   await expect(page).toHaveURL(/\/reviews$/);
-  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBeUndefined();
+  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBe("saved-document");
   await expect(page.getByRole("heading", { name: "My reviews" })).toBeVisible();
   await expect(savedLink).not.toHaveAttribute("aria-current", "page");
   await expect(reviewsLink).toHaveAttribute("aria-current", "page");
@@ -72,6 +72,6 @@ test("primary customer navigation uses dedicated page links", async ({ page }) =
   });
   await suggestionsLink.click();
   await expect(page).toHaveURL(/\/suggestions$/);
-  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBeUndefined();
+  await expect.poll(() => page.evaluate(() => window.__trueBitesDocumentMarker)).toBe("reviews-document");
   await expect(page.getByRole("heading", { name: "My suggestions" })).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, Search, ShieldAlert } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Lightbulb, ShieldAlert } from "lucide-react";
 import { useSession } from "../lib/SessionContext";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import AdvancedFilters from "./discovery/AdvancedFilters";
@@ -25,7 +25,6 @@ export default function Dashboard({
   filters,
   onFilters,
   onClearFilters,
-  hasLocation,
   loading,
   loadError,
   onRetryLoad,
@@ -170,25 +169,12 @@ export default function Dashboard({
               </button>
             </div>
 
-            <label data-testid="discovery-search" className="relative mb-5 flex w-full items-center">
-              <Search size={18} className="absolute left-3.5 text-muted" />
-              <input
-                value={filters.search}
-                onChange={(event) => onFilters({ search: event.target.value })}
-                placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
-                aria-label="Search places"
-                className="min-h-12 w-full rounded border border-sand bg-white pl-11 pr-4 text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
-              />
-            </label>
-
             <div className="mb-8">
               <AdvancedFilters
                 filters={filters}
                 onChange={onFilters}
                 onClear={onClearFilters}
                 vendors={vendors}
-                resultCount={filteredVendors.length}
-                hasLocation={hasLocation}
               />
             </div>
 

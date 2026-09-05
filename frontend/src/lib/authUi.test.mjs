@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const loginPage = read("../pages/LoginPage.jsx");
+const profilePage = read("../pages/ProfilePage.jsx");
 const header = read("../components/discovery/DiscoveryHeader.jsx");
 const guestPrompt = read("../components/discovery/GuestPrompt.jsx");
 
@@ -53,13 +54,29 @@ test("the account menu can be dismissed", () => {
   assert.match(header, /event\.key === "Escape"/, "the menu does not close on Escape");
 });
 
-test("the login page has one back control, and it prefers history", () => {
-  assert.doesNotMatch(loginPage, /Return to main page/, "the bottom text link is still there");
-  assert.match(loginPage, /ArrowLeft/, "there is no back arrow");
-  assert.match(loginPage, /location\.key !== "default"/, "the back arrow does not check for history");
-  assert.match(loginPage, /navigate\(-1\)/, "the back arrow never goes back");
-  assert.match(loginPage, /navigate\("\/discover"\)/, "the back arrow has no fallback");
+test("the login page has one context-aware back control", () => {
+  assert.doesNotMatch(loginPage, /Return to main page/, "the old main-page link is still there");
+  assert.doesNotMatch(loginPage, /Back to Log In/, "the forgot form still has a second back control");
+  assert.match(loginPage, /ArrowLeft/, "there is no upper-left back arrow");
+  assert.match(loginPage,
+    /if \(mode === "forgot"\)[\s\S]*?setMode\("signin"\)[\s\S]*?return;/,
+    "the arrow does not return Forgot Password to Log In");
+  assert.match(loginPage, /location\.key !== "default"/, "the normal back path does not check history");
+  assert.match(loginPage, /navigate\(-1\)/, "the normal back path never uses history");
+  assert.match(loginPage, /navigate\("\/discover"\)/, "the normal back path has no cold-open fallback");
   assert.doesNotMatch(loginPage, /<Link to="\/"/, "the logo is still a link");
+});
+
+test("profile sends a password reset link directly and names the destination", () => {
+  assert.match(profilePage, /onClick=\{handleResetPassword\}/, "Reset Password does not send directly");
+  assert.match(profilePage, /resetSaving \? "Sending…" : "Reset Password"/, "the reset button has no sending state");
+  assert.match(profilePage,
+    /Password reset link sent to\s*\{userEmail\}\. Please check your inbox and spam folder\./,
+    "the success message does not name the signed-in email");
+  assert.match(profilePage, /role="status"/, "the persistent success message is not announced as a status");
+  assert.doesNotMatch(profilePage, /function startResettingPassword/, "the obsolete confirmation step still exists");
+  assert.doesNotMatch(profilePage, /Your password has been updated\./, "Profile still claims the password changed before the email link is used");
+  assert.doesNotMatch(profilePage, /resetSaving \? "Saving…" : "Save"/, "the obsolete Save action still exists");
 });
 
 test("the admin login page keeps its own exit", () => {

@@ -38,7 +38,7 @@ test.describe("landing and discovery navigation", () => {
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
     await page.getByRole("link", { name: "Plan Visit" }).first().click();
-    await expect(page).toHaveURL(/\/map$/);
+    await expect(page).toHaveURL(/\/discover$/);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   });
 
@@ -48,7 +48,7 @@ test.describe("landing and discovery navigation", () => {
       contentType: "application/json",
       body: NEARBY_FIXTURE.body,
     }));
-    await page.goto("/map", { waitUntil: "domcontentloaded" });
+    await page.goto("/discover", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /Hidden gems, authentic flavours/i })).toBeVisible();
     const nextPage = page.getByRole("button", { name: "Next page" });
     await expect(nextPage).toBeVisible();

@@ -83,6 +83,12 @@ export default function LoginPage() {
   // "default" — window.history.length would also count other sites visited in
   // the same tab, so going back could leave TrueBites entirely.
   function goBack() {
+    if (mode === "forgot") {
+      setMode("signin");
+      setErrorMsg("");
+      setInfoMsg("");
+      return;
+    }
     if (location.key !== "default") navigate(-1);
     else navigate("/discover");
   }
@@ -303,12 +309,6 @@ export default function LoginPage() {
               Forgot password?
             </button>
           )}
-          {mode === "forgot" && (
-            <button className={AUTH_LINK} onClick={() => { setMode("signin"); setErrorMsg(""); setInfoMsg(""); }}>
-              Back to Log In
-            </button>
-          )}
-
           {errorMsg && <p className={AUTH_ERROR}>{errorMsg}</p>}
           {infoMsg && <p className={AUTH_INFO}>{infoMsg}</p>}
 

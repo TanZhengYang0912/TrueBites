@@ -1,14 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 // Shown whenever a guest (no session) tries to bookmark, add a stop tied to
 // their account, or open "My reviews" — actions that need an identity to
-// mean anything.
+// mean anything. It is portalled because a fixed overlay is sized against an
+// ancestor with backdrop-filter / filter / transform rather than the viewport.
+// DiscoveryHeader has backdrop-blur, so keeping this as its child would squash
+// the overlay into the header band.
 export default function GuestPrompt({ open, onClose }) {
   const navigate = useNavigate();
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       className="fixed inset-0 z-[1100] flex items-end justify-center bg-ink/56 p-0 animate-backdrop-in sm:items-center sm:p-5"
@@ -38,9 +42,10 @@ export default function GuestPrompt({ open, onClose }) {
           onClick={() => navigate("/login")}
           className="min-h-11 w-full rounded-[10px] bg-forest px-4 text-[14.5px] font-semibold text-white"
         >
-          Log In
+          Log In or Sign Up
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

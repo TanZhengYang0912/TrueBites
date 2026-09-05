@@ -24,7 +24,6 @@ test("MapPage derives location-aware distances only from a user origin", () => {
 
 test("MapPage keeps Melaka-centre fallback separate from a real distance origin", () => {
   assert.match(mapPage, /const \[distanceOrigin, setDistanceOrigin\] = useState\(null\)/);
-  assert.match(mapPage, /hasLocation=\{distanceOrigin != null\}/);
   assert.doesNotMatch(mapPage, /setDistanceOrigin\(MELAKA_CENTER\)/);
 });
 
@@ -34,7 +33,6 @@ test("MapPage derives one filtered sorted collection and shares it with both vie
   assert.match(mapPage, /sortVendors\(/);
   assert.match(mapPage, /<Dashboard[\s\S]*?filteredVendors=\{filteredVendors\}/);
   assert.match(mapPage, /<VendorPanel[\s\S]*?filteredVendors=\{filteredVendors\}/);
-  assert.match(mapPage, /hasLocation=\{distanceOrigin != null\}/);
 });
 
 test("map pins and nearby rows reuse the shared result instead of matching again", () => {
@@ -67,7 +65,6 @@ test("AdvancedFilters exposes every approved control and responsive semantics", 
     "filter-price",
     "filter-hours",
     "filter-rating",
-    "filter-distance",
     "filter-open-now",
     "clear-filters",
   ]) {
@@ -81,30 +78,29 @@ test("AdvancedFilters exposes every approved control and responsive semantics", 
   assert.match(source, /aria-checked/);
 });
 
-test("AdvancedFilters disables and explains location-dependent controls", () => {
+test("AdvancedFilters has no location-dependent discovery control", () => {
   const componentUrl = new URL("../components/discovery/AdvancedFilters.jsx", import.meta.url);
   assert.equal(existsSync(componentUrl), true, "AdvancedFilters.jsx must exist");
   const source = readFileSync(componentUrl, "utf8");
-  assert.match(source, /hasLocation/);
-  assert.match(source, /Set your location/);
-  assert.match(source, /disabled=\{!hasLocation\}/);
+  assert.doesNotMatch(source, /hasLocation/);
+  assert.doesNotMatch(source, /Set your location/);
   assert.doesNotMatch(source, /sort by distance/i);
 });
 
-test("Dashboard renders controlled advanced filters and paginates the shared result", () => {
+test("Dashboard delegates controlled filters to the shared panel and paginates the shared result", () => {
   assert.match(dashboard, /<AdvancedFilters/);
-  assert.match(dashboard, /resultCount=\{filteredVendors\.length\}/);
+  assert.doesNotMatch(dashboard, /resultCount/, "Dashboard still passes the removed resultCount prop");
   assert.match(dashboard, /paginate\(filteredVendors, page, PAGE_SIZE\)/);
-  assert.match(dashboard, /value=\{filters\.search\}/);
+  assert.doesNotMatch(dashboard, /data-testid="discovery-search"/);
   assert.match(dashboard, /onClear=\{onClearFilters\}/);
   assert.doesNotMatch(dashboard, /onSort/);
   assert.doesNotMatch(dashboard, /<FilterChips/);
 });
 
-test("VendorPanel uses controlled search and the compact shared panel", () => {
-  assert.match(vendorPanel, /value=\{filters\.search\}/);
+test("VendorPanel delegates search to the compact shared panel", () => {
+  assert.doesNotMatch(vendorPanel, /aria-label="Search vendors"/);
   assert.match(vendorPanel, /<AdvancedFilters/);
-  assert.match(vendorPanel, /resultCount=\{filteredVendors\.length\}/);
+  assert.doesNotMatch(vendorPanel, /resultCount/, "VendorPanel still passes the removed resultCount prop");
   assert.match(vendorPanel, /compact/);
   assert.doesNotMatch(vendorPanel, /onSort/);
   assert.doesNotMatch(vendorPanel, /<FilterChips/);

@@ -83,15 +83,23 @@ async function stubDiscoveryApis(page, { vendors = VENDORS, geolocation = "succe
   }, geolocation);
 }
 
-test("desktop discovery filters start open and update the result set", async ({ page }) => {
+async function openFilters(page) {
+  const toggle = page.getByTestId("filters-toggle");
+  if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+  await expect(page.getByTestId("filters-region")).toBeVisible();
+}
+
+test("discovery filters start collapsed and update the result set when opened", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByTestId("filters-region")).toBeVisible();
-  await expect(page.getByTestId("advanced-filters")).toContainText("3 places found");
+  await expect(page.getByTestId("filters-region")).toBeHidden();
+  await openFilters(page);
+  await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "River Cafe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Night Grill" })).toBeVisible();
   await page.getByTestId("filter-rating").selectOption("4.5");
-  await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
   await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "River Cafe" })).toBeHidden();
 });
@@ -99,70 +107,74 @@ test("desktop discovery filters start open and update the result set", async ({ 
 test("mobile filters start closed and expand without viewport overflow", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("filters-region")).toBeHidden();
-  await page.getByTestId("filters-toggle").click();
-  await expect(page.getByTestId("filters-region")).toBeVisible();
+  await openFilters(page);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test("filters persist when switching between List and Map", async ({ page }) => {
+test("filters persist while their panel is closed and reopened", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
+  await openFilters(page);
   await page.getByTestId("filter-price").selectOption("10-20");
-  await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page).toHaveURL(/\/map\?view=map$/);
-  await page.getByRole("tab", { name: "Vendors" }).click();
+  await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "River Cafe" })).toBeHidden();
+  await page.getByTestId("filters-toggle").click();
+  await expect(page.getByTestId("filters-region")).toBeHidden();
+  await openFilters(page);
   await expect(page.getByTestId("filter-price")).toHaveValue("10-20");
-  await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
-  await page.getByRole("button", { name: "List", exact: true }).click();
-  await expect(page).toHaveURL(/\/map$/);
-  await expect(page.getByTestId("filter-price")).toHaveValue("10-20");
+  await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "River Cafe" })).toBeHidden();
 });
 
-test("distance controls are unavailable before a location exists", async ({ page }) => {
+test("distance is not a discovery filter", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByTestId("filter-distance")).toBeDisabled();
-  await expect(page.getByTestId("advanced-filters")).toContainText("Set your location to filter by distance");
-  await expect(page.getByText("Sort by", { exact: true })).toHaveCount(0);
+  await openFilters(page);
+  await expect(page.getByTestId("filter-distance")).toHaveCount(0);
+  await expect(page.getByText("Set your location to filter by distance")).toHaveCount(0);
 });
 
 test("hours, open-now and Clear all stay deterministic", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
+  await openFilters(page);
   await page.getByTestId("filter-hours").selectOption("breakfast");
-  await expect(page.getByTestId("advanced-filters")).toContainText("2 places found");
+  await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "River Cafe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Night Grill" })).toBeHidden();
   await page.getByTestId("filter-category").selectOption("cafe");
   await page.getByTestId("filter-open-now").click();
-  await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
   await expect(page.getByRole("heading", { name: "River Cafe" })).toBeVisible();
 
   await page.getByTestId("clear-filters").click();
   await expect(page.getByTestId("filter-hours")).toHaveValue("any");
   await expect(page.getByTestId("filter-category")).toHaveValue("all");
   await expect(page.getByTestId("filter-open-now")).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByTestId("advanced-filters")).toContainText("3 places found");
+  await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "River Cafe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Night Grill" })).toBeVisible();
 });
 
 test("changing and clearing filters resets pagination to page one", async ({ page }) => {
   await stubDiscoveryApis(page, { vendors: PAGED_VENDORS });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
   await page.getByRole("button", { name: "Page 2" }).click();
   await expect(page.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
+  await openFilters(page);
   await page.getByTestId("filter-rating").selectOption("4.5");
   await expect(page.getByRole("navigation", { name: "Vendor pages" })).toBeHidden();
   await expect(page.getByRole("heading", { name: "Nyonya Kitchen" })).toBeVisible();
@@ -170,27 +182,26 @@ test("changing and clearing filters resets pagination to page one", async ({ pag
   await expect(page.getByRole("button", { name: "Page 1" })).toHaveAttribute("aria-current", "page");
 });
 
-test("a successful location enables distance filtering in the Map sidebar", async ({ page }) => {
+test("the Map sidebar keeps its separate nearby-radius controls", async ({ page }) => {
   await stubDiscoveryApis(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("tab", { name: "Vendors" }).click();
-  await expect(page.getByTestId("filter-distance")).toBeEnabled();
-  await page.getByTestId("filter-distance").selectOption("1");
-  await expect(page.getByTestId("advanced-filters")).toContainText("2 places found");
+  await expect(page.getByRole("button", { name: "2km" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "1km" }).click();
+  await expect(page.getByRole("button", { name: "1km" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("filter-distance")).toHaveCount(0);
 });
 
-test("Melaka-centre fallback does not enable user-distance controls", async ({ page }) => {
+test("Melaka-centre fallback keeps the nearby-radius controls available", async ({ page }) => {
   await stubDiscoveryApis(page, { geolocation: "failure" });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("tab", { name: "Vendors" }).click();
-  await expect(page.getByTestId("filter-distance")).toBeDisabled();
-  await expect(page.getByTestId("advanced-filters")).toContainText("Set your location");
+  await expect(page.getByRole("button", { name: "2km" })).toBeVisible();
+  await expect(page.getByTestId("filter-distance")).toHaveCount(0);
 });
 
 test("one filtered vendor remains the same sidebar row and map pin", async ({ page }) => {
@@ -198,9 +209,7 @@ test("one filtered vendor remains the same sidebar row and map pin", async ({ pa
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/map", { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("tab", { name: "Vendors" }).click();
-  await expect(page.getByTestId("advanced-filters")).toContainText("1 places found");
   await expect(page.getByText("Nyonya Kitchen", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nyonya Kitchen" })).toBeVisible();
 });

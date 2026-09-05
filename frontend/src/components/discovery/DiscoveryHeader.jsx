@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import TrueBitesLogo from "../TrueBitesLogo";
 import NotificationBell from "./NotificationBell";
+import GuestPrompt from "./GuestPrompt";
+import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 
 // Shared customer header for discovery and map surfaces. Search lives in the
 // discovery hero so the top bar stays quiet and consistent across screens.
@@ -32,7 +34,23 @@ export default function DiscoveryHeader({
   onOpenVendor,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const menuRef = useRef(null);
+  const navigate = useNavigate();
+
+  // Same condition as Dashboard.jsx's requireAuth. ENGAGEMENT_TEST_MODE is on
+  // in the Playwright harness, where these links should navigate rather than
+  // opening a dialog.
+  function goGated(path) {
+    return (event) => {
+      if (!session && !ENGAGEMENT_TEST_MODE) {
+        event.preventDefault();
+        setGuestPromptOpen(true);
+        return;
+      }
+      navigate(path);
+    };
+  }
 
   // Same dismissal contract as NotificationBell: outside click and Escape.
   // A menu that traps the page is worse than no menu.
@@ -83,8 +101,9 @@ export default function DiscoveryHeader({
           <MapIcon size={14} strokeWidth={1.7} />
           <span>Map</span>
         </Link>
-        <a
-          href="/saved"
+        <Link
+          to="/saved"
+          onClick={goGated("/saved")}
           className={activeSection === "saved" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "saved" ? "page" : undefined}
         >
@@ -93,22 +112,24 @@ export default function DiscoveryHeader({
           {savedCount > 0 && (
             <span className="rounded-full bg-forest px-1.5 text-[10px] font-bold text-white">{savedCount}</span>
           )}
-        </a>
-        <a
-          href="/reviews"
+        </Link>
+        <Link
+          to="/reviews"
+          onClick={goGated("/reviews")}
           className={activeSection === "reviews" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
           My reviews
-        </a>
-        <a
-          href="/suggestions"
+        </Link>
+        <Link
+          to="/suggestions"
+          onClick={goGated("/suggestions")}
           className={activeSection === "suggestions" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "suggestions" ? "page" : undefined}
         >
           <Lightbulb size={14} strokeWidth={1.8} />
           <span>Suggest</span>
-        </a>
+        </Link>
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
@@ -165,6 +186,7 @@ export default function DiscoveryHeader({
           </div>
         )}
       </div>
+      <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
     </header>
   );
 }

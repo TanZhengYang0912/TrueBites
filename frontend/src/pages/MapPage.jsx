@@ -15,6 +15,8 @@ import DirectionsRenderer from "../components/DirectionsRenderer";
 import TransitLayer from "../components/TransitLayer";
 import Dashboard from "../components/Dashboard";
 import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
+import GuestPrompt from "../components/discovery/GuestPrompt";
+import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
@@ -80,6 +82,8 @@ export default function MapPage() {
   const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
   const [folders, setFolders] = useState([]);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [detailVendor, setDetailVendor] = useState(null);
   const bookmarks = new Set(bookmarkRows.map((r) => r.vendor_id));
   const [focusVendor, setFocusVendor] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -338,7 +342,9 @@ export default function MapPage() {
   // Un-saving is a plain delete; saving opens the folder picker (rendered by
   // each view below) so the vendor lands somewhere the user chose.
   function toggleBookmark(id) {
-    if (!session && !ENGAGEMENT_TEST_MODE) { navigate("/login"); return; }
+    // Same contract as Dashboard.jsx's requireAuth: explain why, in place,
+    // instead of discarding the map the visitor was looking at.
+    if (!session && !ENGAGEMENT_TEST_MODE) { setGuestPromptOpen(true); return; }
     if (bookmarks.has(id)) {
       removeBookmark(id)
         .then(() => { refreshBookmarks(); notify("Vendor removed from bookmarks."); })
@@ -399,7 +405,6 @@ export default function MapPage() {
       () => {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
-        setFilters((current) => ({ ...current, distance: "any" }));
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
           notify("Couldn't get your location — showing Melaka centre instead.", true);
@@ -424,7 +429,6 @@ export default function MapPage() {
       () => {
         setUserPos(MELAKA_CENTER);
         setDistanceOrigin(null);
-        setFilters((current) => ({ ...current, distance: "any" }));
         setLocateTarget(MELAKA_CENTER);
         notify("Couldn't get your location — showing vendors near Melaka centre.", true);
       }
@@ -486,7 +490,6 @@ export default function MapPage() {
           filters={filters}
           onFilters={updateFilters}
           onClearFilters={clearFilters}
-          hasLocation={distanceOrigin != null}
           loading={vendorsLoading}
           loadError={vendorsError}
           onRetryLoad={loadVendors}
@@ -509,6 +512,7 @@ export default function MapPage() {
             onCreateFolder={createFolderAndSave}
           />
         )}
+        <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
         <Toast toast={toast} />
       </>
     );
@@ -612,6 +616,7 @@ export default function MapPage() {
                 userPos={userPos}
                 onSelect={setSelected}
                 onAddStop={addStop}
+                onViewDetails={setDetailVendor}
                 tripOrder={vendorStopOrder}
                 userStopNumber={meIndex >= 0 ? meIndex + 1 : null}
                 selectedId={selected?.id}
@@ -637,7 +642,9 @@ export default function MapPage() {
         </GMap>
 
         {!mapFullscreen && (
-          <div className="absolute inset-x-0 top-0 z-10">
+          <div className="absolute inset-x-0 top-0 z-30">
+            {/* This wrapper is the header's stacking context, so it must sit above
+                MapPanel (z-20) and the fullscreen control (z-10). */}
             <DiscoveryHeader
               session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl}
               savedCount={bookmarks.size}
@@ -715,7 +722,6 @@ export default function MapPage() {
                 filters={filters}
                 onFilters={updateFilters}
                 onClearFilters={clearFilters}
-                hasLocation={distanceOrigin != null}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}
                 showAllVendors={showAllVendors}
@@ -738,6 +744,21 @@ export default function MapPage() {
             onCreateFolder={createFolderAndSave}
           />
         )}
+        {detailVendor && (
+          <VendorDetailModal
+            key={detailVendor.id}
+            vendor={detailVendor}
+            inTrip={vendorStopOrder.has(detailVendor.id)}
+            bookmarked={bookmarks.has(detailVendor.id)}
+            onToggleBookmark={toggleBookmark}
+            onAddStop={addStop}
+            onClose={() => setDetailVendor(null)}
+            onVendorUpdated={(vendorId, patch) => {
+              setDetailVendor((current) => (current && current.id === vendorId ? { ...current, ...patch } : current));
+            }}
+          />
+        )}
+        <GuestPrompt open={guestPromptOpen} onClose={() => setGuestPromptOpen(false)} />
         <Toast toast={toast} />
       </div>
     </APIProvider>

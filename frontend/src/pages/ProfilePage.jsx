@@ -7,7 +7,7 @@ import { deleteAccount, uploadAvatar } from "../api";
 import DobScrollPicker from "../components/DobScrollPicker";
 import { customerSession } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
-import { AUTH_INPUT, AUTH_ERROR } from "./LoginPage";
+import { AUTH_INPUT, AUTH_ERROR, AUTH_INFO } from "./LoginPage";
 import Footer from "../components/Footer";
 import { COUNTRY_CODES, DEFAULT_COUNTRY, splitStoredPhone } from "../lib/countryCodes";
 
@@ -50,7 +50,6 @@ export default function ProfilePage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [resettingPassword, setResettingPassword] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
   const [resetError, setResetError] = useState("");
   const [resetDone, setResetDone] = useState(false);
@@ -260,15 +259,10 @@ export default function ProfilePage() {
     setEditing(false);
   }
 
-  function startResettingPassword() {
-    setResetError("");
-    setResetDone(false);
-    setResettingPassword(true);
-  }
-
   async function handleResetPassword() {
     setResetSaving(true);
     setResetError("");
+    setResetDone(false);
     const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
       redirectTo: `${window.location.origin}/reset-password?redirect=profile`,
     });
@@ -358,37 +352,17 @@ export default function ProfilePage() {
             </button>
 
             {hasPassword && (
-              <button onClick={startResettingPassword} className={`mb-2.5 ${ACTION_MUTED}`}>
-                Reset Password
-              </button>
-            )}
-
-            {resettingPassword && (
-              <div className="mb-2.5 rounded-lg border border-sand bg-chalk p-3.5 text-left">
-                {resetDone ? (
-                  <>
-                    <p className="mb-3 mt-0 text-[13px] text-ink">Your password has been updated.</p>
-                    <button onClick={() => setResettingPassword(false)} className={ROW_CONFIRM + " w-full"}>
-                      Done
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="mb-3 mt-0 text-[13px] leading-normal text-ink">
-                      We’ll email you a secure link to choose a new password.
-                    </p>
-                    {resetError && <p className={`mb-3 ${AUTH_ERROR}`}>{resetError}</p>}
-                    <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                      <button onClick={() => setResettingPassword(false)} disabled={resetSaving} className={ROW_CANCEL}>
-                        Cancel
-                      </button>
-                      <button onClick={handleResetPassword} disabled={resetSaving} className={ROW_CONFIRM}>
-                        {resetSaving ? "Saving…" : "Save"}
-                      </button>
-                    </div>
-                  </>
+              <>
+                <button onClick={handleResetPassword} disabled={resetSaving} className={`mb-2.5 ${ACTION_MUTED}`}>
+                  {resetSaving ? "Sending…" : "Reset Password"}
+                </button>
+                {resetError && <p role="alert" className={`mb-2.5 ${AUTH_ERROR}`}>{resetError}</p>}
+                {resetDone && (
+                  <p role="status" className={`mb-2.5 ${AUTH_INFO}`}>
+                    Password reset link sent to {userEmail}. Please check your inbox and spam folder.
+                  </p>
                 )}
-              </div>
+              </>
             )}
 
             <button onClick={handleLogout} className={`mb-6 ${ACTION_MUTED}`}>

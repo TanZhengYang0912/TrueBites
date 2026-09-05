@@ -1,0 +1,133 @@
+<style>
+  .pin-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:22px; }
+  .pin-card { border:1px solid #D8D2C8; border-radius:18px; overflow:hidden; background:#fff; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .15s; }
+  .pin-card:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(64,84,74,.12); }
+  .pin-card.selected { border:2px solid #40544A; box-shadow:0 0 0 4px rgba(64,84,74,.12); }
+  .map-preview { height:245px; position:relative; overflow:hidden; background:#dff3ea; }
+  .map-preview svg.map { width:100%; height:100%; display:block; }
+  .pin-row { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:25px; padding-top:4px; }
+  .pin-state { display:flex; flex-direction:column; align-items:center; gap:8px; color:#40544A; font:600 11px Arial,sans-serif; }
+  .pin-state svg { overflow:visible; filter:drop-shadow(0 3px 3px rgba(32,42,53,.25)); }
+  .card-copy { padding:17px 18px 19px; }
+  .card-copy h3 { margin:0 0 6px; color:#202A35; font-size:17px; }
+  .card-copy p { margin:0; color:#69717A; font-size:13px; line-height:1.45; }
+  .recommend { display:inline-block; margin-bottom:8px; padding:4px 8px; border-radius:999px; background:#40544A; color:#fff; font:700 10px Arial,sans-serif; letter-spacing:.03em; }
+  .rule-note { margin-top:20px; padding:14px 16px; border:1px solid #b9e3c6; border-radius:12px; background:#e9f7ee; color:#274f3b; font-size:13px; line-height:1.5; }
+  .legend { display:flex; gap:18px; margin-top:10px; color:#69717A; font-size:12px; flex-wrap:wrap; }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  @media (max-width:900px) { .pin-grid { grid-template-columns:1fr; } .map-preview { height:210px; } }
+</style>
+
+<h2>Choose the new TrueBites vendor pin</h2>
+<p class="subtitle">All vendors use the same normal pin — <code>city_level</code> and <code>unknown</code> no longer become a brown “?” marker. Each option shows normal and selected states at real map scale.</p>
+
+<div class="pin-grid">
+  <div class="pin-card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="map-preview">
+      <svg class="map" viewBox="0 0 360 245" aria-hidden="true">
+        <rect width="360" height="245" fill="#DFF3EA"/>
+        <path d="M-20 190 C80 155 135 205 230 166 S340 135 390 155 V260 H-20Z" fill="#7DCDD7"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#F7F6F3" stroke-width="18"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#C8CED0" stroke-width="2"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#F7F6F3" stroke-width="12"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#C8CED0" stroke-width="2"/>
+      </svg>
+      <div class="pin-row">
+        <div class="pin-state">
+          <svg width="42" height="56" viewBox="0 0 42 56"><path d="M21 2C10.5 2 2 10.4 2 20.8c0 13.3 19 32.8 19 32.8s19-19.5 19-32.8C40 10.4 31.5 2 21 2Z" fill="#40544A" stroke="#FFFDF8" stroke-width="3"/><circle cx="21" cy="20" r="7" fill="#FFFDF8"/></svg>
+          <span>Normal / city level</span>
+        </div>
+        <div class="pin-state">
+          <svg width="49" height="64" viewBox="0 0 42 56"><path d="M21 2C10.5 2 2 10.4 2 20.8c0 13.3 19 32.8 19 32.8s19-19.5 19-32.8C40 10.4 31.5 2 21 2Z" fill="#A35D47" stroke="#FFFDF8" stroke-width="3"/><circle cx="21" cy="20" r="7" fill="#FFFDF8"/></svg>
+          <span>Selected</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-copy">
+      <h3>A. Quiet Forest</h3>
+      <p>Clean Google-style silhouette, refined with TrueBites forest and a cream centre. Familiar and very readable, but intentionally understated.</p>
+    </div>
+  </div>
+
+  <div class="pin-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="map-preview">
+      <svg class="map" viewBox="0 0 360 245" aria-hidden="true">
+        <rect width="360" height="245" fill="#DFF3EA"/>
+        <path d="M-20 190 C80 155 135 205 230 166 S340 135 390 155 V260 H-20Z" fill="#7DCDD7"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#F7F6F3" stroke-width="18"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#C8CED0" stroke-width="2"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#F7F6F3" stroke-width="12"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#C8CED0" stroke-width="2"/>
+      </svg>
+      <div class="pin-row">
+        <div class="pin-state">
+          <svg width="46" height="58" viewBox="0 0 46 58">
+            <path d="M23 2C11.4 2 2 11.1 2 22.4c0 14 21 33.2 21 33.2s21-19.2 21-33.2C44 11.1 34.6 2 23 2Z" fill="#40544A" stroke="#FFFDF8" stroke-width="3"/>
+            <path d="M13.5 18.5h19l-2.6-5.2H16.1l-2.6 5.2Z" fill="#FFFDF8"/>
+            <path d="M15.8 20.5v10.2h14.4V20.5M20.2 30.7v-6h5.6v6" fill="none" stroke="#FFFDF8" stroke-width="2.2" stroke-linejoin="round"/>
+          </svg>
+          <span>Normal / city level</span>
+        </div>
+        <div class="pin-state">
+          <svg width="53" height="67" viewBox="0 0 46 58">
+            <path d="M23 2C11.4 2 2 11.1 2 22.4c0 14 21 33.2 21 33.2s21-19.2 21-33.2C44 11.1 34.6 2 23 2Z" fill="#A35D47" stroke="#FFFDF8" stroke-width="3"/>
+            <path d="M13.5 18.5h19l-2.6-5.2H16.1l-2.6 5.2Z" fill="#FFFDF8"/>
+            <path d="M15.8 20.5v10.2h14.4V20.5M20.2 30.7v-6h5.6v6" fill="none" stroke="#FFFDF8" stroke-width="2.2" stroke-linejoin="round"/>
+          </svg>
+          <span>Selected</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-copy">
+      <span class="recommend">RECOMMENDED</span>
+      <h3>B. Hawker Stall</h3>
+      <p>A small storefront canopy makes the pin unmistakably about local vendors. Distinctive to TrueBites while staying legible at map size.</p>
+    </div>
+  </div>
+
+  <div class="pin-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="map-preview">
+      <svg class="map" viewBox="0 0 360 245" aria-hidden="true">
+        <rect width="360" height="245" fill="#DFF3EA"/>
+        <path d="M-20 190 C80 155 135 205 230 166 S340 135 390 155 V260 H-20Z" fill="#7DCDD7"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#F7F6F3" stroke-width="18"/>
+        <path d="M-30 62 L80 112 L155 75 L250 115 L385 56" fill="none" stroke="#C8CED0" stroke-width="2"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#F7F6F3" stroke-width="12"/>
+        <path d="M73 -10 L100 88 L44 175" fill="none" stroke="#C8CED0" stroke-width="2"/>
+      </svg>
+      <div class="pin-row">
+        <div class="pin-state">
+          <svg width="46" height="58" viewBox="0 0 46 58">
+            <path d="M23 2C11.4 2 2 11.1 2 22.4c0 14 21 33.2 21 33.2s21-19.2 21-33.2C44 11.1 34.6 2 23 2Z" fill="#FFFDF8" stroke="#40544A" stroke-width="4"/>
+            <circle cx="23" cy="21" r="10" fill="#A35D47"/>
+            <path d="M19 14.8v12.4M16.7 14.8v4.5c0 2.3 4.6 2.3 4.6 0v-4.5M27.5 14.8v12.4M27.5 14.8c3 1.8 3 6.1 0 7.2" fill="none" stroke="#FFFDF8" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span>Normal / city level</span>
+        </div>
+        <div class="pin-state">
+          <svg width="53" height="67" viewBox="0 0 46 58">
+            <path d="M23 2C11.4 2 2 11.1 2 22.4c0 14 21 33.2 21 33.2s21-19.2 21-33.2C44 11.1 34.6 2 23 2Z" fill="#FFFDF8" stroke="#A35D47" stroke-width="4"/>
+            <circle cx="23" cy="21" r="10" fill="#40544A"/>
+            <path d="M19 14.8v12.4M16.7 14.8v4.5c0 2.3 4.6 2.3 4.6 0v-4.5M27.5 14.8v12.4M27.5 14.8c3 1.8 3 6.1 0 7.2" fill="none" stroke="#FFFDF8" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span>Selected</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-copy">
+      <h3>C. Plate & Cutlery</h3>
+      <p>A food-first badge with stronger contrast and more visual detail. Expressive, though slightly busier when many pins are visible together.</p>
+    </div>
+  </div>
+</div>
+
+<div class="rule-note">
+  <strong>Confirmed display rule:</strong> exact, city-level and unknown vendors all receive the chosen normal pin. Selection still enlarges and changes colour; numbered trip-stop pins stay numbered so route order remains readable.
+</div>
+
+<div class="legend">
+  <span><i class="dot" style="background:#40544A"></i> Normal vendor</span>
+  <span><i class="dot" style="background:#A35D47"></i> Selected vendor</span>
+  <span><i class="dot" style="background:#7DCDD7"></i> Map water</span>
+</div>

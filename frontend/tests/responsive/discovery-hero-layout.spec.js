@@ -11,7 +11,7 @@ async function stubVendors(page) {
 test("desktop swaps the community CTA and search widths", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await stubVendors(page);
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
   const hero = page.getByRole("heading", { name: /Hidden gems, authentic flavours/i });
   const cta = page.getByTestId("community-discoveries-cta");
@@ -34,7 +34,7 @@ test("desktop swaps the community CTA and search widths", async ({ page }) => {
 test("mobile stacks title, community CTA, then search", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await stubVendors(page);
-  await page.goto("/map", { waitUntil: "domcontentloaded" });
+  await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
   const hero = page.getByRole("heading", { name: /Hidden gems, authentic flavours/i });
   const cta = page.getByTestId("community-discoveries-cta");
