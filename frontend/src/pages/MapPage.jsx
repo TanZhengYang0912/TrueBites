@@ -434,13 +434,15 @@ export default function MapPage() {
       notify("Your account is suspended — the map isn't available right now.", true);
       return;
     }
+    // Enter the map immediately. Geolocation permission can remain pending
+    // indefinitely, so navigation must not wait for either GPS callback.
+    setFocusVendor(null);
+    setSelected(null);
+    setSearchParams({ view: "map" });
     const focusOn = (pos) => {
       setUserPos(pos);
       setDistanceOrigin(pos);
       setLocateTarget(pos);
-      setFocusVendor(null);
-      setSelected(null);
-      setSearchParams({ view: "map" });
     };
     if (distanceOrigin) { focusOn(distanceOrigin); return; }
     navigator.geolocation.getCurrentPosition(
@@ -450,9 +452,6 @@ export default function MapPage() {
         setDistanceOrigin(null);
         setFilters((current) => ({ ...current, distance: "any" }));
         setLocateTarget(MELAKA_CENTER);
-        setFocusVendor(null);
-        setSelected(null);
-        setSearchParams({ view: "map" });
         notify("Couldn't get your location — showing vendors near Melaka centre.", true);
       }
     );
