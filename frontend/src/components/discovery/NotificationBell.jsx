@@ -72,6 +72,10 @@ export default function NotificationBell({ onOpenVendor }) {
   // Opening a notification reads that one. Updated locally first so the badge
   // drops before the dropdown closes — the server call is confirmation, not
   // the thing the user is waiting on.
+  // Two different ids live on one notification: `item.id` identifies the feed
+  // row (what "read" applies to) and `item.vendor_id` identifies the place the
+  // row is about (what the reader wants to see). Passing the first where the
+  // second belongs is why clicking a notification used to do nothing.
   function openNotification(item) {
     setReadIds((current) => (current.includes(item.id) ? current : [...current, item.id]));
     setOpen(false);
