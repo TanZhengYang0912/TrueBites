@@ -13,7 +13,11 @@ import {
 } from "../lib/vendorValidation.js";
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
 import { logActivity } from "../lib/auditLog.js";
-import { notifyNewVendor } from "../lib/notify.js";
+import { notifyVendorLifecycle } from "../lib/notify.js";
+import {
+  NEW_VENDOR_NOTIFICATION,
+  notificationTypeForActivation,
+} from "../lib/vendorLifecycle.js";
 import { isSuspended } from "../lib/suspension.js";
 import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
@@ -395,16 +399,20 @@ router.patch("/vendors/:id", async (req, res) => {
   // actually result from this patch — existing fields overridden by
   // whatever this request also changes — so a save that fixes the gap in
   // the same request is never falsely blocked.
-  let wasActive = false;
+  let activationType = null;
   if (clean.status === "active") {
     const { data: current, error: findErr } = await supabase
       .from("vendors")
-      .select("status, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
+      .select("status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
       .eq("id", id)
       .maybeSingle();
     if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
     if (!current) return res.status(404).json({ error: "Vendor not found" });
-    wasActive = current.status === "active";
+    activationType = notificationTypeForActivation({
+      previousStatus: current.status,
+      nextStatus: clean.status,
+      publishedAt: current.published_at,
+    });
     const issues = vendorActivationIssues({ ...current, ...clean });
     if (issues.length) {
       return res.status(400).json({
@@ -413,7 +421,9 @@ router.patch("/vendors/:id", async (req, res) => {
     }
   }
 
-  const patch = { ...clean, last_updated: new Date().toISOString() };
+  const updatedAt = new Date().toISOString();
+  const patch = { ...clean, last_updated: updatedAt };
+  if (activationType === NEW_VENDOR_NOTIFICATION) patch.published_at = updatedAt;
   // Write both hour columns — operating_hours previously went stale because
   // only operating_hours_raw was updated here while the GET preferred
   // operating_hours.
@@ -442,11 +452,9 @@ router.patch("/vendors/:id", async (req, res) => {
       } catch (syncError) {
         console.error("vendor suggestion publish sync failed:", syncError.message);
       }
-      // Fires on a genuine draft/suspended → active transition only. Whether
-      // that transition is actually *news* is decided by notifyNewVendor,
-      // which announces any given vendor once and ignores later
-      // re-activations.
-      if (!wasActive) await notifyNewVendor(data);
+      if (activationType) {
+        await notifyVendorLifecycle({ type: activationType, ...data });
+      }
     }
     await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
     res.json(data);

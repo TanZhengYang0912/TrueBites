@@ -2,11 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
-const bell = read("../components/discovery/NotificationBell.jsx");
+const source = readFileSync(
+  new URL("../components/discovery/NotificationBell.jsx", import.meta.url),
+  "utf8",
+);
 
-test("a notification opens its vendor, not its own id", () => {
-  assert.match(bell, /onOpenVendor\?\.\(item\.vendor_id\)/, "the bell still passes the notification id as a vendor id");
-  assert.match(bell, /markNotificationRead\(item\.id\)/, "read-marking must still use the notification's own id");
-  assert.doesNotMatch(bell, /onOpenVendor\?\.\(id\)/, "the old wrong argument is still there");
+test("the bell renders exact first-publication and reactivation copy", () => {
+  assert.match(source, /case "vendor_reactivated":/);
+  assert.match(source, /\$\{item\.name\} is available again!/);
+  assert.match(source, /New restaurant: \$\{item\.name\}!/);
+});
+
+test("opening an event navigates by vendor id and marks the event id read", () => {
+  assert.match(source, /onOpenVendor\?\.\(item\.vendor_id\)/);
+  assert.match(source, /markNotificationRead\(item\.id\)/);
+  assert.match(source, /onClick=\{\(\) => openNotification\(item\)\}/);
+  assert.doesNotMatch(source, /onOpenVendor\?\.\(id\)/);
 });

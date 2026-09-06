@@ -200,6 +200,8 @@ export default function NotificationBell({ onOpenVendor }) {
 // changed, ...) gets its own phrasing without touching the dropdown markup.
 function notificationText(item) {
   switch (item.type) {
+    case "vendor_reactivated":
+      return `${item.name} is available again!`;
     case "new_vendor":
     default:
       return `New restaurant: ${item.name}!`;
