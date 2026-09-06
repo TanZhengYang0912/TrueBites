@@ -34,6 +34,7 @@ BOX_GREY = (247, 249, 250)
 
 STROKE = 5
 THIN_STROKE = 3
+ARROW_INSET = 20
 
 
 def _font_candidates(filename: str) -> Iterable[Path]:
@@ -276,6 +277,36 @@ def draw_polyline_arrow(
         draw_arrow_head(draw, points[-2], points[-1], fill=fill, size=arrow_size)
 
 
+def inset_arrow_tip(
+    points: Sequence[tuple[float, float]],
+    distance: float = ARROW_INSET,
+) -> list[tuple[float, float]]:
+    """Advance the tip so the complete arrowhead sits inside its target node."""
+
+    adjusted = list(points)
+    if len(adjusted) < 2 or distance == 0:
+        return adjusted
+    previous = adjusted[-2]
+    tip = adjusted[-1]
+    length = math.hypot(tip[0] - previous[0], tip[1] - previous[1])
+    if length == 0:
+        return adjusted
+    ux = (tip[0] - previous[0]) / length
+    uy = (tip[1] - previous[1]) / length
+    adjusted[-1] = (tip[0] + ux * distance, tip[1] + uy * distance)
+    return adjusted
+
+
+def draw_activity_arrow(
+    draw: ImageDraw.ImageDraw,
+    points: Sequence[tuple[float, float]],
+    **kwargs: object,
+) -> None:
+    """Draw activity control flow with its arrowhead fully inside the target."""
+
+    draw_polyline_arrow(draw, inset_arrow_tip(points), **kwargs)
+
+
 def draw_label_on_line(
     draw: ImageDraw.ImageDraw,
     position: tuple[int, int],
@@ -415,15 +446,15 @@ def plan_activity_routes() -> dict[str, list[tuple[int, int]]]:
         "backend_invalid_to_error": [(1975, 1265), (1585, 1265)],
         "display_to_review": [
             (1255, 1740),
-            (1255, 1760),
-            (457, 1760),
-            (457, 1780),
+            (1255, 1752),
+            (292, 1752),
+            (292, 1765),
         ],
         "validation_error_retry": [
             (1255, 1340),
             (1255, 1380),
-            (95, 1380),
-            (95, 572),
+            (115, 1380),
+            (115, 572),
             (135, 572),
         ],
     }
@@ -446,13 +477,14 @@ def optimize_activity_routes() -> dict[str, list[tuple[int, int]]]:
             (820, 620),
             (820, 480),
             (457, 480),
-            (457, 455),
+            (457, 460),
         ],
         "processing_failure_to_return": [
-            (1585, 1055),
-            (1600, 1055),
-            (1600, 1760),
-            (780, 1760),
+            (1255, 1125),
+            (1255, 1160),
+            (95, 1160),
+            (95, 1760),
+            (135, 1760),
         ],
     }
 
@@ -518,7 +550,7 @@ def render_plan_activity() -> Path:
     decision_font = load_font(26, bold=True)
 
     # Activities and decisions are placed entirely inside their responsible lanes.
-    open_map = rounded_activity(draw, (135, 322, 780, 432), "Open /map", fill=PALE_GREEN, font=box_font)
+    open_map = rounded_activity(draw, (135, 327, 780, 437), "Open /map", fill=PALE_GREEN, font=box_font)
     open_shell = rounded_activity(
         draw,
         (925, 305, 1585, 445),
@@ -595,14 +627,14 @@ def render_plan_activity() -> Path:
     )
     review = rounded_activity(
         draw,
-        (135, 1780, 450, 1890),
+        (135, 1765, 450, 1865),
         "Review trip",
         fill=PALE_GREEN,
         font=small_font,
     )
     optimize_optional = rounded_activity(
         draw,
-        (500, 1780, 790, 1890),
+        (500, 1765, 790, 1865),
         "Optional:\nOptimize Stop Order",
         fill=PALE_YELLOW,
         font=load_font(21, bold=True),
@@ -610,37 +642,37 @@ def render_plan_activity() -> Path:
     )
 
     # Start marker and control-flow arrows are routed through open gutters.
-    draw.ellipse((168, 266, 198, 296), fill=BLACK)
-    draw_polyline_arrow(draw, [(183, 296), (183, 322)], width=STROKE)
-    draw_polyline_arrow(draw, [(780, 378), (925, 378)], width=STROKE)
-    draw_polyline_arrow(draw, [(1255, 445), (1255, 495)], width=STROKE)
-    draw_polyline_arrow(draw, routes["gps_to_edit"], width=STROKE)
-    draw_polyline_arrow(draw, [(457, 640), (457, 720)], width=STROKE)
-    draw_polyline_arrow(draw, [(780, 775), (925, 775)], width=STROKE)
-    draw_polyline_arrow(draw, [(1255, 830), (1255, 850)], width=STROKE)
+    draw.ellipse((171, 292, 195, 316), fill=BLACK)
+    draw_activity_arrow(draw, [(183, 316), (183, 327)], width=STROKE)
+    draw_activity_arrow(draw, [(780, 378), (925, 378)], width=STROKE)
+    draw_activity_arrow(draw, [(1255, 445), (1255, 495)], width=STROKE)
+    draw_activity_arrow(draw, routes["gps_to_edit"], width=STROKE)
+    draw_activity_arrow(draw, [(457, 640), (457, 720)], width=STROKE)
+    draw_activity_arrow(draw, [(780, 775), (925, 775)], width=STROKE)
+    draw_activity_arrow(draw, [(1255, 830), (1255, 850)], width=STROKE)
     draw_label_on_line(draw, (1295, 990), "valid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(1105, 925), (875, 925), (875, 1270), (925, 1270)], width=STROKE)
+    draw_activity_arrow(draw, [(1105, 925), (875, 925), (875, 1270), (925, 1270)], width=STROKE)
     draw_label_on_line(draw, (900, 945), "invalid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(1255, 1000), (1255, 1035)], width=STROKE)
-    draw_polyline_arrow(draw, [(1585, 1102), (1765, 1102)], width=STROKE)
-    draw_polyline_arrow(draw, [(2140, 1170), (2140, 1180)], width=STROKE)
-    draw_polyline_arrow(draw, routes["backend_invalid_to_error"], width=STROKE)
+    draw_activity_arrow(draw, [(1255, 1000), (1255, 1035)], width=STROKE)
+    draw_activity_arrow(draw, [(1585, 1102), (1765, 1102)], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 1170), (2140, 1180)], width=STROKE)
+    draw_activity_arrow(draw, routes["backend_invalid_to_error"], width=STROKE)
     draw_label_on_line(draw, (1705, 1235), "invalid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(2140, 1350), (2140, 1400)], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 1350), (2140, 1400)], width=STROKE)
     draw_label_on_line(draw, (2180, 1360), "valid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(2140, 1535), (2140, 1600)], width=STROKE)
-    draw_polyline_arrow(draw, [(1765, 1670), (1585, 1670)], width=STROKE)
-    draw_polyline_arrow(draw, routes["display_to_review"], width=STROKE)
-    draw_polyline_arrow(draw, [(450, 1835), (500, 1835)], dashed=True, width=STROKE)
+    draw_activity_arrow(draw, [(2140, 1535), (2140, 1600)], width=STROKE)
+    draw_activity_arrow(draw, [(1765, 1670), (1585, 1670)], width=STROKE)
+    draw_activity_arrow(draw, routes["display_to_review"], width=STROKE)
+    draw_activity_arrow(draw, [(450, 1815), (500, 1815)], dashed=True, width=STROKE)
 
     # The retry loop uses the empty lower gutter and returns along the far-left margin.
-    draw_polyline_arrow(
+    draw_activity_arrow(
         draw,
         routes["validation_error_retry"],
         dashed=True,
         width=STROKE,
     )
-    draw_label_on_line(draw, (110, 1345), "edit and retry", font=load_font(21, bold=True))
+    draw_label_on_line(draw, (135, 1345), "edit and retry", font=load_font(21, bold=True))
 
     path = OUTPUT_DIR / "map-routing-activity-plan-trip.png"
     image.save(path, format="PNG", optimize=False, compress_level=9)
@@ -660,7 +692,7 @@ def render_optimize_activity() -> Path:
 
     request = rounded_activity(
         draw,
-        (135, 322, 780, 455),
+        (135, 327, 780, 460),
         "Explicitly request\n“Suggest Best Order”",
         fill=PALE_GREEN,
         font=box_font,
@@ -729,34 +761,34 @@ def render_optimize_activity() -> Path:
         font=box_font,
     )
 
-    draw.ellipse((168, 266, 198, 296), fill=BLACK)
-    draw_polyline_arrow(draw, [(183, 296), (183, 322)], width=STROKE)
-    draw_polyline_arrow(draw, [(780, 388), (925, 388)], width=STROKE)
-    draw_polyline_arrow(draw, [(1585, 388), (1765, 388)], width=STROKE)
-    draw_polyline_arrow(draw, [(2140, 455), (2140, 530)], width=STROKE)
-    draw_polyline_arrow(draw, routes["validation_invalid_to_error"], width=STROKE)
+    draw.ellipse((171, 292, 195, 316), fill=BLACK)
+    draw_activity_arrow(draw, [(183, 316), (183, 327)], width=STROKE)
+    draw_activity_arrow(draw, [(780, 388), (925, 388)], width=STROKE)
+    draw_activity_arrow(draw, [(1585, 388), (1765, 388)], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 455), (2140, 530)], width=STROKE)
+    draw_activity_arrow(draw, routes["validation_invalid_to_error"], width=STROKE)
     draw_label_on_line(draw, (1690, 585), "invalid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(2140, 700), (2140, 760)], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 700), (2140, 760)], width=STROKE)
     draw_label_on_line(draw, (2180, 718), "valid", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(2140, 900), (2140, 970)], width=STROKE)
-    draw_polyline_arrow(draw, routes["osrm_failure_to_error"], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 900), (2140, 970)], width=STROKE)
+    draw_activity_arrow(draw, routes["osrm_failure_to_error"], width=STROKE)
     draw_label_on_line(draw, (1690, 1025), "failure", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(2140, 1140), (2140, 1200)], width=STROKE)
+    draw_activity_arrow(draw, [(2140, 1140), (2140, 1200)], width=STROKE)
     draw_label_on_line(draw, (2180, 1155), "success", font=load_font(22, bold=True))
-    draw_polyline_arrow(draw, [(1765, 1280), (1585, 1280)], width=STROKE)
-    draw_polyline_arrow(draw, routes["render_to_review"], width=STROKE)
-    draw_polyline_arrow(draw, [(455, 1590), (455, 1690)], width=STROKE)
+    draw_activity_arrow(draw, [(1765, 1280), (1585, 1280)], width=STROKE)
+    draw_activity_arrow(draw, routes["render_to_review"], width=STROKE)
+    draw_activity_arrow(draw, [(455, 1590), (455, 1690)], width=STROKE)
     draw_label_on_line(draw, (490, 1620), "return", font=load_font(22, bold=True))
 
     # Validation uses the local gap to retry; provider failure keeps the current
     # order and returns to the base use case through the open lower gutter.
-    draw_polyline_arrow(
+    draw_activity_arrow(
         draw,
         routes["validation_failure_retry"],
         dashed=True,
         width=STROKE,
     )
-    draw_polyline_arrow(
+    draw_activity_arrow(
         draw,
         routes["processing_failure_to_return"],
         width=STROKE,
