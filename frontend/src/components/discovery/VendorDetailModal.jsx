@@ -193,20 +193,17 @@ export default function VendorDetailModal({ vendor, inTrip, bookmarked, onToggle
           )}
 
           {/* CTA row */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => onAddStop(vendor)}
-              disabled={inTrip}
-              className={inTrip
-                ? "min-h-11 flex-1 rounded-full border-[1.5px] border-sand bg-chalk px-4 text-[14.5px] font-semibold text-forest"
-                : "min-h-11 flex-1 rounded-full border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"}
-            >
-              {inTrip ? "✓ Already in Your Trip" : "+ Add to Trip"}
-            </button>
-            <IconBtn onClick={() => onToggleBookmark(vendor.id)} bordered label={bookmarked ? "Remove saved place" : "Save place"}>
-              <Bookmark size={16} color={bookmarked ? TERRACOTTA : MUTED} fill={bookmarked ? TERRACOTTA : "none"} strokeWidth={1.7} />
-            </IconBtn>
-          </div>
+          {/* Saving lives only on the hero's top-right control — a second save
+              button beside Add to Trip was two affordances for one action. */}
+          <button
+            onClick={() => onAddStop(vendor)}
+            disabled={inTrip}
+            className={inTrip
+              ? "min-h-11 w-full rounded-full border-[1.5px] border-sand bg-chalk px-4 text-[14.5px] font-semibold text-forest"
+              : "min-h-11 w-full rounded-full border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"}
+          >
+            {inTrip ? "✓ Already in Your Trip" : "+ Add to Trip"}
+          </button>
 
           {/* Reviews */}
           <div className="border-t border-sand pt-3.5">

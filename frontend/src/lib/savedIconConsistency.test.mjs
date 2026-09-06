@@ -23,7 +23,9 @@ test("VendorDetailModal uses Bookmark for every save control and never Heart", (
   const saveControls = [...vendorDetailModal.matchAll(
     /<IconBtn[\s\S]*?onClick=\{\(\) => onToggleBookmark\(vendor\.id\)\}[\s\S]*?<\/IconBtn>/g,
   )].map(([markup]) => markup);
-  assert.equal(saveControls.length, 2);
+  // One save control, on the hero. The second one beside Add to Trip was
+  // removed on 2026-09-06 — one action should not have two buttons.
+  assert.equal(saveControls.length, 1);
   for (const saveControl of saveControls) {
     assert.match(saveControl, /<Bookmark\b/);
     assert.match(saveControl, /fill=\{bookmarked \? TERRACOTTA : "none"\}/);
