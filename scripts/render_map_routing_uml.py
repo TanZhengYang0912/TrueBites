@@ -407,6 +407,56 @@ def draw_activity_lanes(draw: ImageDraw.ImageDraw, *, title_suffix: str) -> None
     draw.text((WIDTH - 510, 48), title_suffix, font=load_font(25, bold=True), fill=MID_GREY)
 
 
+def plan_activity_routes() -> dict[str, list[tuple[int, int]]]:
+    """Return the long plan-activity connectors that need dedicated gutters."""
+
+    return {
+        "gps_to_edit": [(925, 572), (780, 572)],
+        "backend_invalid_to_error": [(1975, 1265), (1585, 1265)],
+        "display_to_review": [
+            (1255, 1740),
+            (1255, 1760),
+            (457, 1760),
+            (457, 1780),
+        ],
+        "validation_error_retry": [
+            (1255, 1340),
+            (1255, 1380),
+            (95, 1380),
+            (95, 572),
+            (135, 572),
+        ],
+    }
+
+
+def optimize_activity_routes() -> dict[str, list[tuple[int, int]]]:
+    """Return optimization connectors with distinct retry channels."""
+
+    return {
+        "validation_invalid_to_error": [(1975, 615), (1585, 615)],
+        "osrm_failure_to_error": [(1975, 1055), (1585, 1055)],
+        "render_to_review": [
+            (1255, 1360),
+            (1255, 1400),
+            (457, 1400),
+            (457, 1450),
+        ],
+        "validation_failure_retry": [
+            (925, 620),
+            (820, 620),
+            (820, 480),
+            (457, 480),
+            (457, 455),
+        ],
+        "processing_failure_to_return": [
+            (1585, 1055),
+            (1600, 1055),
+            (1600, 1760),
+            (780, 1760),
+        ],
+    }
+
+
 def render_use_case() -> Path:
     image, draw = new_canvas(
         "Map Routing — Use-Case Diagram",
@@ -462,6 +512,7 @@ def render_plan_activity() -> Path:
         "Activity diagram • opening the map, collecting stops, requesting and reviewing a route",
     )
     draw_activity_lanes(draw, title_suffix="Plan Multi-Stop Trip")
+    routes = plan_activity_routes()
     box_font = load_font(28)
     small_font = load_font(24)
     decision_font = load_font(26, bold=True)
@@ -563,11 +614,7 @@ def render_plan_activity() -> Path:
     draw_polyline_arrow(draw, [(183, 296), (183, 322)], width=STROKE)
     draw_polyline_arrow(draw, [(780, 378), (925, 378)], width=STROKE)
     draw_polyline_arrow(draw, [(1255, 445), (1255, 495)], width=STROKE)
-    draw_polyline_arrow(
-        draw,
-        [(925, 560), (875, 560), (875, 572), (780, 572)],
-        width=STROKE,
-    )
+    draw_polyline_arrow(draw, routes["gps_to_edit"], width=STROKE)
     draw_polyline_arrow(draw, [(457, 640), (457, 720)], width=STROKE)
     draw_polyline_arrow(draw, [(780, 775), (925, 775)], width=STROKE)
     draw_polyline_arrow(draw, [(1255, 830), (1255, 850)], width=STROKE)
@@ -577,23 +624,23 @@ def render_plan_activity() -> Path:
     draw_polyline_arrow(draw, [(1255, 1000), (1255, 1035)], width=STROKE)
     draw_polyline_arrow(draw, [(1585, 1102), (1765, 1102)], width=STROKE)
     draw_polyline_arrow(draw, [(2140, 1170), (2140, 1180)], width=STROKE)
-    draw_polyline_arrow(draw, [(1975, 1265), (1850, 1265), (1850, 1270), (1585, 1270)], width=STROKE)
+    draw_polyline_arrow(draw, routes["backend_invalid_to_error"], width=STROKE)
     draw_label_on_line(draw, (1705, 1235), "invalid", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(2140, 1350), (2140, 1400)], width=STROKE)
     draw_label_on_line(draw, (2180, 1360), "valid", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(2140, 1535), (2140, 1600)], width=STROKE)
     draw_polyline_arrow(draw, [(1765, 1670), (1585, 1670)], width=STROKE)
-    draw_polyline_arrow(draw, [(925, 1670), (850, 1670), (850, 1835), (450, 1835)], width=STROKE)
+    draw_polyline_arrow(draw, routes["display_to_review"], width=STROKE)
     draw_polyline_arrow(draw, [(450, 1835), (500, 1835)], dashed=True, width=STROKE)
 
-    # Invalid point handling loops back to the editable stop list without crossing labels.
+    # The retry loop uses the empty lower gutter and returns along the far-left margin.
     draw_polyline_arrow(
         draw,
-        [(925, 1270), (865, 1270), (865, 660), (95, 660), (95, 572), (135, 572)],
+        routes["validation_error_retry"],
         dashed=True,
         width=STROKE,
     )
-    draw_label_on_line(draw, (110, 690), "edit and retry", font=load_font(21, bold=True))
+    draw_label_on_line(draw, (110, 1345), "edit and retry", font=load_font(21, bold=True))
 
     path = OUTPUT_DIR / "map-routing-activity-plan-trip.png"
     image.save(path, format="PNG", optimize=False, compress_level=9)
@@ -606,6 +653,7 @@ def render_optimize_activity() -> Path:
         "Activity diagram • explicit optimization request, OSRM processing and return to the base use case",
     )
     draw_activity_lanes(draw, title_suffix="Optimize Stop Order")
+    routes = optimize_activity_routes()
     box_font = load_font(28)
     small_font = load_font(24)
     decision_font = load_font(26, bold=True)
@@ -686,31 +734,31 @@ def render_optimize_activity() -> Path:
     draw_polyline_arrow(draw, [(780, 388), (925, 388)], width=STROKE)
     draw_polyline_arrow(draw, [(1585, 388), (1765, 388)], width=STROKE)
     draw_polyline_arrow(draw, [(2140, 455), (2140, 530)], width=STROKE)
-    draw_polyline_arrow(draw, [(1975, 615), (1845, 615), (1845, 620), (1585, 620)], width=STROKE)
+    draw_polyline_arrow(draw, routes["validation_invalid_to_error"], width=STROKE)
     draw_label_on_line(draw, (1690, 585), "invalid", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(2140, 700), (2140, 760)], width=STROKE)
     draw_label_on_line(draw, (2180, 718), "valid", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(2140, 900), (2140, 970)], width=STROKE)
-    draw_polyline_arrow(draw, [(1975, 1055), (1850, 1055), (1850, 1060), (1585, 1060)], width=STROKE)
+    draw_polyline_arrow(draw, routes["osrm_failure_to_error"], width=STROKE)
     draw_label_on_line(draw, (1690, 1025), "failure", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(2140, 1140), (2140, 1200)], width=STROKE)
     draw_label_on_line(draw, (2180, 1155), "success", font=load_font(22, bold=True))
     draw_polyline_arrow(draw, [(1765, 1280), (1585, 1280)], width=STROKE)
-    draw_polyline_arrow(draw, [(1255, 1360), (1255, 1420), (780, 1420), (780, 1520)], width=STROKE)
+    draw_polyline_arrow(draw, routes["render_to_review"], width=STROKE)
     draw_polyline_arrow(draw, [(455, 1590), (455, 1690)], width=STROKE)
     draw_label_on_line(draw, (490, 1620), "return", font=load_font(22, bold=True))
 
-    # Failure and invalid branches loop back to the same user-editing entry point.
+    # Validation uses the local gap to retry; provider failure keeps the current
+    # order and returns to the base use case through the open lower gutter.
     draw_polyline_arrow(
         draw,
-        [(925, 620), (865, 620), (865, 470), (95, 470), (95, 388), (135, 388)],
+        routes["validation_failure_retry"],
         dashed=True,
         width=STROKE,
     )
     draw_polyline_arrow(
         draw,
-        [(925, 1055), (865, 1055), (865, 470), (95, 470), (95, 388), (135, 388)],
-        dashed=True,
+        routes["processing_failure_to_return"],
         width=STROKE,
     )
 
