@@ -221,6 +221,31 @@ def draw_arrow_head(
     draw.polygon((tip, left, right), fill=fill)
 
 
+def draw_open_arrow_head(
+    draw: ImageDraw.ImageDraw,
+    previous: tuple[float, float],
+    tip: tuple[float, float],
+    *,
+    fill: tuple[int, int, int] = BLACK,
+    size: float = 18,
+    width: int = STROKE,
+) -> None:
+    """Draw the open dependency arrowhead used by UML include/extend links."""
+
+    px, py = previous
+    tx, ty = tip
+    length = math.hypot(tx - px, ty - py)
+    if length == 0:
+        return
+    ux = (tx - px) / length
+    uy = (ty - py) / length
+    nx = -uy
+    ny = ux
+    left = (tx - ux * size + nx * size * 0.62, ty - uy * size + ny * size * 0.62)
+    right = (tx - ux * size - nx * size * 0.62, ty - uy * size - ny * size * 0.62)
+    draw.line((left, tip, right), fill=fill, width=width, joint="curve")
+
+
 def draw_polyline_arrow(
     draw: ImageDraw.ImageDraw,
     points: Sequence[tuple[float, float]],
@@ -229,6 +254,7 @@ def draw_polyline_arrow(
     fill: tuple[int, int, int] = BLACK,
     width: int = STROKE,
     arrow_size: float = 18,
+    open_head: bool = False,
 ) -> None:
     if len(points) < 2:
         return
@@ -237,7 +263,17 @@ def draw_polyline_arrow(
             draw_dashed_line(draw, start, end, fill=fill, width=width)
         else:
             draw.line((start, end), fill=fill, width=width, joint="curve")
-    draw_arrow_head(draw, points[-2], points[-1], fill=fill, size=arrow_size)
+    if open_head:
+        draw_open_arrow_head(
+            draw,
+            points[-2],
+            points[-1],
+            fill=fill,
+            size=arrow_size,
+            width=width,
+        )
+    else:
+        draw_arrow_head(draw, points[-2], points[-1], fill=fill, size=arrow_size)
 
 
 def draw_label_on_line(
@@ -411,6 +447,7 @@ def render_use_case() -> Path:
         dashed=True,
         width=STROKE,
         arrow_size=22,
+        open_head=True,
     )
     draw_label_on_line(draw, (1340, 920), "«extend»", font=load_font(27, bold=True))
 
