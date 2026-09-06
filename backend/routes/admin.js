@@ -442,8 +442,10 @@ router.patch("/vendors/:id", async (req, res) => {
       } catch (syncError) {
         console.error("vendor suggestion publish sync failed:", syncError.message);
       }
-      // Only a genuine draft/suspended → active transition is news; saving an
-      // already-active vendor again must not spam the feed.
+      // Fires on a genuine draft/suspended → active transition only. Whether
+      // that transition is actually *news* is decided by notifyNewVendor,
+      // which announces any given vendor once and ignores later
+      // re-activations.
       if (!wasActive) await notifyNewVendor(data);
     }
     await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
