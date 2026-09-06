@@ -3,6 +3,11 @@ import express from "express";
 import { supabase } from "../supabase.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { logActivity } from "../lib/auditLog.js";
+import { notifyVendorLifecycle } from "../lib/notify.js";
+import {
+  NEW_VENDOR_NOTIFICATION,
+  notificationTypeForActivation,
+} from "../lib/vendorLifecycle.js";
 import {
   STORAGE_BUCKET,
   VENDOR_STATUSES,
@@ -231,20 +236,29 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
     return res.status(400).json({ error: `status must be one of: ${VENDOR_STATUSES.join(", ")}` });
   }
 
-  // Stamp the first activation only. Re-activating a suspended vendor keeps its
-  // original publish date, so it does not resurface as "new" in the bell.
-  const { data: current } = await supabase
+  const { data: current, error: findErr } = await supabase
     .from("vendors")
-    .select("published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
+    .select("status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
     .eq("id", req.params.id)
     .maybeSingle();
+
+  if (findErr) {
+    return res.status(500).json({ error: "database query failed", details: findErr.message });
+  }
+  if (!current) return res.status(404).json({ error: "vendor not found" });
+
+  const activationType = notificationTypeForActivation({
+    previousStatus: current.status,
+    nextStatus: status,
+    publishedAt: current.published_at,
+  });
 
   // Same completeness bar as every other "make it active" action — see
   // PATCH /api/admin/vendors/:id (routes/admin.js) for why: an incomplete
   // vendor could read "Active" here while GET /restaurants/nearby silently
   // drops it (no coordinates) or it's simply not a usable listing yet.
   if (status === "active") {
-    const issues = vendorActivationIssues(current || {});
+    const issues = vendorActivationIssues(current);
     if (issues.length) {
       return res.status(400).json({
         error: `Cannot activate — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
@@ -253,7 +267,7 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
   }
 
   const patch = { status };
-  if (status === "active" && !current?.published_at) {
+  if (activationType === NEW_VENDOR_NOTIFICATION) {
     patch.published_at = new Date().toISOString();
   }
 
@@ -261,11 +275,14 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
     .from("vendors")
     .update(patch)
     .eq("id", req.params.id)
-    .select("id, vendor_name, status, published_at")
+    .select("id, vendor_name, cuisine_types, status, published_at")
     .single();
 
   if (error) {
     return res.status(500).json({ error: "database update failed", details: error.message });
+  }
+  if (activationType) {
+    await notifyVendorLifecycle({ type: activationType, ...data });
   }
   await logActivity({ actor: req.callerUser, action: "vendor.status_change", entityType: "vendor", entityId: req.params.id, metadata: { status } });
   res.json(data);

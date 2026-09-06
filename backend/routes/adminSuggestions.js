@@ -5,7 +5,11 @@ import { assertTransition, statusesForSuggestionFilter, SUGGESTION_STATUSES } fr
 import { startProcessingJob, retryJob, createDraftFromJob } from "../lib/ai/pipeline.js";
 import { loadJob } from "../lib/ai/jobStore.js";
 import { vendorActivationIssues } from "../lib/vendorValidation.js";
-import { notifyNewVendor } from "../lib/notify.js";
+import { notifyVendorLifecycle } from "../lib/notify.js";
+import {
+  NEW_VENDOR_NOTIFICATION,
+  notificationTypeForActivation,
+} from "../lib/vendorLifecycle.js";
 
 const router = Router();
 
@@ -244,7 +248,7 @@ router.post("/suggestions/:id/publish", async (req, res) => {
     // before Publish, not discover the listing is half-empty after the fact.
     const { data: vendorRow, error: findErr } = await supabase
       .from("vendors")
-      .select("id, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+      .select("id, status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
       .eq("id", suggestion.vendor_id)
       .maybeSingle();
     if (findErr) throw findErr;
@@ -256,10 +260,26 @@ router.post("/suggestions/:id/publish", async (req, res) => {
       });
     }
 
-    const { data: vendor, error: vendorError } = await supabase.from("vendors").update({ status: "active" }).eq("id", suggestion.vendor_id).select("id,status").single();
+    const reviewedAt = new Date().toISOString();
+    const activationType = notificationTypeForActivation({
+      previousStatus: vendorRow.status,
+      nextStatus: "active",
+      publishedAt: vendorRow.published_at,
+    });
+    const vendorPatch = { status: "active" };
+    if (activationType === NEW_VENDOR_NOTIFICATION) vendorPatch.published_at = reviewedAt;
+
+    const { data: vendor, error: vendorError } = await supabase
+      .from("vendors")
+      .update(vendorPatch)
+      .eq("id", suggestion.vendor_id)
+      .select("id,status,published_at,vendor_name,cuisine_types")
+      .single();
     if (vendorError) throw vendorError;
-    await notifyNewVendor({ id: vendor.id, vendor_name: vendorRow.vendor_name, cuisine_types: vendorRow.cuisine_types });
-    const { data, error } = await supabase.from("vendor_suggestions").update({ status: "published", published_at: new Date().toISOString(), reviewed_by: req.callerUser.id === "dev" ? null : req.callerUser.id }).eq("id", suggestion.id).select(ADMIN_SELECT).single();
+    if (activationType) {
+      await notifyVendorLifecycle({ type: activationType, ...vendor });
+    }
+    const { data, error } = await supabase.from("vendor_suggestions").update({ status: "published", published_at: reviewedAt, reviewed_by: req.callerUser.id === "dev" ? null : req.callerUser.id }).eq("id", suggestion.id).select(ADMIN_SELECT).single();
     if (error) throw error;
     await logActivity({ actor: req.callerUser, action: "vendor_suggestion.publish", entityType: "vendor_suggestion", entityId: suggestion.id, metadata: { vendor_id: vendor.id } });
     res.json({ suggestion: data, vendor });

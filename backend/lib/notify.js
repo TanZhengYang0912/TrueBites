@@ -1,16 +1,28 @@
 import { supabase } from "../supabase.js";
+import {
+  NEW_VENDOR_NOTIFICATION,
+  VENDOR_REACTIVATED_NOTIFICATION,
+} from "./vendorLifecycle.js";
 
-// Records one row in the notifications feed. Never throws — a logging
-// failure here must not break the vendor-publish request it's describing
-// (same convention as logActivity in auditLog.js).
-export async function notifyNewVendor({ id, vendor_name, cuisine_types } = {}) {
+const VENDOR_LIFECYCLE_TYPES = new Set([
+  NEW_VENDOR_NOTIFICATION,
+  VENDOR_REACTIVATED_NOTIFICATION,
+]);
+
+// Records one row in the customer notification feed. Never throws: a feed
+// failure must not roll back the successful vendor status change it describes.
+export async function notifyVendorLifecycle({ type, id, vendor_name, cuisine_types } = {}) {
+  if (!VENDOR_LIFECYCLE_TYPES.has(type)) return;
+
   try {
-    await supabase.from("notifications").insert({
-      type: "new_vendor",
+    const { error } = await supabase.from("notifications").insert({
+      type,
       vendor_id: id || null,
       payload: { name: vendor_name || "", cuisine_types: cuisine_types || null },
     });
+
+    if (error) throw error;
   } catch (err) {
-    console.error("notify new_vendor failed:", err.message);
+    console.error(`notify ${type} failed:`, err.message);
   }
 }

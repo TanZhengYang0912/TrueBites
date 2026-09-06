@@ -72,11 +72,11 @@ export default function NotificationBell({ onOpenVendor }) {
   // Opening a notification reads that one. Updated locally first so the badge
   // drops before the dropdown closes — the server call is confirmation, not
   // the thing the user is waiting on.
-  function openNotification(id) {
-    setReadIds((current) => (current.includes(id) ? current : [...current, id]));
+  function openNotification(item) {
+    setReadIds((current) => (current.includes(item.id) ? current : [...current, item.id]));
     setOpen(false);
-    onOpenVendor?.(id);
-    markNotificationRead(id).catch((err) => setError(err.message));
+    if (item.vendor_id) onOpenVendor?.(item.vendor_id);
+    markNotificationRead(item.id).catch((err) => setError(err.message));
   }
 
   async function resetSeen() {
@@ -157,7 +157,7 @@ export default function NotificationBell({ onOpenVendor }) {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => openNotification(item.id)}
+                  onClick={() => openNotification(item)}
                   className="flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left hover:bg-chalk"
                 >
                   <span
@@ -196,6 +196,8 @@ export default function NotificationBell({ onOpenVendor }) {
 // changed, ...) gets its own phrasing without touching the dropdown markup.
 function notificationText(item) {
   switch (item.type) {
+    case "vendor_reactivated":
+      return `${item.name} is available again!`;
     case "new_vendor":
     default:
       return `New restaurant: ${item.name}!`;
