@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, UserRound } from "lucide-react";
+import { Bookmark, Lightbulb, LayoutGrid, Map as MapIcon, Star, UserRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 import GuestPrompt from "./GuestPrompt";
@@ -118,7 +118,8 @@ export default function DiscoveryHeader({
           className={activeSection === "reviews" ? NAV_ACTIVE : NAV_IDLE}
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
-          My reviews
+          <Star size={14} strokeWidth={1.7} />
+          <span>My reviews</span>
         </Link>
         <Link
           to="/suggestions"

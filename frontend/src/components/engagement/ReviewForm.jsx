@@ -5,6 +5,7 @@ import StarRating from "./StarRating";
 
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_BODY_LENGTH = 999;
 
 export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notify }) {
   const [rating, setRating] = useState(initial?.rating || 0);
@@ -57,13 +58,20 @@ export default function ReviewForm({ vendorId, initial, onSaved, onCancel, notif
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
       <StarRating value={rating} onChange={setRating} size={22} />
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Share what you tried and how it was…"
-        rows={3}
-        className="w-full resize-y rounded-[10px] border border-sand px-3 py-2.5 text-[13.5px] outline-none focus:border-forest"
-      />
+      <div>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value.slice(0, MAX_BODY_LENGTH))}
+          placeholder="Share what you tried and how it was…"
+          rows={3}
+          maxLength={MAX_BODY_LENGTH}
+          spellCheck="true"
+          className="w-full resize-y rounded-[10px] border border-sand px-3 py-2.5 text-[13.5px] outline-none focus:border-forest"
+        />
+        <div className="mt-1 text-right text-[11.5px] text-muted">
+          {body.length}/{MAX_BODY_LENGTH}
+        </div>
+      </div>
       <label className="flex min-h-6 w-fit cursor-pointer items-center gap-1.5 text-[12.5px] text-muted">
         <input
           type="checkbox"
