@@ -15,6 +15,7 @@ import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import { Empty, FolderMoveSelect, FolderPill, Pagination } from "../components/engagement/EngagementPageControls";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
+import { FOLDER_NAME_MAX_LENGTH, FOLDER_NAME_ILLEGAL_CHARS_MESSAGE, sanitizeFolderNameInput } from "../lib/folderName";
 
 const TERRACOTTA = "#A35D47";
 const PAGE_SIZE = 6;
@@ -93,6 +94,12 @@ export default function SavedPage() {
   const initials = firstName
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
+
+  function handleFolderNameChange(e) {
+    const { value, hadIllegalChars } = sanitizeFolderNameInput(e.target.value);
+    setNewFolderName(value);
+    if (hadIllegalChars) notify(FOLDER_NAME_ILLEGAL_CHARS_MESSAGE, true);
+  }
 
   function handleCancelCreateFolder() {
     setNewFolderName("");
@@ -200,9 +207,10 @@ export default function SavedPage() {
                   <input
                     autoFocus
                     value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onChange={handleFolderNameChange}
                     onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
                     placeholder="Folder name"
+                    maxLength={FOLDER_NAME_MAX_LENGTH}
                     className="min-h-11 min-w-0 flex-1 rounded-md border border-sand px-3 text-[12.5px] outline-none focus:border-forest"
                   />
                   <button

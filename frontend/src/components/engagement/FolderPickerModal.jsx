@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, FolderPlus } from "lucide-react";
+import { FOLDER_NAME_MAX_LENGTH, FOLDER_NAME_ILLEGAL_CHARS_MESSAGE, sanitizeFolderNameInput } from "../../lib/folderName";
 
 export default function FolderPickerModal({ vendorName, folders, onClose, onSave, onCreateFolder }) {
   const [newFolderName, setNewFolderName] = useState("");
@@ -8,6 +9,12 @@ export default function FolderPickerModal({ vendorName, folders, onClose, onSave
   const [error, setError] = useState("");
 
   const customFolders = folders.filter((f) => !f.is_default);
+
+  const handleNameChange = (e) => {
+    const { value, hadIllegalChars } = sanitizeFolderNameInput(e.target.value);
+    setNewFolderName(value);
+    setError(hadIllegalChars ? FOLDER_NAME_ILLEGAL_CHARS_MESSAGE : "");
+  };
 
   const handleSave = async (folderId) => {
     setSaving(folderId || "default");
@@ -86,8 +93,9 @@ export default function FolderPickerModal({ vendorName, folders, onClose, onSave
               <input
                 autoFocus
                 value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
+                onChange={handleNameChange}
                 placeholder="Folder name"
+                maxLength={FOLDER_NAME_MAX_LENGTH}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 className="min-h-11 min-w-0 flex-1 rounded-lg border border-sand px-3 text-[13.5px] outline-none focus:border-forest"
               />
