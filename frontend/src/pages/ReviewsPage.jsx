@@ -24,6 +24,7 @@ import VendorDetailModal from "../components/discovery/VendorDetailModal";
 import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import { Empty, Pagination } from "../components/engagement/EngagementPageControls";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
+import { TRIP_LIMIT_ADD_MESSAGE, isTripAtLimit } from "../lib/tripRoutingPolicy";
 
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
@@ -48,6 +49,7 @@ export default function ReviewsPage() {
   const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null);
   const [toast, notify] = useToast();
   const [tripStopIds, setTripStopIds] = useState(new Set());
+  const tripAtLimit = isTripAtLimit(tripStopIds.size);
   const bookmarkedVendorIds = new Set(bookmarks.map((bookmark) => bookmark.vendor_id));
   const owner = tripOwner(session);
   const savedCount = useSavedCount(false);
@@ -65,6 +67,7 @@ export default function ReviewsPage() {
     const result = addVendorToTrip(vendor, owner);
     if (result === "added") notify(`${vendor.name} added to your trip.`);
     else if (result === "no-location") notify("This vendor doesn't have a location yet.", true);
+    else if (result === "limit") notify(TRIP_LIMIT_ADD_MESSAGE, true);
   }
 
   useEffect(() => {
@@ -242,6 +245,7 @@ export default function ReviewsPage() {
                     <VendorCard
                       vendor={review.vendor}
                       inTrip={tripStopIds.has(review.vendor.id)}
+                      tripAtLimit={tripAtLimit}
                       bookmarked={bookmarkedVendorIds.has(review.vendor.id)}
                       onToggleBookmark={() => toggleBookmarkForVendor(review.vendor)}
                       onAddStop={handleAddStop}
@@ -267,6 +271,7 @@ export default function ReviewsPage() {
           key={detailVendor.id}
           vendor={detailVendor}
           inTrip={tripStopIds.has(detailVendor.id)}
+          tripAtLimit={tripAtLimit}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={toggleBookmarkFromDetail}
           onAddStop={handleAddStop}

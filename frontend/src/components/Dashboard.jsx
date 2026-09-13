@@ -34,6 +34,7 @@ export default function Dashboard({
   bookmarks,
   onToggleBookmark,
   tripVendorIds,
+  tripAtLimit,
   onAddStop,
   onVendorUpdated,
   focusVendorId,
@@ -217,6 +218,7 @@ export default function Dashboard({
                     <VendorCard
                       key={v.id} vendor={v}
                       inTrip={isInTrip(v.id)} bookmarked={bookmarks.has(v.id)}
+                      tripAtLimit={tripAtLimit}
                       onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
                       onOpenDetail={setDetailVendor}
                     />
@@ -240,6 +242,7 @@ export default function Dashboard({
           key={detailVendor.id}
           vendor={detailVendor}
           inTrip={isInTrip(detailVendor.id)} bookmarked={bookmarks.has(detailVendor.id)}
+          tripAtLimit={tripAtLimit}
           onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
           onClose={() => setDetailVendor(null)}
           onVendorUpdated={(vendorId, patch) => {

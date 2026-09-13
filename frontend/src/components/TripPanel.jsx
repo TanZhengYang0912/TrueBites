@@ -26,13 +26,14 @@ const ICON_BTN = "grid size-11 shrink-0 place-items-center text-muted";
 // surfaces vendors near "Your location" (never the last stop) that aren't in
 // the trip yet, one tap to add.
 export default function TripPanel({
-  trip, summary, loading,
+  trip, summary, loading, routeMessage, tripAtLimit,
   onReorder, onClear, onRemove, onEditStop,
   travelMode, onTravelMode,
   onManualLocation, onLocateMe,
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
   onAddCustomStop,
+  onTripLimit,
   onSuggestBestOrder,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
@@ -46,6 +47,14 @@ export default function TripPanel({
     next.splice(i, 0, moved);
     setDragIdx(null);
     onReorder(next);
+  }
+
+  function startAddingPlace() {
+    if (tripAtLimit) {
+      onTripLimit?.();
+      return;
+    }
+    setAddingPlace(true);
   }
 
   const vendorStops = trip.filter((s) => !s.isMe);
@@ -194,18 +203,28 @@ export default function TripPanel({
           />
         ) : (
           <button
-            onClick={() => setAddingPlace(true)}
-            className="flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-terracotta"
+            onClick={startAddingPlace}
+            aria-disabled={tripAtLimit}
+            title={tripAtLimit ? "Trip limit reached (27 stops)" : undefined}
+            className={tripAtLimit
+              ? "flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-muted"
+              : "flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-terracotta"}
           >
             <Plus size={13} /> Add a place
           </button>
         )
       )}
 
-      {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
+      {routeMessage && (
+        <div role="status" className="my-2 rounded-lg border border-terracotta/30 bg-terracotta/10 px-3 py-2 text-[11.5px] leading-relaxed text-terracotta">
+          {routeMessage}
+        </div>
+      )}
+
+      {loading && !routeMessage && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
       {/* Route summary tiles */}
-      {summary && !loading && (
+      {summary && (!loading || routeMessage) && (
         <div className="my-3 grid grid-cols-2 gap-2">
           <StatTile icon={<Route size={13} color={MAP_COLORS.terracotta} />} value={summary.distance} label="Total Distance" />
           <StatTile icon={<Clock size={13} color={MAP_COLORS.terracotta} />} value={summary.duration} label="Est. Duration" />

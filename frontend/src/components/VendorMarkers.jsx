@@ -117,7 +117,7 @@ function VendorMarker({ vendor, position, stopNum, isSelected, onSelect, onOpenC
   );
 }
 
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
+export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange, tripAtLimit }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
@@ -206,45 +206,51 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, o
       {openId &&
         vendors
           .filter((v) => v.id === openId)
-          .map((v) => (
-            <InfoWindow
-              key={v.id}
-              position={displayPosition(v)}
-              onCloseClick={() => onOpenChange(null)}
-            >
-              <div className="max-w-[220px] font-body">
-                <img
-                  src={vendorGallery(v)[0]}
-                  alt=""
-                  loading="lazy"
-                  className="mb-2 block h-[110px] w-full rounded-md object-cover"
-                  style={{ objectPosition: FOOD_PHOTO_POSITION }}
-                />
-                <strong className="break-words">{v.name}</strong>
-                {v.address && <div className="my-0.5 break-words text-xs text-[#555]">{v.address}</div>}
-                {onViewDetails && (
-                  <button
-                    type="button"
-                    onClick={() => onViewDetails(v)}
-                    className="mt-2 inline-flex min-h-11 items-center rounded-md bg-forest px-3 text-xs text-white"
-                  >
-                    View details
-                  </button>
-                )}
-                {onAddStop && (
-                  <button
-                    onClick={() => onAddStop(v)}
-                    disabled={tripOrder?.has(v.id)}
-                    className={tripOrder?.has(v.id)
-                      ? "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-[#eee] px-3 text-xs text-[#777]"
-                      : "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-success px-3 text-xs text-white"}
-                  >
-                    {tripOrder?.has(v.id) ? `✓ Stop ${tripOrder.get(v.id)}` : "➕ Add stop"}
-                  </button>
-                )}
-              </div>
-            </InfoWindow>
-          ))}
+          .map((v) => {
+            const inTrip = tripOrder?.has(v.id);
+            const addAtLimit = !inTrip && tripAtLimit;
+            return (
+              <InfoWindow
+                key={v.id}
+                position={displayPosition(v)}
+                onCloseClick={() => onOpenChange(null)}
+              >
+                <div className="max-w-[220px] font-body">
+                  <img
+                    src={vendorGallery(v)[0]}
+                    alt=""
+                    loading="lazy"
+                    className="mb-2 block h-[110px] w-full rounded-md object-cover"
+                    style={{ objectPosition: FOOD_PHOTO_POSITION }}
+                  />
+                  <strong className="break-words">{v.name}</strong>
+                  {v.address && <div className="my-0.5 break-words text-xs text-[#555]">{v.address}</div>}
+                  {onViewDetails && (
+                    <button
+                      type="button"
+                      onClick={() => onViewDetails(v)}
+                      className="mt-2 inline-flex min-h-11 items-center rounded-md bg-forest px-3 text-xs text-white"
+                    >
+                      View details
+                    </button>
+                  )}
+                  {onAddStop && (
+                    <button
+                      onClick={() => onAddStop(v)}
+                      disabled={inTrip}
+                      aria-disabled={addAtLimit}
+                      title={addAtLimit ? "Trip limit reached (27 stops)" : undefined}
+                      className={inTrip || addAtLimit
+                        ? "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-[#eee] px-3 text-xs text-[#777]"
+                        : "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-success px-3 text-xs text-white"}
+                    >
+                      {inTrip ? `✓ Stop ${tripOrder.get(v.id)}` : "➕ Add stop"}
+                    </button>
+                  )}
+                </div>
+              </InfoWindow>
+            );
+          })}
 
       {/* While it's a trip stop, "Your location" is drawn as the same numbered Hawker Stall
           pin as every other stop — a differently-shaped marker in the middle of

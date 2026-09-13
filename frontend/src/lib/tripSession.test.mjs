@@ -88,3 +88,45 @@ test("clearTrip removes persistence and updates same-tab subscribers", () => {
   assert.ok(events.includes("truebites:trip-changed"));
   unsubscribe();
 });
+
+test("outside-map vendor additions enforce the Google trip capacity", () => {
+  installBrowserStorage();
+  const stops = Array.from({ length: 27 }, (_, index) => ({
+    id: `stop-${index}`,
+    name: `Stop ${index}`,
+    lat: 2.2 + index / 1000,
+    lng: 102.2 + index / 1000,
+  }));
+  tripStorage.saveTrip(stops, "DRIVING", "guest");
+
+  const result = tripStorage.addVendorToTrip({
+    id: "vendor-28",
+    name: "Twenty Eight",
+    latitude: 2.3,
+    longitude: 102.3,
+  });
+
+  assert.equal(result, "limit");
+  assert.equal(tripStorage.loadTrip("guest").stops.length, 27);
+});
+
+test("outside-map vendor additions still allow the twenty-seventh stop", () => {
+  installBrowserStorage();
+  const stops = Array.from({ length: 26 }, (_, index) => ({
+    id: `stop-${index}`,
+    name: `Stop ${index}`,
+    lat: 2.2 + index / 1000,
+    lng: 102.2 + index / 1000,
+  }));
+  tripStorage.saveTrip(stops, "DRIVING", "guest");
+
+  const result = tripStorage.addVendorToTrip({
+    id: "vendor-27",
+    name: "Twenty Seven",
+    latitude: 2.3,
+    longitude: 102.3,
+  });
+
+  assert.equal(result, "added");
+  assert.equal(tripStorage.loadTrip("guest").stops.length, 27);
+});

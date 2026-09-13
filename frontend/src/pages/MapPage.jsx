@@ -34,6 +34,13 @@ import {
 } from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
 import { customerSession } from "../lib/roles";
+import {
+  EMPTY_ROUTE_SUMMARY,
+  TRIP_LIMIT_ADD_MESSAGE,
+  getDirectionsErrorMessage,
+  getRouteConstraint,
+  isTripAtLimit,
+} from "../lib/tripRoutingPolicy";
 
 const MELAKA_CENTER = { lat: 2.1896, lng: 102.2501 };
 const API_KEY = import.meta.env.VITE_MAPS_BROWSER_KEY;
@@ -117,12 +124,17 @@ export default function MapPage() {
   const [travelMode, setTravelMode] = useState(null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
   const [hydratedOwner, setHydratedOwner] = useState(null);
   const [dirSummary, setDirSummary] = useState(null);
+  const [dirError, setDirError] = useState(null);
   const [routeIndex, setRouteIndex] = useState(0);       // selected alt route (DRIVING)
   const [routeOptions, setRouteOptions] = useState([]);  // alt routes + toll flags (DRIVING)
   const [transitLegs, setTransitLegs] = useState([]);    // itinerary legs (TRANSIT)
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
   const [mapError, setMapError] = useState("");
+  const tripAtLimit = isTripAtLimit(trip.length);
+  const routeConstraint = getRouteConstraint(travelMode, trip.length);
+  const routeMessage = routeConstraint?.message || getDirectionsErrorMessage(dirError, trip.length);
+  const displayedSummary = routeConstraint ? EMPTY_ROUTE_SUMMARY : travelMode ? dirSummary : tripData;
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -131,6 +143,7 @@ export default function MapPage() {
     setTravelMode(stored?.travelMode || null);
     setTripData(null);
     setDirSummary(null);
+    setDirError(null);
     setRouteOptions([]);
     setTransitLegs([]);
     setHydratedOwner(owner);
@@ -258,9 +271,11 @@ export default function MapPage() {
   // `pos.label` is present when the origin came from Places Autocomplete, absent
   // for GPS — so a typed origin reads as its address instead of a generic string.
   const meStop = (pos) => ({ id: "__me__", name: pos.label || "Your location", lat: pos.lat, lng: pos.lng, isMe: true });
+  function showTripLimit() { notify(TRIP_LIMIT_ADD_MESSAGE, true); }
 
   async function planTrip(list, optimize) {
     if (list.length < 2) { setTripData(null); return; }
+    if (getRouteConstraint(null, list.length)) { setTripData(null); return; }
     setTripLoading(true);
     try {
       const points = list.map((s) => ({ lat: s.lat, lng: s.lng }));
@@ -269,6 +284,7 @@ export default function MapPage() {
       setTripData({ path: res.path, distance: res.distance, duration: res.duration });
     } catch (e) {
       console.error(e);
+      setTripData(null);
       notify("Trip planning failed (the free routing server may be busy). Please try again.", true);
     } finally {
       setTripLoading(false);
@@ -278,6 +294,10 @@ export default function MapPage() {
   useEffect(() => {
     if (!userPos) return;
     const hasMe = trip.some((s) => s.isMe);
+    if (!hasMe && isTripAtLimit(trip.length)) {
+      showTripLimit();
+      return;
+    }
     const next = hasMe
       ? trip.map((s) => (s.isMe ? { ...s, lat: userPos.lat, lng: userPos.lng, name: userPos.label || "Your location" } : s))
       : [meStop(userPos), ...trip];
@@ -288,6 +308,7 @@ export default function MapPage() {
 
   function addStop(vendor) {
     if (trip.some((s) => s.id === vendor.id)) return;
+    if (isTripAtLimit(trip.length)) { showTripLimit(); return; }
     const list = [...trip, vendorStop(vendor)];
     setTrip(list);
     planTrip(list, true);
@@ -295,6 +316,7 @@ export default function MapPage() {
   }
   // A typed place (not a vendor) — e.g. "pick up a friend on the way".
   function addCustomStop(place) {
+    if (isTripAtLimit(trip.length)) { showTripLimit(); return; }
     const stop = { id: `custom-${Date.now()}`, name: place.label, lat: place.lat, lng: place.lng, isMe: false, source: "custom" };
     const list = [...trip, stop];
     setTrip(list);
@@ -326,6 +348,7 @@ export default function MapPage() {
     setTrip(list);
     setTripData(null);
     setDirSummary(null);
+    setDirError(null);
     setRouteOptions([]);
     setTransitLegs([]);
   }
@@ -340,7 +363,19 @@ export default function MapPage() {
 
   // A previously-picked alt route index shouldn't survive a mode switch or a
   // fresh route recalculation — always default back to Google's top pick.
-  useEffect(() => { setRouteIndex(0); }, [travelMode, trip]);
+  useEffect(() => {
+    setRouteIndex(0);
+    setDirError(null);
+    setDirSummary(null);
+    setRouteOptions([]);
+    setTransitLegs([]);
+  }, [travelMode, trip]);
+
+  useEffect(() => {
+    if (!routeConstraint) return;
+    setRouteOptions([]);
+    setTransitLegs([]);
+  }, [routeConstraint?.code]);
 
   // Un-saving is a plain delete; saving opens the folder picker (rendered by
   // each view below) so the vendor lands somewhere the user chose.
@@ -499,6 +534,7 @@ export default function MapPage() {
           bookmarks={bookmarks}
           onToggleBookmark={toggleBookmark}
           tripVendorIds={new Set(trip.filter((s) => !s.isMe).map((s) => s.id))}
+          tripAtLimit={tripAtLimit}
           onAddStop={addStop}
           focusVendorId={focusVendorId}
           onFocusVendorHandled={clearFocusVendor}
@@ -620,6 +656,7 @@ export default function MapPage() {
                 onSelect={setSelected}
                 onAddStop={addStop}
                 onViewDetails={setDetailVendor}
+                tripAtLimit={tripAtLimit}
                 tripOrder={vendorStopOrder}
                 userStopNumber={meIndex >= 0 ? meIndex + 1 : null}
                 selectedId={selected?.id}
@@ -628,8 +665,8 @@ export default function MapPage() {
                 radiusCenter={anchor}
                 radiusKm={radiusKm}
               />
-              {travelMode === "TRANSIT" && <TransitLayer />}
-              {travelMode
+              {travelMode === "TRANSIT" && !routeConstraint && <TransitLayer />}
+              {travelMode && !routeConstraint
                 ? (
                   <DirectionsRenderer
                     stops={trip}
@@ -638,9 +675,10 @@ export default function MapPage() {
                     onSummary={setDirSummary}
                     onRoutes={setRouteOptions}
                     onTransitLegs={setTransitLegs}
+                    onError={setDirError}
                   />
                 )
-                : tripData?.path && <TripPolyline path={tripData.path} />
+                : !travelMode && !routeConstraint && tripData?.path && <TripPolyline path={tripData.path} />
               }
         </GMap>
 
@@ -700,7 +738,9 @@ export default function MapPage() {
             {panelTab === "trip" ? (
               <TripPanel
                 trip={trip}
-                summary={travelMode ? dirSummary : tripData}
+                summary={displayedSummary}
+                routeMessage={routeMessage}
+                tripAtLimit={tripAtLimit}
                 loading={tripLoading}
                 onReorder={reorderTrip}
                 onClear={clearTrip}
@@ -715,6 +755,7 @@ export default function MapPage() {
                 onSelectRoute={setRouteIndex}
                 transitLegs={transitLegs}
                 onAddCustomStop={addCustomStop}
+                onTripLimit={showTripLimit}
                 onSuggestBestOrder={() => planTrip(trip, true)}
               />
             ) : (
@@ -730,6 +771,7 @@ export default function MapPage() {
                 showAllVendors={showAllVendors}
                 onToggleAllVendors={() => setShowAllVendors((v) => !v)}
                 onAddStop={addStop}
+                tripAtLimit={tripAtLimit}
                 onSelectNearby={selectNearby}
                 hasAnchor={anchor != null}
                 tripIds={new Set(trip.map((s) => s.id))}
@@ -755,6 +797,7 @@ export default function MapPage() {
             bookmarked={bookmarks.has(detailVendor.id)}
             onToggleBookmark={toggleBookmark}
             onAddStop={addStop}
+            tripAtLimit={tripAtLimit}
             onClose={() => setDetailVendor(null)}
             onVendorUpdated={(vendorId, patch) => {
               setDetailVendor((current) => (current && current.id === vendorId ? { ...current, ...patch } : current));

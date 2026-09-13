@@ -13,7 +13,7 @@ export default function VendorPanel({
   radiusKm, onRadiusChange,
   showAllVendors, onToggleAllVendors,
   onAddStop, onSelectNearby,
-  hasAnchor, tripIds,
+  hasAnchor, tripIds, tripAtLimit,
 }) {
   return (
     <>
@@ -82,7 +82,11 @@ export default function VendorPanel({
                   <button
                     onClick={(e) => { e.stopPropagation(); onAddStop(v); }}
                     aria-label={`Add ${v.name} to trip`}
-                    className="grid size-11 shrink-0 place-items-center text-terracotta"
+                    aria-disabled={tripAtLimit}
+                    title={tripAtLimit ? "Trip limit reached (27 stops)" : undefined}
+                    className={tripAtLimit
+                      ? "grid size-11 shrink-0 place-items-center text-muted"
+                      : "grid size-11 shrink-0 place-items-center text-terracotta"}
                   >
                     <Plus size={16} strokeWidth={1.8} />
                   </button>

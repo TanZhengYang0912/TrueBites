@@ -1,3 +1,5 @@
+import { isTripAtLimit } from "./tripRoutingPolicy.js";
+
 // Trip persistence — browser-local planning state scoped to the current guest
 // or signed-in account. Only { id, name, lat, lng, isMe, source } is stored —
 // never the embedded `vendor` object, since that's a point-in-time snapshot
@@ -110,6 +112,7 @@ export function addVendorToTrip(vendor, owner = "guest") {
   const stored = loadTrip(owner);
   const stops = stored?.stops || [];
   if (stops.some((s) => s.id === vendor.id)) return "duplicate";
+  if (isTripAtLimit(stops.length)) return "limit";
   const stop = { id: vendor.id, name: vendor.name, lat: vendor.latitude, lng: vendor.longitude, isMe: false };
   saveTrip([...stops, stop], stored?.travelMode ?? null, owner);
   return "added";

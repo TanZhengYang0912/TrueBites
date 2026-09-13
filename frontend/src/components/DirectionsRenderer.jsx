@@ -43,7 +43,7 @@ function extractTransitLegs(route) {
   return legs;
 }
 
-export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, onSummary, onRoutes, onTransitLegs }) {
+export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, onSummary, onRoutes, onTransitLegs, onError }) {
   const map = useMap();
   const rendererRef = useRef(null);
   // Which travel mode we have already centred for. Recentring belongs to
@@ -63,10 +63,12 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
 
     if (!stops || stops.length < 2 || !travelMode) {
       rendererRef.current.setMap(null);
+      onSummary?.(null);
+      onError?.(null);
+      onRoutes?.([]);
+      onTransitLegs?.([]);
       return;
     }
-
-    rendererRef.current.setMap(map);
 
     const origin = { lat: stops[0].lat, lng: stops[0].lng };
     const destination = { lat: stops[stops.length - 1].lat, lng: stops[stops.length - 1].lng };
@@ -80,9 +82,11 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       waypoints,
       travelMode: google.maps.TravelMode[travelMode],
     };
+    onError?.(null);
 
     function applyResult(result) {
       const route = result.routes[Math.min(routeIndex, result.routes.length - 1)];
+      rendererRef.current?.setMap(map);
       rendererRef.current?.setDirections(result);
       rendererRef.current?.setRouteIndex(Math.min(routeIndex, result.routes.length - 1));
       // The camera is not ours to move. Every change made in the trip panel —
@@ -92,6 +96,7 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
 
       const dist = route.legs.reduce((a, l) => a + l.distance.value, 0);
       const dur = route.legs.reduce((a, l) => a + l.duration.value, 0);
+      onError?.(null);
       onSummary?.({ distance: formatDistance(dist), duration: formatDuration(dur) });
 
       if (travelMode === "TRANSIT") {
@@ -124,9 +129,11 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
           onRoutes?.(routes);
           applyResult(withAlts);
         })
-        .catch(() => {
+        .catch((error) => {
           if (cancelled) return;
-          onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          rendererRef.current?.setMap(null);
+          onSummary?.({ distance: "—", duration: "—" });
+          onError?.(error);
           onRoutes?.([]);
         });
     } else {
@@ -136,9 +143,11 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
           if (cancelled) return;
           applyResult(result);
         })
-        .catch(() => {
+        .catch((error) => {
           if (cancelled) return;
-          onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          rendererRef.current?.setMap(null);
+          onSummary?.({ distance: "—", duration: "—" });
+          onError?.(error);
           if (travelMode === "TRANSIT") onTransitLegs?.([]);
         });
     }

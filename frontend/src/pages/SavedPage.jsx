@@ -19,6 +19,7 @@ import FolderPickerModal from "../components/engagement/FolderPickerModal";
 import { Empty, FolderMoveSelect, FolderPill, Pagination } from "../components/engagement/EngagementPageControls";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { FOLDER_NAME_MAX_LENGTH, FOLDER_NAME_ILLEGAL_CHARS_MESSAGE, sanitizeFolderNameInput } from "../lib/folderName";
+import { TRIP_LIMIT_ADD_MESSAGE, isTripAtLimit } from "../lib/tripRoutingPolicy";
 
 const TERRACOTTA = "#A35D47";
 const PAGE_SIZE = 6;
@@ -51,6 +52,7 @@ export default function SavedPage() {
   const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null); // vendor awaiting unbookmark confirmation
   const [toast, notify] = useToast();
   const [tripStopIds, setTripStopIds] = useState(new Set());
+  const tripAtLimit = isTripAtLimit(tripStopIds.size);
   const bookmarkedVendorIds = new Set(bookmarks.map((b) => b.vendor_id));
   const owner = tripOwner(session);
   const savedCount = useSavedCount(false);
@@ -67,6 +69,7 @@ export default function SavedPage() {
     const result = addVendorToTrip(vendor, owner);
     if (result === "added") notify(`${vendor.name} added to your trip.`);
     else if (result === "no-location") notify("This vendor doesn't have a location yet.", true);
+    else if (result === "limit") notify(TRIP_LIMIT_ADD_MESSAGE, true);
   }
 
   useEffect(() => { setBookmarkPage(1); }, [activeFolder]);
@@ -274,6 +277,7 @@ export default function SavedPage() {
                         <VendorCard
                           vendor={b.vendor}
                           inTrip={tripStopIds.has(b.vendor.id)}
+                          tripAtLimit={tripAtLimit}
                           bookmarked={true}
                           onToggleBookmark={() => setPendingUnbookmarkVendor(b.vendor)}
                           onAddStop={handleAddStop}
@@ -295,6 +299,7 @@ export default function SavedPage() {
           key={detailVendor.id}
           vendor={detailVendor}
           inTrip={tripStopIds.has(detailVendor.id)}
+          tripAtLimit={tripAtLimit}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={() => toggleBookmarkFromDetail(detailVendor.id)}
           onAddStop={handleAddStop}
