@@ -43,12 +43,30 @@ function extractTransitLegs(route) {
   return legs;
 }
 
+// Google Directions is the sole route drawer (OSRM only optimises stop order —
+// see MapPage's planTrip). A route request is fired once per [map, stops,
+// travelMode] change and its result cached in resultRef; picking a different
+// alternative (routeIndex) is pure presentation and re-renders the cached
+// result instead of firing a new Google request.
 export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, onSummary, onRoutes, onTransitLegs }) {
   const map = useMap();
   const rendererRef = useRef(null);
-  // Which travel mode we have already centred for. Recentring belongs to
-  // "navigation started", not "the route was recomputed" — reordering stops
-  // recomputes the route and used to drag the camera with it.
+  const resultRef = useRef(null);
+  const callbacksRef = useRef({});
+  callbacksRef.current = { onSummary, onRoutes, onTransitLegs };
+
+  function publishRoute(result, index, mode) {
+    if (!result?.routes?.length) return;
+    const safeIndex = Math.min(index, result.routes.length - 1);
+    const route = result.routes[safeIndex];
+    rendererRef.current?.setMap(map);
+    rendererRef.current?.setDirections(result);
+    rendererRef.current?.setRouteIndex(safeIndex);
+    const distance = route.legs.reduce((sum, leg) => sum + leg.distance.value, 0);
+    const duration = route.legs.reduce((sum, leg) => sum + leg.duration.value, 0);
+    callbacksRef.current.onSummary?.({ distance: formatDistance(distance), duration: formatDuration(duration) });
+    callbacksRef.current.onTransitLegs?.(mode === "TRANSIT" ? extractTransitLegs(route) : []);
+  }
 
   useEffect(() => {
     if (!map) return;
@@ -61,12 +79,22 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       rendererRef.current = new google.maps.DirectionsRenderer({ suppressMarkers: true, preserveViewport: true });
     }
 
+    resultRef.current = null;
+
     if (!stops || stops.length < 2 || !travelMode) {
       rendererRef.current.setMap(null);
+      callbacksRef.current.onSummary?.(null);
+      callbacksRef.current.onRoutes?.([]);
+      callbacksRef.current.onTransitLegs?.([]);
       return;
     }
 
-    rendererRef.current.setMap(map);
+    // Hide the previous route and clear its summary while the new one loads —
+    // a route failure below must never leave a stale summary on screen.
+    rendererRef.current.setMap(null);
+    callbacksRef.current.onSummary?.(null);
+    callbacksRef.current.onRoutes?.([]);
+    callbacksRef.current.onTransitLegs?.([]);
 
     const origin = { lat: stops[0].lat, lng: stops[0].lng };
     const destination = { lat: stops[stops.length - 1].lat, lng: stops[stops.length - 1].lng };
@@ -80,24 +108,6 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       waypoints,
       travelMode: google.maps.TravelMode[travelMode],
     };
-
-    function applyResult(result) {
-      const route = result.routes[Math.min(routeIndex, result.routes.length - 1)];
-      rendererRef.current?.setDirections(result);
-      rendererRef.current?.setRouteIndex(Math.min(routeIndex, result.routes.length - 1));
-      // The camera is not ours to move. Every change made in the trip panel —
-      // reordering, adding, removing, switching travel mode — recomputes this
-      // route, and panning on any of them threw away wherever the user had
-      // scrolled to. Centring on the user is the GPS button's job.
-
-      const dist = route.legs.reduce((a, l) => a + l.distance.value, 0);
-      const dur = route.legs.reduce((a, l) => a + l.duration.value, 0);
-      onSummary?.({ distance: formatDistance(dist), duration: formatDuration(dur) });
-
-      if (travelMode === "TRANSIT") {
-        onTransitLegs?.(extractTransitLegs(route));
-      }
-    }
 
     if (travelMode === "DRIVING") {
       // Two requests: one with alternatives (default, may include toll roads),
@@ -121,25 +131,29 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
               hasTolls: !tollFreeSummaries.has(r.summary),
             };
           });
-          onRoutes?.(routes);
-          applyResult(withAlts);
+          resultRef.current = withAlts;
+          callbacksRef.current.onRoutes?.(routes);
+          publishRoute(withAlts, routeIndex, travelMode);
         })
         .catch(() => {
           if (cancelled) return;
-          onSummary?.({ error: true, distance: "—", duration: "No route available" });
-          onRoutes?.([]);
+          resultRef.current = null;
+          callbacksRef.current.onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          callbacksRef.current.onRoutes?.([]);
         });
     } else {
       directionsService
         .route(baseRequest)
         .then((result) => {
           if (cancelled) return;
-          applyResult(result);
+          resultRef.current = result;
+          publishRoute(result, routeIndex, travelMode);
         })
         .catch(() => {
           if (cancelled) return;
-          onSummary?.({ error: true, distance: "—", duration: "No route available" });
-          if (travelMode === "TRANSIT") onTransitLegs?.([]);
+          resultRef.current = null;
+          callbacksRef.current.onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          if (travelMode === "TRANSIT") callbacksRef.current.onTransitLegs?.([]);
         });
     }
 
@@ -147,7 +161,14 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       cancelled = true;
       rendererRef.current?.setMap(null);
     };
-  }, [map, stops, travelMode, routeIndex]);
+  }, [map, stops, travelMode]);
+
+  // Picking an alternative route (or a mode already routed) is presentation
+  // only — it re-renders the cached Google result and makes zero new requests.
+  useEffect(() => {
+    if (!resultRef.current) return;
+    publishRoute(resultRef.current, routeIndex, travelMode);
+  }, [routeIndex, travelMode]);
 
   return null;
 }

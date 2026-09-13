@@ -251,7 +251,6 @@ export default function SavedPage() {
                       <div key={b.vendor_id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                         <VendorCard
                           vendor={b.vendor}
-                          inTrip={false}
                           bookmarked={true}
                           onToggleBookmark={() => setPendingUnbookmarkVendor(b.vendor)}
                           onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
@@ -272,7 +271,6 @@ export default function SavedPage() {
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={false}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={() => toggleBookmarkFromDetail(detailVendor.id)}
           onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}

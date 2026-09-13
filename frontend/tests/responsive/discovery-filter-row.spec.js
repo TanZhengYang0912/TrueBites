@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 test("the filter toggle opens and closes the panel", async ({ page }) => {
-  await page.goto("/discover", { waitUntil: "networkidle" });
+  await page.addInitScript(() => window.localStorage.setItem("truebites:welcome-seen", "1"));
+  await page.goto("/discover");
   const panel = page.getByTestId("filters-region");
   await expect(panel).toBeHidden();
 
@@ -14,7 +15,8 @@ test("the filter toggle opens and closes the panel", async ({ page }) => {
 });
 
 test("search and creator stay reachable without opening the panel", async ({ page }) => {
-  await page.goto("/discover", { waitUntil: "networkidle" });
+  await page.addInitScript(() => window.localStorage.setItem("truebites:welcome-seen", "1"));
+  await page.goto("/discover");
   await page.getByLabel("Search places").fill("nasi");
   await expect(page.getByLabel("Search places")).toHaveValue("nasi");
   await expect(page.getByTestId("filter-creator")).toBeVisible();

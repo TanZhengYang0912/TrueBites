@@ -13,8 +13,10 @@ export default function VendorPanel({
   radiusKm, onRadiusChange,
   showAllVendors, onToggleAllVendors,
   onAddStop, onSelectNearby,
-  hasAnchor, tripIds,
+  hasAnchor, visibleCount, onShowMore,
 }) {
+  const visibleNearby = nearby.slice(0, visibleCount);
+  const shown = Math.min(visibleCount, nearby.length);
   return (
     <>
       <AdvancedFilters
@@ -59,45 +61,53 @@ export default function VendorPanel({
         {showAllVendors ? "Showing vendors on map" : "Vendors hidden on map"}
       </button>
 
-      {nearby.length > 0 ? (
+      {visibleNearby.length > 0 ? (
         <div className="mt-1.5">
-          {nearby.map((v) => {
-            const inTrip = tripIds.has(v.id);
-            return (
-              <div
-                key={v.id}
-                onClick={() => onSelectNearby?.(v)}
-                className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5"
+          {visibleNearby.map((v) => (
+            <div
+              key={v.id}
+              data-testid="nearby-vendor-row"
+              onClick={() => onSelectNearby?.(v)}
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5"
+            >
+              <img src={placeholderImage(v)} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
+              <span className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] text-ink">{v.name}</div>
+                <div className="text-[11px] text-muted">
+                  {[distanceLabel(v), priceLabel(v)].filter(Boolean).join(" · ")}
+                </div>
+              </span>
+              <button
+                onClick={(event) => { event.stopPropagation(); onAddStop(v); }}
+                aria-label={`Add ${v.name} to trip`}
+                className="grid size-11 shrink-0 place-items-center text-terracotta"
               >
-                <img src={placeholderImage(v)} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
-                <span className="min-w-0 flex-1">
-                  <div className="truncate text-[12.5px] text-ink">{v.name}</div>
-                  <div className="text-[11px] text-muted">
-                    {[distanceLabel(v), priceLabel(v)].filter(Boolean).join(" · ")}
-                  </div>
-                </span>
-                {inTrip ? (
-                  <span className="shrink-0 px-1 text-[10.5px] font-semibold text-success">In trip</span>
-                ) : (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onAddStop(v); }}
-                    aria-label={`Add ${v.name} to trip`}
-                    className="grid size-11 shrink-0 place-items-center text-terracotta"
-                  >
-                    <Plus size={16} strokeWidth={1.8} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                <Plus size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+          ))}
+          <div className="mt-2 flex items-center justify-between gap-3 border-t border-sand pt-2">
+            <span className="text-[11px] text-muted">Showing {shown} of {nearby.length}</span>
+            {shown < nearby.length && (
+              <button
+                type="button"
+                onClick={onShowMore}
+                className="min-h-11 text-[12px] font-semibold text-terracotta"
+              >
+                Show 15 more
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="mt-1.5 text-[11.5px] text-muted">
           {!hasAnchor
-            ? "Set your starting point to see nearby vendors."
+            ? "Set your search area to see nearby vendors."
             : filteredVendors.length === 0
               ? "Nothing matches those filters."
-              : `Nothing within ${radiusKm}km — try a bigger radius or All.`}
+              : radiusKm === "all"
+                ? "No vendors are available."
+                : `Nothing within ${radiusKm}km — try a bigger radius or All.`}
         </div>
       )}
     </>

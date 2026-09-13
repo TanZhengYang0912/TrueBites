@@ -43,7 +43,7 @@ export function createBrandClusterRenderer() {
   };
 }
 
-function HawkerStallPin({ selected = false, stopNum = null }) {
+export function HawkerStallPin({ selected = false, stopNum = null }) {
   const numbered = stopNum !== null && stopNum !== undefined;
   const fill = selected || numbered ? MAP_COLORS.terracotta : MAP_COLORS.forest;
 
@@ -71,7 +71,7 @@ function HawkerStallPin({ selected = false, stopNum = null }) {
           dominantBaseline="middle"
           fill="#FFFDF8"
           fontFamily="Arial, sans-serif"
-          fontSize={Number(stopNum) >= 10 ? "12" : "15"}
+          fontSize={String(stopNum).length > 1 ? "12" : "15"}
           fontWeight="700"
         >
           {stopNum}
@@ -92,17 +92,16 @@ function HawkerStallPin({ selected = false, stopNum = null }) {
   );
 }
 
-// Renders vendor pins with clustering, plus numbered pins for trip stops and a
-// "you are here" marker. Vendor data comes from Supabase: { id, name, address,
-// latitude, longitude }.
-function VendorMarker({ vendor, position, stopNum, isSelected, onSelect, onOpenChange, onMarkerChange }) {
+// Renders non-trip vendor pins with clustering; trip stops and the "you are
+// here" marker are owned by TripStopMarkers. Vendor data comes from Supabase:
+// { id, name, address, latitude, longitude }.
+function VendorMarker({ vendor, position, isSelected, onSelect, onOpenChange, onMarkerChange }) {
   const [markerRef, marker] = useAdvancedMarkerRef();
-  const excludeFromCluster = Boolean(stopNum) || isSelected;
 
   useEffect(() => {
-    onMarkerChange(vendor.id, marker, excludeFromCluster);
+    onMarkerChange(vendor.id, marker, isSelected);
     return () => onMarkerChange(vendor.id, null, true);
-  }, [vendor.id, marker, excludeFromCluster, onMarkerChange]);
+  }, [vendor.id, marker, isSelected, onMarkerChange]);
 
   return (
     <AdvancedMarker
@@ -112,29 +111,39 @@ function VendorMarker({ vendor, position, stopNum, isSelected, onSelect, onOpenC
       onClick={() => { onOpenChange(vendor.id); onSelect(vendor); }}
       zIndex={isSelected ? 999 : undefined}
     >
-      <HawkerStallPin selected={isSelected} stopNum={stopNum} />
+      <HawkerStallPin selected={isSelected} />
     </AdvancedMarker>
   );
 }
 
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange }) {
+export default function VendorMarkers({ vendors, onSelect, onAddStop, onViewDetails, selectedId, openId, onOpenChange }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
+  const excluded = useRef({});
 
   const refreshCluster = useCallback(() => {
     if (!clusterer.current) return;
     clusterer.current.clearMarkers();
     clusterer.current.addMarkers(Object.values(markers.current));
-  }, []);
+    Object.values(excluded.current).forEach((marker) => {
+      if (marker && marker.map !== map) marker.map = map;
+    });
+  }, [map]);
 
   const setClusterMarker = useCallback((id, marker, excludeFromCluster) => {
-    if (marker && !excludeFromCluster) {
-      if (markers.current[id] === marker) return;
-      markers.current[id] = marker;
-    } else {
-      if (!markers.current[id]) return;
+    if (!marker) {
       delete markers.current[id];
+      delete excluded.current[id];
+      refreshCluster();
+      return;
+    }
+    if (excludeFromCluster) {
+      delete markers.current[id];
+      excluded.current[id] = marker;
+    } else {
+      delete excluded.current[id];
+      markers.current[id] = marker;
     }
     refreshCluster();
   }, [refreshCluster]);
@@ -159,42 +168,15 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, o
     };
   }, [map, refreshCluster]);
 
-  // Trip stops that share the exact same coordinates (confirmed real case: two
-  // vendors both geocoded to the same generic area centroid, e.g. no street
-  // address available) would otherwise stack one pin exactly on top of the
-  // other, hiding it completely. Nudge duplicates apart in a small circle so
-  // every stop stays visible and clickable.
-  const positionKey = (v) => `${v.latitude.toFixed(5)},${v.longitude.toFixed(5)}`;
-  const tripStopGroups = {};
-  vendors.forEach((v) => {
-    if (!tripOrder?.has(v.id)) return;
-    const key = positionKey(v);
-    (tripStopGroups[key] ||= []).push(v.id);
-  });
-  const JITTER_DEG = 0.0013; // ~140m — visible apart at typical trip-viewing zoom, still negligible on the map
-  const displayPosition = (v) => {
-    const group = tripStopGroups[positionKey(v)];
-    if (!group || group.length < 2) return { lat: v.latitude, lng: v.longitude };
-    const idx = group.indexOf(v.id);
-    const angle = (2 * Math.PI * idx) / group.length;
-    return {
-      lat: v.latitude + JITTER_DEG * Math.sin(angle),
-      lng: v.longitude + JITTER_DEG * Math.cos(angle),
-    };
-  };
-
   return (
     <>
       {vendors.map((v) => {
-        const stopNum = tripOrder?.get(v.id);
         const isSelected = v.id === selectedId;
-        const pos = displayPosition(v);
         return (
           <VendorMarker
             key={v.id}
             vendor={v}
-            position={pos}
-            stopNum={stopNum}
+            position={{ lat: v.latitude, lng: v.longitude }}
             isSelected={isSelected}
             onSelect={onSelect}
             onOpenChange={onOpenChange}
@@ -209,7 +191,7 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, o
           .map((v) => (
             <InfoWindow
               key={v.id}
-              position={displayPosition(v)}
+              position={{ lat: v.latitude, lng: v.longitude }}
               onCloseClick={() => onOpenChange(null)}
             >
               <div className="max-w-[220px] font-body">
@@ -234,30 +216,14 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, o
                 {onAddStop && (
                   <button
                     onClick={() => onAddStop(v)}
-                    disabled={tripOrder?.has(v.id)}
-                    className={tripOrder?.has(v.id)
-                      ? "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-[#eee] px-3 text-xs text-[#777]"
-                      : "ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-success px-3 text-xs text-white"}
+                    className="ml-1.5 mt-2 inline-flex min-h-11 items-center rounded-md bg-success px-3 text-xs text-white"
                   >
-                    {tripOrder?.has(v.id) ? `✓ Stop ${tripOrder.get(v.id)}` : "➕ Add stop"}
+                    ➕ Add stop
                   </button>
                 )}
               </div>
             </InfoWindow>
           ))}
-
-      {/* While it's a trip stop, "Your location" is drawn as the same numbered Hawker Stall
-          pin as every other stop — a differently-shaped marker in the middle of
-          a numbered route reads as a different kind of thing. It falls back to
-          the pulsing dot only once removed from the trip, where it means
-          "you are here" rather than "stop N". */}
-      {userPos && (
-        <AdvancedMarker position={userPos} title="You are here">
-          {userStopNumber
-            ? <HawkerStallPin stopNum={userStopNumber} />
-            : <div className="user-loc-dot" />}
-        </AdvancedMarker>
-      )}
     </>
   );
 }

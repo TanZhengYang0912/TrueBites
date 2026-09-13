@@ -6,10 +6,10 @@ const sessionContext = readFileSync(new URL("./SessionContext.jsx", import.meta.
 const mapPage = readFileSync(new URL("../pages/MapPage.jsx", import.meta.url), "utf8");
 const tripFab = readFileSync(new URL("../components/TripFab.jsx", import.meta.url), "utf8");
 
-test("SessionProvider clears trip persistence only across real identity boundaries", () => {
-  assert.match(sessionContext, /createTripSessionBoundary/);
-  assert.match(sessionContext, /clearTrip/);
-  assert.match(sessionContext, /observeTripSession\(s\)/);
+test("SessionProvider reconciles ownership before publishing auth state", () => {
+  assert.match(sessionContext, /reconcileTripOwner\(data\.session\);\s*setSession\(data\.session\)/);
+  assert.match(sessionContext, /reconcileTripOwner\(nextSession\);\s*setSession\(nextSession\)/);
+  assert.doesNotMatch(sessionContext, /createTripSessionBoundary|clearTrip/);
 });
 
 test("MapPage hydrates and saves trips under the resolved session owner", () => {

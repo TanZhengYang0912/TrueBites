@@ -3,14 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const markerPath = new URL("../components/VendorMarkers.jsx", import.meta.url);
+const stopMarkerPath = new URL("../components/TripStopMarkers.jsx", import.meta.url);
 
 test("all vendor precision values use one Hawker Stall pin", async () => {
   const source = await readFile(markerPath, "utf8");
 
-  assert.match(source, /function HawkerStallPin/);
+  assert.match(source, /export function HawkerStallPin/);
   assert.match(source,
     /const fill = selected \|\| numbered \? MAP_COLORS\.terracotta : MAP_COLORS\.forest/);
-  assert.match(source, /<HawkerStallPin selected=\{isSelected\} stopNum=\{stopNum\} \/>/);
+  assert.match(source, /<HawkerStallPin selected=\{isSelected\} \/>/);
   assert.doesNotMatch(source, /\bisApproximate\b/);
   assert.doesNotMatch(source, /location_precision/);
   assert.doesNotMatch(source, /Approximate location/);
@@ -18,11 +19,16 @@ test("all vendor precision values use one Hawker Stall pin", async () => {
 });
 
 test("trip stops keep their route number in the same marker shape", async () => {
-  const source = await readFile(markerPath, "utf8");
+  const markerSource = await readFile(markerPath, "utf8");
+  const stopSource = await readFile(stopMarkerPath, "utf8");
 
-  assert.match(source, /<text[\s\S]*?\{stopNum\}[\s\S]*?<\/text>/);
-  assert.match(source,
-    /userStopNumber\s*\?\s*<HawkerStallPin stopNum=\{userStopNumber\} \/>/);
+  // The numbered-pin rendering lives in HawkerStallPin itself (shared by both
+  // components); trip-stop numbering is now TripStopMarkers' job, not
+  // VendorMarkers'.
+  assert.match(markerSource, /<text[\s\S]*?\{stopNum\}[\s\S]*?<\/text>/);
+  assert.match(stopSource, /import \{ HawkerStallPin \} from "\.\/VendorMarkers"/);
+  assert.match(stopSource, /<HawkerStallPin stopNum=\{group\.stops\.map/);
+  assert.doesNotMatch(markerSource, /tripOrder|userStopNumber/);
 });
 
 test("marker refs update clusters without rerendering through an inline ref", async () => {

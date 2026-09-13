@@ -15,16 +15,16 @@ test("MapPage owns canonical filters and keeps the result order fixed", () => {
   assert.doesNotMatch(mapPage, /setSort\(/);
 });
 
-test("MapPage derives location-aware distances only from a user origin", () => {
+test("MapPage derives location-aware distances only from the resolved anchor", () => {
   assert.match(mapPage, /const vendorsWithDistance = useMemo/);
-  assert.match(mapPage, /distanceOrigin\s*\?/);
-  assert.match(mapPage, /haversineKm\(distanceOrigin\.lat, distanceOrigin\.lng/);
+  assert.match(mapPage, /searchAnchor\s*\?/);
+  assert.match(mapPage, /haversineKm\(searchAnchor\.lat, searchAnchor\.lng/);
   assert.match(mapPage, /distKm:\s*undefined/);
 });
 
-test("MapPage keeps Melaka-centre fallback separate from a real distance origin", () => {
-  assert.match(mapPage, /const \[distanceOrigin, setDistanceOrigin\] = useState\(null\)/);
-  assert.doesNotMatch(mapPage, /setDistanceOrigin\(MELAKA_CENTER\)/);
+test("MapPage keeps Melaka-centre fallback separate from the real anchor", () => {
+  assert.match(mapPage, /const searchAnchor = useMemo\(\s*\(\) => trip\.find\(\(stop\) => stop\.type === "anchor"\) \|\| null,/);
+  assert.doesNotMatch(mapPage, /setUserPos\(MELAKA_CENTER\)/);
 });
 
 test("MapPage derives one filtered sorted collection and shares it with both views", () => {
@@ -37,13 +37,14 @@ test("MapPage derives one filtered sorted collection and shares it with both vie
 
 test("map pins and nearby rows reuse the shared result instead of matching again", () => {
   assert.match(mapPage, /const filteredIds = new Set\(filteredVendors\.map/);
-  assert.match(mapPage, /const nearbyToAdd = anchor\s*\? filteredVendors/);
+  assert.match(mapPage, /const nearbyVendors = useMemo\(\(\) => \{/);
+  assert.match(mapPage, /sortVendors\(\s*filteredVendors\.filter/);
   const sharedPipeline = mapPage.slice(mapPage.indexOf("const filteredIds"));
   assert.doesNotMatch(sharedPipeline, /matchesFilters\(/);
 });
 
 test("a focused vendor cannot bypass active discovery filters", () => {
-  assert.match(mapPage, /const visibleFocusVendor = focusVendor && \(stopIds\.has\(focusVendor\.id\) \|\| filteredIds\.has\(focusVendor\.id\)\)/);
+  assert.match(mapPage, /const visibleFocusVendor = focusVendor && \(tripVendorIds\.has\(focusVendor\.id\) \|\| filteredIds\.has\(focusVendor\.id\)\)/);
   assert.match(mapPage, /focusVendor: visibleFocusVendor/);
   assert.match(mapPage, /<FocusOnVendor vendor=\{visibleFocusVendor\}/);
 });

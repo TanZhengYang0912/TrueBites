@@ -226,7 +226,6 @@ export default function ReviewsPage() {
                   <div key={review.id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                     <VendorCard
                       vendor={review.vendor}
-                      inTrip={false}
                       bookmarked={bookmarkedVendorIds.has(review.vendor.id)}
                       onToggleBookmark={() => toggleBookmarkForVendor(review.vendor)}
                       onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
@@ -251,7 +250,6 @@ export default function ReviewsPage() {
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={false}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={toggleBookmarkFromDetail}
           onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Bookmark, Check, MapPin, Plus, Star, Wallet } from "lucide-react";
+import { Bookmark, MapPin, Plus, Star, Wallet } from "lucide-react";
 import {
   categoryLabel, vendorGallery, creatorHandle,
   priceRangeLabel, hoursStatus, photoAltText, FOOD_PHOTO_POSITION,
@@ -17,7 +17,7 @@ const CLOSED_RED = "#C92A2A";
 // right at one of those widths.
 const IMAGE = "relative aspect-[4/3] cursor-pointer bg-sand";
 
-export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmark, onAddStop, onOpenDetail }) {
+export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAddStop, onOpenDetail }) {
   const handle = creatorHandle(vendor);
   const price = priceRangeLabel(vendor);
   const hours = hoursStatus(vendor);
@@ -103,7 +103,15 @@ export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmar
           ) : (
             <span>—</span>
           )}
-          {price && <><span className="text-sand">·</span><Wallet size={12} /><span>{price}</span></>}
+          {price && (
+            <>
+              <span className="text-sand">·</span>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <Wallet size={12} />
+                <span>{price}</span>
+              </span>
+            </>
+          )}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px]">
@@ -118,15 +126,12 @@ export default function VendorCard({ vendor, inTrip, bookmarked, onToggleBookmar
           ) : <span />}
           <button
             type="button"
-            onClick={() => !inTrip && onAddStop(vendor)}
-            disabled={inTrip}
-            aria-label={inTrip ? "Already added to trip" : "Add to trip"}
-            className={inTrip
-              ? "inline-flex min-h-11 shrink-0 items-center gap-1 font-semibold text-muted"
-              : "inline-flex min-h-11 shrink-0 items-center gap-1 font-semibold text-forest active:scale-97"}
+            onClick={() => onAddStop(vendor)}
+            aria-label="Add to trip"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 font-semibold text-forest active:scale-97"
           >
-            {inTrip ? <Check size={12} /> : <Plus size={12} />}
-            {inTrip ? "Added" : "Add to trip"}
+            <Plus size={12} />
+            Add to trip
           </button>
         </div>
       </div>

@@ -190,7 +190,9 @@ export function walkLabel(vendor) {
 }
 
 export function distanceLabel(vendor) {
-  return vendor.distKm != null ? `${vendor.distKm} km` : null;
+  if (vendor?.distKm == null) return null; // Number(null) is 0, which would print "0 km"
+  const distance = Number(vendor.distKm);
+  return Number.isFinite(distance) ? `${Number(distance.toFixed(2))} km` : null;
 }
 
 // "Nasi Lemak, Rendang" -> "Nasi Lemak" (first listed dish/cuisine for the tag pill)
