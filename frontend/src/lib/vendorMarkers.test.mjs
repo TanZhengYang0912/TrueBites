@@ -4,6 +4,8 @@ import test from "node:test";
 
 const markerPath = new URL("../components/VendorMarkers.jsx", import.meta.url);
 const stopMarkerPath = new URL("../components/TripStopMarkers.jsx", import.meta.url);
+const vendorPanelPath = new URL("../components/VendorPanel.jsx", import.meta.url);
+const tripPanelPath = new URL("../components/TripPanel.jsx", import.meta.url);
 
 test("all vendor precision values use one Hawker Stall pin", async () => {
   const source = await readFile(markerPath, "utf8");
@@ -58,4 +60,17 @@ test("map clusters use one brand-green renderer and do not render a nearby radiu
   assert.doesNotMatch(source, /\bCircle\b/);
   assert.doesNotMatch(source, /radiusCenter/);
   assert.doesNotMatch(source, /radiusKm/);
+});
+
+test("compact Map vendor avatars reuse the Discover gallery fallback", async () => {
+  const vendorPanel = await readFile(vendorPanelPath, "utf8");
+  const tripPanel = await readFile(tripPanelPath, "utf8");
+
+  assert.match(vendorPanel, /import \{ vendorGallery, priceLabel, distanceLabel \} from "\.\.\/lib\/vendorDisplay"/);
+  assert.match(vendorPanel, /src=\{vendorGallery\(v\)\[0\]\}/);
+  assert.doesNotMatch(vendorPanel, /\bplaceholderImage\b/);
+
+  assert.match(tripPanel, /import \{ vendorGallery, priceLabel \} from "\.\.\/lib\/vendorDisplay"/);
+  assert.match(tripPanel, /src=\{vendorGallery\(row\.vendor\)\[0\]\}/);
+  assert.doesNotMatch(tripPanel, /\bplaceholderImage\b/);
 });

@@ -1,6 +1,6 @@
 import { Plus, Eye, EyeOff } from "lucide-react";
 import AdvancedFilters from "./discovery/AdvancedFilters";
-import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDisplay";
+import { vendorGallery, priceLabel, distanceLabel } from "../lib/vendorDisplay";
 
 const RADII = [1, 2, 5, "all"];
 
@@ -70,7 +70,7 @@ export default function VendorPanel({
               onClick={() => onSelectNearby?.(v)}
               className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5"
             >
-              <img src={placeholderImage(v)} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
+              <img src={vendorGallery(v)[0]} alt="" className="size-7.5 shrink-0 rounded-full object-cover" />
               <span className="min-w-0 flex-1">
                 <div className="truncate text-[12.5px] text-ink">{v.name}</div>
                 <div className="text-[11px] text-muted">
