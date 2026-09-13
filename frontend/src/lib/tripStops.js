@@ -53,22 +53,31 @@ export function groupStopsByPosition(numberedStops = [], metres = 15) {
   return groups;
 }
 
+// Older builds saved the anchor as the literal "Your location". Blank it so the
+// next GPS fix (or the user) labels it with a real address.
+const LEGACY_ANCHOR_NAME = "Your location";
+// "__me__" was the old anchor's fixed id; editing that row's address left a
+// non-anchor stop wearing it. It is a typed address, never a database vendor,
+// and must not share an id with the real anchor.
+const LEGACY_ME_ID = "__me__";
+const isLegacyCustomId = (id) => String(id).startsWith("custom-") || id === LEGACY_ME_ID;
+const freshIfLegacyMe = (id) => (id === LEGACY_ME_ID ? newStopId("custom-stop") : id);
+
 export function migrateStop(stop) {
   if (STOP_TYPES.includes(stop?.type)) {
+    if (stop.type === "anchor" && stop.name === LEGACY_ANCHOR_NAME) return { ...stop, name: "" };
     // A typed address that an earlier build stored as a vendor has no database
     // row to match, so it rendered read-only. Its id still says what it was.
-    if (stop.type === "vendor" && String(stop.vendorId || stop.id).startsWith("custom-")) {
+    if (stop.type === "vendor" && isLegacyCustomId(stop.vendorId || stop.id)) {
       const { vendorId, vendor, ...rest } = stop;
-      return { ...rest, type: "custom" };
+      return { ...rest, type: "custom", id: freshIfLegacyMe(rest.id) };
     }
     return stop.type === "vendor" && !stop.vendorId ? { ...stop, vendorId: stop.id } : stop;
   }
   const { isMe, source, ...rest } = stop || {};
-  // Legacy anchors were saved as the literal "Your location". Blank the name so
-  // the next GPS fix (or the user) labels it with a real address.
-  if (isMe) return { ...rest, type: "anchor", name: rest.name === "Your location" ? "" : rest.name };
-  if (source === "custom" || source === "gps" || String(rest.id).startsWith("custom-")) {
-    return { ...rest, type: "custom" };
+  if (isMe) return { ...rest, type: "anchor", name: rest.name === LEGACY_ANCHOR_NAME ? "" : rest.name };
+  if (source === "custom" || source === "gps" || isLegacyCustomId(rest.id)) {
+    return { ...rest, type: "custom", id: freshIfLegacyMe(rest.id) };
   }
   return { ...rest, type: "vendor", vendorId: rest.vendorId || rest.id };
 }

@@ -74,9 +74,14 @@ test("legacy isMe becomes anchor and legacy vendor id becomes vendorId", () => {
   assert.equal("isMe" in oldAnchor, false);
   assert.equal(oldAnchor.name, "", "legacy placeholder name is dropped so GPS can relabel it");
   assert.equal(migrateStop({ id: "__me__", name: "Jalan Hang Tuah", lat: 1, lng: 2, isMe: true }).name, "Jalan Hang Tuah");
+  assert.equal(migrateStop({ id: "anchor-1", type: "anchor", name: "Your location", lat: 1, lng: 2 }).name, "", "already-migrated anchors get the same treatment");
   const misfiled = migrateStop({ id: "custom-1", type: "vendor", vendorId: "custom-1", name: "R1, Jalan Tun Razak", lat: 1, lng: 2 });
   assert.equal(misfiled.type, "custom");
   assert.equal("vendorId" in misfiled, false);
+  const editedMe = migrateStop({ id: "__me__", type: "vendor", vendorId: "__me__", name: "R1, Jalan Tun Razak", lat: 1, lng: 2 });
+  assert.equal(editedMe.type, "custom");
+  assert.notEqual(editedMe.id, "__me__", "must not collide with the anchor's legacy id");
+  assert.equal(migrateStop({ id: "__me__", name: "Typed", lat: 1, lng: 2, isMe: false }).type, "custom");
 });
 
 test("storage keeps type/vendorId, strips vendor snapshots, and permits repeats", () => {
