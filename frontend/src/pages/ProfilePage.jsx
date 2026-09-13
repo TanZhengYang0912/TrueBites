@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -57,6 +57,22 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
+  // Effect, not a render-time call: customerSession() reports null for an
+  // admin (even one mid "View Site" preview), so this branch is reachable
+  // whenever someone clicks the profile icon there. App.jsx's AuthGate also
+  // navigates in its own effect on that same route change, and two
+  // navigate() calls racing — one from render, one from an effect — is what
+  // left LoginPage permanently blank the first time this path got exercised
+  // (see the comment there); same fix here before this page hits it too.
+  // Runs unconditionally (before the `loading` early return below) — hooks
+  // can't sit after a conditional return, so this must skip its own work
+  // internally instead of the whole call being skipped.
+  useEffect(() => {
+    if (!loading && !session && !loggingOut && !deleting) {
+      navigate("/login", { replace: true });
+    }
+  }, [loading, session, loggingOut, deleting, navigate]);
+
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-chalk text-muted">
@@ -66,7 +82,6 @@ export default function ProfilePage() {
   }
 
   if (!session && !loggingOut && !deleting) {
-    navigate("/login", { replace: true });
     return null;
   }
 
