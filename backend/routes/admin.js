@@ -148,7 +148,14 @@ function buildDashboardAnalytics(vendors, reviews) {
 
   const hiddenReviews = reviews.filter((review) => review.is_hidden).length;
   const draftVendors = statusCounts.get("draft") || 0;
-  const missingAddress = vendors.filter((vendor) => !vendor.address || !vendor.city).length;
+  // address only, not city: vendorActivationIssues (lib/vendorValidation.js —
+  // the actual gate for going Active) never requires city, and the manual
+  // Add Vendor form has no City field at all, so most vendors legitimately
+  // have a blank city despite a complete address. Counting city here flagged
+  // nearly every vendor — including fully-Active, fully-addressed ones — as
+  // "missing verified location", wildly inflating this number for something
+  // that was never actually blocking anything.
+  const missingAddress = vendors.filter((vendor) => !vendor.address).length;
   const missingHours = vendors.filter((vendor) => !vendor.operating_hours_raw).length;
   const aiImported = vendors.filter((vendor) => vendor.source_video_url).length;
   const aiDrafts = vendors.filter((vendor) => vendor.source_video_url && String(vendor.status || "").toLowerCase() === "draft").length;
@@ -328,7 +335,8 @@ router.get("/vendors", async (req, res) => {
     if (category !== "all" && ADMIN_CATEGORIES.includes(category)) builder = builder.eq("cuisine_types", category);
     if (query) builder = builder.or(buildVendorSearch(query));
     if (flag === "missing_address") {
-      builder = builder.or("address.is.null,address.eq.,city.is.null,city.eq.");
+      // address only — see the comment on missingAddress above.
+      builder = builder.or("address.is.null,address.eq.");
     } else if (flag === "missing_hours") {
       builder = builder.or("operating_hours_raw.is.null,operating_hours_raw.eq.");
     }
@@ -349,7 +357,7 @@ router.get("/vendors", async (req, res) => {
       // and the flag=missing_address/missing_hours filter above — the list
       // view needs to show exactly what a filtered-in vendor is missing
       // without every admin re-deriving that from raw fields per row.
-      missingAddress: !vendor.address || !vendor.city,
+      missingAddress: !vendor.address,
       missingHours: !vendor.operating_hours_raw,
       status: (vendor.status || "draft").toUpperCase(),
       videos: vendor.source_video_url ? 1 : 0,
