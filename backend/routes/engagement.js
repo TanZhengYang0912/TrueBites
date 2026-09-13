@@ -420,10 +420,8 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
   if (rating == null || rating < 1 || rating > 5) {
     return res.status(400).json({ error: "rating must be an integer 1-5" });
   }
-  const body = String(req.body?.body || "").trim() || null;
-  if (body && body.length > MAX_REVIEW_BODY_LENGTH) {
-    return res.status(400).json({ error: `Review must be ${MAX_REVIEW_BODY_LENGTH} characters or fewer.` });
-  }
+  const { body, error: bodyError } = validateReviewBody(req.body?.body);
+  if (bodyError) return res.status(400).json({ error: bodyError });
   const profane = body ? isProfaneLoose(body) : false;
   const isAnonymous = Boolean(req.body?.is_anonymous);
 
@@ -479,10 +477,8 @@ router.patch("/engagement/reviews/:id", async (req, res) => {
     patch.rating = rating;
   }
   if (req.body?.body != null) {
-    const body = String(req.body.body).trim() || null;
-    if (body && body.length > MAX_REVIEW_BODY_LENGTH) {
-      return res.status(400).json({ error: `Review must be ${MAX_REVIEW_BODY_LENGTH} characters or fewer.` });
-    }
+    const { body, error: bodyError } = validateReviewBody(req.body.body);
+    if (bodyError) return res.status(400).json({ error: bodyError });
     patch.body = body;
     const profane = body ? isProfaneLoose(body) : false;
     patch.is_hidden = profane;
