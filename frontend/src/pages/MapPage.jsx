@@ -22,6 +22,8 @@ import Toast from "../components/engagement/Toast";
 import { useToast, sleep } from "../lib/useToast";
 import { ENGAGEMENT_TEST_MODE } from "../lib/testMode";
 import { loadTrip, saveTrip, tripOwner } from "../lib/tripStorage";
+import { reportSavedCount, useSavedCount } from "../lib/savedCount";
+import { getCachedBookmarks, getCachedFolders, setCachedBookmarks, setCachedFolders } from "../lib/bookmarksCache";
 import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
@@ -79,12 +81,13 @@ export default function MapPage() {
   const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
   const owner = tripOwner(authSession);
-  const [bookmarkRows, setBookmarkRows] = useState([]); // {vendor_id, folder_id, folder} from the server
-  const [folders, setFolders] = useState([]);
+  const [bookmarkRows, setBookmarkRows] = useState(() => getCachedBookmarks() ?? []); // {vendor_id, folder_id, folder} from the server
+  const [folders, setFolders] = useState(() => getCachedFolders() ?? []);
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null); // vendor awaiting a folder pick
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [detailVendor, setDetailVendor] = useState(null);
   const bookmarks = new Set(bookmarkRows.map((r) => r.vendor_id));
+  const savedCount = useSavedCount(false);
   const [focusVendor, setFocusVendor] = useState(null);
   const [selected, setSelected] = useState(null);
   const [openId, setOpenId] = useState(null); // vendor id whose InfoWindow is open
@@ -246,8 +249,8 @@ export default function MapPage() {
   }, [session]);
 
   function refreshBookmarks() {
-    getFolders().then((f) => setFolders(f.folders)).catch((e) => console.error("failed to load folders:", e.message));
-    getBookmarks().then((b) => setBookmarkRows(b.bookmarks)).catch((e) => console.error("failed to load bookmarks:", e.message));
+    getFolders().then((f) => { setFolders(f.folders); setCachedFolders(f.folders); }).catch((e) => console.error("failed to load folders:", e.message));
+    getBookmarks().then((b) => { setBookmarkRows(b.bookmarks); setCachedBookmarks(b.bookmarks); reportSavedCount(b.bookmarks.length); }).catch((e) => console.error("failed to load bookmarks:", e.message));
   }
 
   // Each stop is a normal draggable entry — the user's location too.
@@ -647,7 +650,7 @@ export default function MapPage() {
                 MapPanel (z-20) and the fullscreen control (z-10). */}
             <DiscoveryHeader
               session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl}
-              savedCount={bookmarks.size}
+              savedCount={savedCount}
               onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
               onSignUp={() => navigate("/login?mode=signup")}
               activeSection="map"

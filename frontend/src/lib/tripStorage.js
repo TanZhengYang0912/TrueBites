@@ -85,3 +85,32 @@ export function subscribeTripCount(callback, owner = "guest") {
     window.removeEventListener("storage", read);
   };
 }
+
+// Same idea as subscribeTripCount, but reports the set of vendor ids
+// currently in the trip — for pages outside the map (Saved, My reviews) that
+// need to show a vendor's card as already-added without duplicating MapPage's
+// route-planning logic.
+export function subscribeTripStopIds(callback, owner = "guest") {
+  const read = () => callback(new Set((loadTrip(owner)?.stops || []).map((s) => s.id)));
+  read();
+  window.addEventListener(CHANGE_EVENT, read);
+  window.addEventListener("storage", read);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, read);
+    window.removeEventListener("storage", read);
+  };
+}
+
+// Appends a vendor to the trip from pages that only show a vendor card (no
+// map/route context) — Saved and My reviews. Mirrors MapPage's own addStop
+// mapping ({ id, name, lat, lng, isMe: false }) minus route re-planning,
+// since there's no route panel to update on those pages.
+export function addVendorToTrip(vendor, owner = "guest") {
+  if (vendor.latitude == null || vendor.longitude == null) return "no-location";
+  const stored = loadTrip(owner);
+  const stops = stored?.stops || [];
+  if (stops.some((s) => s.id === vendor.id)) return "duplicate";
+  const stop = { id: vendor.id, name: vendor.name, lat: vendor.latitude, lng: vendor.longitude, isMe: false };
+  saveTrip([...stops, stop], stored?.travelMode ?? null, owner);
+  return "added";
+}

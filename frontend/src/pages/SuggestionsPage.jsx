@@ -6,9 +6,9 @@ import DiscoveryPageIntro from "../components/discovery/DiscoveryPageIntro";
 import SuggestionStatusCard from "../components/suggestions/SuggestionStatusCard";
 import SuggestionForm from "../components/suggestions/SuggestionForm";
 import { getMySuggestions, updateSuggestion } from "../api/suggestions";
-import { getBookmarks } from "../api/engagement";
 import { useSession } from "../lib/SessionContext";
 import { customerSession } from "../lib/roles";
+import { useSavedCount } from "../lib/savedCount";
 import { pageNumbers } from "../lib/pagination";
 
 const PAGE_SIZE = 6;
@@ -39,7 +39,7 @@ export default function SuggestionsPage() {
   const [activeType, setActiveType] = useState("all");
   const [editingSuggestion, setEditingSuggestion] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [savedCount, setSavedCount] = useState(0);
+  const savedCount = useSavedCount(Boolean(userSession));
 
   useEffect(() => {
     if (!userSession) {
@@ -64,15 +64,6 @@ export default function SuggestionsPage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [userSession, page, activeType, activeTab]);
-
-  useEffect(() => {
-    if (!userSession) { setSavedCount(0); return undefined; }
-    let active = true;
-    getBookmarks()
-      .then((b) => { if (active) setSavedCount(b.bookmarks.length); })
-      .catch((err) => console.error("failed to load bookmarks:", err.message));
-    return () => { active = false; };
-  }, [userSession]);
 
   const meta = userSession?.user?.user_metadata || {};
   const email = userSession?.user?.email || "";

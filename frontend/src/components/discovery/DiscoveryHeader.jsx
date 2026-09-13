@@ -10,7 +10,7 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 // Below md the primary nav drops to its own scrollable row beneath the brand.
 const NAV_LINK = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-semibold no-underline transition-colors motion-reduce:transition-none";
 const NAV_IDLE = `${NAV_LINK} text-muted hover:text-forest`;
-const NAV_ACTIVE = `${NAV_LINK} text-forest`;
+const NAV_ACTIVE = `${NAV_LINK} font-bold text-forest`;
 
 const AVATAR = "grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-forest text-sm font-semibold text-white";
 

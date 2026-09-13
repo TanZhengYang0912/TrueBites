@@ -10,6 +10,10 @@ import {
   getMyReviews,
   removeBookmark,
 } from "../api/engagement";
+import { addVendorToTrip, subscribeTripStopIds, tripOwner } from "../lib/tripStorage";
+import { reportSavedCount, useSavedCount } from "../lib/savedCount";
+import { getCachedBookmarks, getCachedFolders, setCachedBookmarks, setCachedFolders } from "../lib/bookmarksCache";
+import { getCachedReviews, setCachedReviews } from "../lib/reviewsCache";
 import Toast from "../components/engagement/Toast";
 import DiscoveryPageShell from "../components/discovery/DiscoveryPageShell";
 import DiscoveryPageIntro from "../components/discovery/DiscoveryPageIntro";
@@ -32,9 +36,9 @@ export default function ReviewsPage() {
   const navigate = useNavigate();
   const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
-  const [bookmarks, setBookmarks] = useState([]);
-  const [folders, setFolders] = useState([]);
-  const [reviews, setReviews] = useState([]);
+  const [bookmarks, setBookmarks] = useState(() => getCachedBookmarks() ?? []);
+  const [folders, setFolders] = useState(() => getCachedFolders() ?? []);
+  const [reviews, setReviews] = useState(() => getCachedReviews() ?? []);
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewRating, setReviewRating] = useState("all");
   const [reviewSort, setReviewSort] = useState("newest");
@@ -43,7 +47,10 @@ export default function ReviewsPage() {
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null);
   const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null);
   const [toast, notify] = useToast();
+  const [tripStopIds, setTripStopIds] = useState(new Set());
   const bookmarkedVendorIds = new Set(bookmarks.map((bookmark) => bookmark.vendor_id));
+  const owner = tripOwner(session);
+  const savedCount = useSavedCount(false);
 
   useEffect(() => {
     if (!session && !ENGAGEMENT_TEST_MODE) return;
@@ -52,22 +59,30 @@ export default function ReviewsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  useEffect(() => subscribeTripStopIds(setTripStopIds, owner), [owner]);
+
+  function handleAddStop(vendor) {
+    const result = addVendorToTrip(vendor, owner);
+    if (result === "added") notify(`${vendor.name} added to your trip.`);
+    else if (result === "no-location") notify("This vendor doesn't have a location yet.", true);
+  }
+
   useEffect(() => {
     setReviewPage(1);
   }, [reviewSearch, reviewRating, reviewSort]);
 
   function refreshBookmarks() {
     getFolders()
-      .then((payload) => setFolders(payload.folders))
+      .then((payload) => { setFolders(payload.folders); setCachedFolders(payload.folders); })
       .catch((error) => { console.error(error.message); notify("Couldn't load your folders.", true); });
     getBookmarks()
-      .then((payload) => setBookmarks(payload.bookmarks))
+      .then((payload) => { setBookmarks(payload.bookmarks); setCachedBookmarks(payload.bookmarks); reportSavedCount(payload.bookmarks.length); })
       .catch((error) => { console.error(error.message); notify("Couldn't load your bookmarks.", true); });
   }
 
   function refreshReviews() {
     return getMyReviews()
-      .then((payload) => setReviews(payload.reviews))
+      .then((payload) => { setReviews(payload.reviews); setCachedReviews(payload.reviews); })
       .catch((error) => { console.error(error.message); notify("Couldn't load your reviews.", true); });
   }
 
@@ -175,7 +190,7 @@ export default function ReviewsPage() {
           initials,
           firstName,
           avatarUrl,
-          savedCount: bookmarks.length,
+          savedCount,
           activeSection: "reviews",
           onLogin: () => navigate("/login"),
           onSignUp: () => navigate("/login?mode=signup"),
@@ -226,10 +241,10 @@ export default function ReviewsPage() {
                   <div key={review.id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                     <VendorCard
                       vendor={review.vendor}
-                      inTrip={false}
+                      inTrip={tripStopIds.has(review.vendor.id)}
                       bookmarked={bookmarkedVendorIds.has(review.vendor.id)}
                       onToggleBookmark={() => toggleBookmarkForVendor(review.vendor)}
-                      onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+                      onAddStop={handleAddStop}
                       onOpenDetail={setDetailVendor}
                     />
                     <div className={CARD_FOOTER}>
@@ -251,10 +266,10 @@ export default function ReviewsPage() {
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={false}
+          inTrip={tripStopIds.has(detailVendor.id)}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={toggleBookmarkFromDetail}
-          onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+          onAddStop={handleAddStop}
           onClose={() => setDetailVendor(null)}
           onVendorUpdated={patchVendorStats}
           onReviewsChanged={refreshReviewsAfterMutation}

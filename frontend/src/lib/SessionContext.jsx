@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { clearTrip, createTripSessionBoundary } from "./tripStorage";
+import { clearSavedCount } from "./savedCount";
+import { clearBookmarksCache } from "./bookmarksCache";
+import { clearReviewsCache } from "./reviewsCache";
 
 // Single source of truth for the Supabase session, read once at the app
 // root. Every page used to call supabase.auth.getSession() independently on
@@ -14,7 +17,12 @@ export function SessionProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const tripSessionBoundary = useRef(null);
   if (!tripSessionBoundary.current) {
-    tripSessionBoundary.current = createTripSessionBoundary(clearTrip);
+    tripSessionBoundary.current = createTripSessionBoundary(() => {
+      clearTrip();
+      clearSavedCount();
+      clearBookmarksCache();
+      clearReviewsCache();
+    });
   }
   const observeTripSession = tripSessionBoundary.current;
 
