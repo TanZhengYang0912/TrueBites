@@ -117,7 +117,19 @@ function VendorMarker({ vendor, position, stopNum, isSelected, onSelect, onOpenC
   );
 }
 
-export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange, tripAtLimit }) {
+function CustomStopMarker({ stop }) {
+  return (
+    <AdvancedMarker
+      position={{ lat: stop.lat, lng: stop.lng }}
+      title={stop.address || stop.name || "Google place"}
+      zIndex={998}
+    >
+      <HawkerStallPin stopNum={stop.stopNum} />
+    </AdvancedMarker>
+  );
+}
+
+export default function VendorMarkers({ vendors, customStops = [], userPos, onSelect, onAddStop, onViewDetails, tripOrder, userStopNumber, selectedId, openId, onOpenChange, tripAtLimit }) {
   const map = useMap();
   const clusterer = useRef(null);
   const markers = useRef({});
@@ -202,6 +214,10 @@ export default function VendorMarkers({ vendors, userPos, onSelect, onAddStop, o
           />
         );
       })}
+
+      {customStops.map((stop) => (
+        <CustomStopMarker key={stop.id} stop={stop} />
+      ))}
 
       {openId &&
         vendors

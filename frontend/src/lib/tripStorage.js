@@ -1,9 +1,11 @@
 import { isTripAtLimit } from "./tripRoutingPolicy.js";
+import { isFreshGooglePlaceCache } from "./customPlaces.js";
 
 // Trip persistence — browser-local planning state scoped to the current guest
-// or signed-in account. Only { id, name, lat, lng, isMe, source } is stored —
-// never the embedded `vendor` object, since that's a point-in-time snapshot
-// that would go stale; MapPage re-hydrates it by id once vendors have loaded.
+// or signed-in account. Only non-location stops are durable; the precise
+// `isMe` origin belongs to tab-scoped sessionStorage. The embedded `vendor`
+// object is also omitted because it is a point-in-time snapshot that would go
+// stale; MapPage re-hydrates vendors by id once the latest list has loaded.
 const STORAGE_KEY = "truebites:trip";
 
 // Fired after every save so same-tab listeners (e.g. the global trip FAB)
@@ -12,6 +14,25 @@ const CHANGE_EVENT = "truebites:trip-changed";
 
 function isValidStop(s) {
   return s && typeof s.id === "string" && typeof s.lat === "number" && typeof s.lng === "number";
+}
+
+function persistentStops(stops, now = Date.now()) {
+  return stops
+    .filter((stop) => !stop.isMe && (stop.source !== "custom" || stop.placeId))
+    .map(({ id, name, lat, lng, source, placeId, cachedAt }) => {
+      if (source === "custom") {
+        return {
+          id,
+          lat,
+          lng,
+          isMe: false,
+          source: "custom",
+          placeId,
+          cachedAt: Number.isFinite(Number(cachedAt)) ? Number(cachedAt) : now,
+        };
+      }
+      return { id, name, lat, lng, isMe: false, source };
+    });
 }
 
 export function tripOwner(session) {
@@ -30,7 +51,17 @@ export function loadTrip(owner = "guest") {
       return null;
     }
     if (!Array.isArray(parsed?.stops) || !parsed.stops.every(isValidStop)) return null;
-    return { stops: parsed.stops, travelMode: parsed.travelMode ?? null };
+    const now = Date.now();
+    const normalizedStops = persistentStops(parsed.stops, now);
+    const stops = normalizedStops.filter((stop) => isFreshGooglePlaceCache(stop, now));
+    if (JSON.stringify(stops) !== JSON.stringify(parsed.stops)) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        owner,
+        stops,
+        travelMode: parsed.travelMode ?? null,
+      }));
+    }
+    return { stops, travelMode: parsed.travelMode ?? null };
   } catch {
     return null; // corrupt/unavailable storage — start fresh
   }
@@ -38,7 +69,7 @@ export function loadTrip(owner = "guest") {
 
 export function saveTrip(stops, travelMode, owner = "guest") {
   try {
-    const stripped = stops.map(({ id, name, lat, lng, isMe, source }) => ({ id, name, lat, lng, isMe, source }));
+    const stripped = persistentStops(stops);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ owner, stops: stripped, travelMode }));
     window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   } catch {

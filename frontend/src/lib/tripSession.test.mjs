@@ -59,6 +59,91 @@ test("a stored trip loads only for the same guest or account owner", () => {
   assert.equal(tripStorage.loadTrip("guest"), null, "legacy ownerless trips must not leak forward");
 });
 
+test("trip persistence never stores the session-only current location", () => {
+  const { values } = installBrowserStorage();
+  const currentLocation = { id: "__me__", name: "Private address", lat: 2.2, lng: 102.2, isMe: true };
+  const vendor = { id: "vendor-1", name: "One", lat: 2.21, lng: 102.21, isMe: false };
+
+  tripStorage.saveTrip([currentLocation, vendor], "DRIVING", "user:user-a");
+
+  const persisted = JSON.parse(values.get("truebites:trip"));
+  assert.deepEqual(persisted.stops.map((stop) => stop.id), ["vendor-1"]);
+  assert.equal(JSON.stringify(persisted).includes("Private address"), false);
+  assert.deepEqual(tripStorage.loadTrip("user:user-a").stops.map((stop) => stop.id), ["vendor-1"]);
+});
+
+test("loading a legacy trip removes a previously persisted current location", () => {
+  const { values } = installBrowserStorage();
+  const currentLocation = { id: "__me__", name: "Private address", lat: 2.2, lng: 102.2, isMe: true };
+  const vendor = { id: "vendor-1", name: "One", lat: 2.21, lng: 102.21, isMe: false };
+  values.set("truebites:trip", JSON.stringify({
+    owner: "user:user-a",
+    stops: [currentLocation, vendor],
+    travelMode: "DRIVING",
+  }));
+
+  assert.deepEqual(tripStorage.loadTrip("user:user-a").stops.map((stop) => stop.id), ["vendor-1"]);
+  assert.equal(values.get("truebites:trip").includes("Private address"), false);
+});
+
+test("custom Google stops persist identity but not Google display details", () => {
+  const { values } = installBrowserStorage();
+  const cachedAt = Date.now();
+  const custom = {
+    id: "custom-1",
+    name: "Cafe Example",
+    lat: 2.201,
+    lng: 102.251,
+    isMe: false,
+    source: "custom",
+    placeId: "google-place-1",
+    cachedAt,
+    address: "Google-provided address",
+    primaryType: "cafe",
+    priceLabel: "RM15 – RM30",
+    vendor: { id: "not-a-vendor" },
+    unrelated: "must-not-persist",
+  };
+
+  tripStorage.saveTrip([custom], "DRIVING", "user:user-a");
+
+  const persisted = JSON.parse(values.get("truebites:trip"));
+  assert.deepEqual(persisted.stops, [{
+    id: "custom-1",
+    lat: 2.201,
+    lng: 102.251,
+    isMe: false,
+    source: "custom",
+    placeId: "google-place-1",
+    cachedAt,
+  }]);
+  assert.equal(JSON.stringify(persisted).includes("Google-provided address"), false);
+  assert.equal(JSON.stringify(persisted).includes("RM15"), false);
+});
+
+test("expired Google coordinate caches and legacy custom stops without Place IDs are removed", () => {
+  const { values } = installBrowserStorage();
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  values.set("truebites:trip", JSON.stringify({
+    owner: "user:user-a",
+    travelMode: "DRIVING",
+    stops: [
+      { id: "expired", name: "Expired", lat: 2.2, lng: 102.2, source: "custom", placeId: "p-old", cachedAt: now - (30 * day) - 1000 },
+      { id: "fresh", name: "Fresh", lat: 2.21, lng: 102.21, source: "custom", placeId: "p-new", cachedAt: now - (30 * day) + 1000 },
+      { id: "legacy", name: "Legacy", lat: 2.22, lng: 102.22, source: "custom", placeId: "p-legacy" },
+      { id: "unrefreshable", name: "Old Google content", lat: 2.23, lng: 102.23, source: "custom" },
+    ],
+  }));
+
+  const loaded = tripStorage.loadTrip("user:user-a");
+
+  assert.deepEqual(loaded.stops.map((stop) => stop.id), ["fresh", "legacy"]);
+  assert.equal(Number.isFinite(loaded.stops.find((stop) => stop.id === "legacy").cachedAt), true);
+  assert.equal(JSON.stringify(loaded).includes("Old Google content"), false);
+  assert.deepEqual(JSON.parse(values.get("truebites:trip")).stops.map((stop) => stop.id), ["fresh", "legacy"]);
+});
+
 test("auth boundary clears only when identity changes, not on reload or token refresh", () => {
   if (!tripStorage.createTripSessionBoundary) return;
   let clears = 0;

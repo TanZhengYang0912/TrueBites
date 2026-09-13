@@ -19,16 +19,24 @@ export function getRouteConstraint(travelMode, stopCount) {
   const overflow = formatTripOverflowMessage(stopCount);
   if (overflow) return { code: "MAX_WAYPOINTS_EXCEEDED", message: overflow };
 
-  if (travelMode === "TRANSIT" && stopCount > 2) {
-    const intermediateCount = stopCount - 2;
-    const stopLabel = intermediateCount === 1 ? "stop" : "stops";
-    return {
-      code: "TRANSIT_WAYPOINTS_UNSUPPORTED",
-      message: `Transit routing supports only a start and destination. Remove ${intermediateCount} intermediate ${stopLabel} to calculate this route.`,
-    };
+  return null;
+}
+
+export function selectRoutingStops(stops, travelMode) {
+  if (!Array.isArray(stops) || stops.length < 2 || travelMode !== "TRANSIT") {
+    return Array.isArray(stops) ? stops : [];
   }
 
-  return null;
+  const origin = stops.find((stop) => stop.isMe) || stops[0];
+  const destination = [...stops].reverse().find((stop) => !stop.isMe && stop !== origin);
+  return destination ? [origin, destination] : [origin];
+}
+
+export function formatTransitScopeMessage(fullStops, routingStops) {
+  if (!Array.isArray(fullStops) || !Array.isArray(routingStops)) return null;
+  const intermediateCount = fullStops.length - routingStops.length;
+  if (intermediateCount <= 0 || routingStops.length < 2) return null;
+  return `Transit route includes only the start and final destination. ${intermediateCount} intermediate stops are not included.`;
 }
 
 function errorText(error) {

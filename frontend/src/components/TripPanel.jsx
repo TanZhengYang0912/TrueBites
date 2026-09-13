@@ -4,8 +4,9 @@ import LocationInput from "./LocationInput";
 import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
 import { MAP_COLORS } from "../lib/mapColors";
-import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDisplay";
+import { vendorGallery, priceLabel } from "../lib/vendorDisplay";
 import { buildGoogleMapsUrl } from "../lib/googleMapsHandoff";
+import { stopStatusPresentation } from "../lib/tripOptimization";
 
 const NAV_MODES = [
   { mode: "DRIVING",     label: "Car",        Icon: Car },
@@ -21,12 +22,22 @@ const OUTLINE_BTN =
 
 const ICON_BTN = "grid size-11 shrink-0 place-items-center text-muted";
 
+const ARRIVAL_TONE_CLASS = {
+  neutral: "text-muted",
+  success: "text-success",
+  warning: "text-[#B56A18]",
+  danger: "text-terracotta",
+  muted: "text-muted",
+};
+
 // Multi-stop trip planner. Every entry (including "Your location") is a normal
 // draggable stop — nothing is locked as start or end. "Nearby to add" always
 // surfaces vendors near "Your location" (never the last stop) that aren't in
 // the trip yet, one tap to add.
 export default function TripPanel({
-  trip, summary, loading, routeMessage, tripAtLimit,
+  trip, summary, routeMessage, transitScopeMessage, tripAtLimit,
+  optimizationLoading, optimizationComparison, arrivalRows = [],
+  routeWarnings = [], routeCopyrights,
   onReorder, onClear, onRemove, onEditStop,
   travelMode, onTravelMode,
   onManualLocation, onLocateMe,
@@ -35,6 +46,8 @@ export default function TripPanel({
   onAddCustomStop,
   onTripLimit,
   onSuggestBestOrder,
+  locationBias,
+  onFocusStop,
 }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [editingId, setEditingId] = useState(null); // id of the stop whose address is being re-typed
@@ -59,6 +72,11 @@ export default function TripPanel({
 
   const vendorStops = trip.filter((s) => !s.isMe);
   const gmaps = buildGoogleMapsUrl(trip, travelMode);
+  const arrivalsById = new Map(arrivalRows.map((row) => [row.stopId, row]));
+  const customAttributions = [...new Map(
+    trip.flatMap((s) => s.attributions || [])
+      .map((attribution) => [`${attribution.provider}|${attribution.providerURI || ""}`, attribution]),
+  ).values()];
 
   return (
     <>
@@ -99,6 +117,7 @@ export default function TripPanel({
             <div className="mb-2">
               <LocationInput
                 placeholder="Search your address…"
+                biasCenter={locationBias}
                 onSelect={(place) => { onManualLocation(place); setEditingId(null); }}
               />
             </div>
@@ -113,6 +132,19 @@ export default function TripPanel({
         <ol className="m-0 list-none p-0">
           {trip.map((s, i) => {
             const editable = s.isMe || s.source === "custom";
+            const arrival = arrivalsById.get(s.id);
+            const statusPresentation = stopStatusPresentation(s.vendor, arrival);
+            const previousStop = trip[i - 1];
+            const routeDistance = arrival?.legDistance
+              ? `${arrival.legDistance} ${arrival.fromStopId === previousStop?.id ? "from previous stop" : "from start"}`
+              : null;
+            const stopName = s.name || (s.source === "custom" ? "Google place" : "Unnamed stop");
+            const stopPrice = s.vendor
+              ? priceLabel(s.vendor)
+              : s.source === "custom"
+                ? s.priceLabel
+                : null;
+            const metadata = [routeDistance, stopPrice].filter(Boolean).join(" · ");
             return (
               <li key={s.id}>
                 <div
@@ -135,7 +167,7 @@ export default function TripPanel({
                     : "flex size-4.5 shrink-0 items-center justify-center rounded-full bg-forest text-[10.5px] text-white"}>{i + 1}</span>
                   {s.vendor ? (
                     <img
-                      src={placeholderImage(s.vendor)} alt=""
+                      src={vendorGallery(s.vendor)[0]} alt=""
                       className="size-8.5 shrink-0 rounded-full object-cover"
                     />
                   ) : s.isMe ? (
@@ -148,17 +180,37 @@ export default function TripPanel({
                     >
                       <LocateFixed size={16} />
                     </span>
+                  ) : s.source === "custom" ? (
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-[#EEF3F0] text-forest"
+                    >
+                      <MapPin size={16} />
+                    </span>
                   ) : null}
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-ink">
-                      {s.name}
-                    </div>
-                    {s.vendor && (
-                      <div className="text-[11px] text-muted">
-                        {[distanceLabel(s.vendor), priceLabel(s.vendor)].filter(Boolean).join(" · ")}
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => onFocusStop?.(s)}
+                    aria-label={`Focus ${stopName} on map`}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className="block truncate text-[13px] font-medium text-ink">
+                      {stopName}
+                    </span>
+                    {metadata && (
+                      <span className="block text-[11px] text-muted">
+                        {metadata}
+                      </span>
                     )}
-                  </span>
+                    {statusPresentation && (
+                      <span
+                        aria-live="polite"
+                        className={`block text-[11px] ${ARRIVAL_TONE_CLASS[statusPresentation.tone] || ARRIVAL_TONE_CLASS.neutral}`}
+                      >
+                        {statusPresentation.text}
+                      </span>
+                    )}
+                  </button>
                   {editable && (
                     <button
                       onClick={() => setEditingId((id) => (id === s.id ? null : s.id))}
@@ -180,6 +232,7 @@ export default function TripPanel({
                   <div className="mb-2">
                     <LocationInput
                       placeholder={s.isMe ? "Search your address…" : "Search a place…"}
+                      biasCenter={locationBias}
                       onSelect={(place) => {
                         if (s.isMe) onManualLocation(place);
                         else onEditStop(s.id, place);
@@ -199,6 +252,7 @@ export default function TripPanel({
         addingPlace ? (
           <LocationInput
             placeholder="Search a place to add…"
+            biasCenter={locationBias}
             onSelect={(place) => { onAddCustomStop(place); setAddingPlace(false); }}
           />
         ) : (
@@ -221,19 +275,34 @@ export default function TripPanel({
         </div>
       )}
 
-      {loading && !routeMessage && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
+      {transitScopeMessage && (
+        <div role="note" className="my-2 text-[10.5px] leading-relaxed text-muted">
+          {transitScopeMessage}
+        </div>
+      )}
 
       {/* Route summary tiles */}
-      {summary && (!loading || routeMessage) && (
+      {summary && (
         <div className="my-3 grid grid-cols-2 gap-2">
           <StatTile icon={<Route size={13} color={MAP_COLORS.terracotta} />} value={summary.distance} label="Total Distance" />
           <StatTile icon={<Clock size={13} color={MAP_COLORS.terracotta} />} value={summary.duration} label="Est. Duration" />
         </div>
       )}
 
+      {(optimizationLoading || optimizationComparison) && (
+        <div aria-live="polite" role="status" className="mb-2 text-center text-[11.5px] text-forest">
+          {optimizationLoading ? "Finding best order…" : optimizationComparison.message}
+        </div>
+      )}
+
       {vendorStops.length >= 2 && (
-        <button onClick={onSuggestBestOrder} className={OUTLINE_BTN}>
-          <Sparkles size={14} /> Suggest Best Order
+        <button
+          onClick={onSuggestBestOrder}
+          disabled={optimizationLoading || Boolean(routeMessage) || travelMode === "TRANSIT"}
+          title={travelMode === "TRANSIT" ? "Best order is unavailable for Transit." : undefined}
+          className={`${OUTLINE_BTN} disabled:cursor-not-allowed disabled:opacity-50`}
+        >
+          <Sparkles size={14} /> {optimizationLoading ? "Finding best order…" : "Suggest Best Order"}
         </button>
       )}
 
@@ -291,6 +360,34 @@ export default function TripPanel({
           Google Maps supports up to 9 stops after your start — the rest are left out.
         </div>
       )}
+
+      <div id="google-place-attributions" className="mt-1 text-center text-xs leading-relaxed text-muted" />
+      {customAttributions.length > 0 && (
+        <div className="mt-1 text-center text-xs leading-relaxed text-muted">
+          Place data: {customAttributions.map((attribution, index) => (
+            <span key={`${attribution.provider}|${attribution.providerURI || ""}`}>
+              {index > 0 ? ", " : ""}
+              {attribution.providerURI ? (
+                <a href={attribution.providerURI} target="_blank" rel="noopener noreferrer" className="underline">
+                  {attribution.provider}
+                </a>
+              ) : attribution.provider}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {routeCopyrights && (
+        <div className="mt-1 text-center text-[10px] leading-relaxed text-muted">
+          {routeCopyrights}
+        </div>
+      )}
+
+      {routeWarnings.map((warning) => (
+        <div key={warning} role="note" className="mt-1 text-center text-[9.5px] leading-relaxed text-muted">
+          {warning}
+        </div>
+      ))}
 
       {trip.length > 0 && (
         <button

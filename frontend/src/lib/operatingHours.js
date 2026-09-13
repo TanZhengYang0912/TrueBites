@@ -64,12 +64,46 @@ export function isOperatingNow(window, now = new Date()) {
   return rangeSegments(window).some(([start, end]) => minute >= start && minute < end);
 }
 
-function formatClock(totalMinutes) {
+export function formatOperatingClock(totalMinutes) {
   const hour24 = Math.floor(totalMinutes / 60) % 24;
   const minute = totalMinutes % 60;
   const period = hour24 >= 12 ? "pm" : "am";
   const hour12 = hour24 % 12 || 12;
   return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+export function formatMalaysiaTime(now = new Date()) {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kuala_Lumpur",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(now).replace(/\b(am|pm)\b/gi, (period) => period.toUpperCase());
+}
+
+export function operatingStatusAt(vendor, now = new Date(), closingSoonMinutes = 60) {
+  const window = operatingWindowForVendor(vendor);
+  if (!window || !(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    return { kind: "unavailable" };
+  }
+  if (window.open === 0 && window.close === 1440) return { kind: "open-24" };
+  if (window.open === window.close) return { kind: "unavailable" };
+
+  const minute = malaysiaMinutes(now);
+  const overnight = window.close < window.open;
+  const open = overnight
+    ? minute >= window.open || minute < window.close
+    : minute >= window.open && minute < window.close;
+  if (!open) return { kind: "closed" };
+
+  const minutesToClose = overnight && minute >= window.open
+    ? 1440 - minute + window.close
+    : window.close - minute;
+  return {
+    kind: minutesToClose <= closingSoonMinutes ? "closing-soon" : "open",
+    closeText: formatOperatingClock(window.close),
+  };
 }
 
 export function operatingStatus(vendor, now = new Date()) {
@@ -79,6 +113,6 @@ export function operatingStatus(vendor, now = new Date()) {
     isOpen: isOperatingNow(window, now),
     label: window.open === 0 && window.close === 1440
       ? "24 hours"
-      : `${formatClock(window.open)} – ${formatClock(window.close)}`,
+      : `${formatOperatingClock(window.open)} – ${formatOperatingClock(window.close)}`,
   };
 }
