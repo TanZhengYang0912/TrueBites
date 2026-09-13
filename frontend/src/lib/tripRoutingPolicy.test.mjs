@@ -13,10 +13,10 @@ import {
 } from "./tripRoutingPolicy.js";
 
 const routeStops = [
-  { id: "me", isMe: true, lat: 3.1, lng: 101.7 },
-  { id: "middle-a", isMe: false, lat: 2.4, lng: 102.0 },
-  { id: "middle-b", isMe: false, lat: 2.3, lng: 102.1 },
-  { id: "final", isMe: false, lat: 2.2, lng: 102.2 },
+  { id: "me", type: "anchor", lat: 3.1, lng: 101.7 },
+  { id: "middle-a", type: "vendor", lat: 2.4, lng: 102.0 },
+  { id: "middle-b", type: "custom", lat: 2.3, lng: 102.1 },
+  { id: "final", type: "vendor", lat: 2.2, lng: 102.2 },
 ];
 
 test("capacity counts origin and destination", () => {

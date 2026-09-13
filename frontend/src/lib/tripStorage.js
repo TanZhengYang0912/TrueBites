@@ -1,9 +1,9 @@
-// Trip persistence — browser-local planning state scoped to the current guest
-// or signed-in account. Only id/type/vendorId/name/lat/lng is stored — never
-// the embedded `vendor` object, since that's a point-in-time snapshot that
-// would go stale; MapPage re-hydrates it by vendorId once vendors have loaded.
+// Browser-local planning state scoped to the current guest or signed-in account.
+// Precise anchors stay in tab-scoped session storage. Vendor snapshots and
+// custom Google display details are re-hydrated instead of persisted here.
 import { isResolvedStop, migrateStop, plannedStopCount, newStopId } from "./tripStops.js";
 import { isTripAtLimit } from "./tripRoutingPolicy.js";
+import { isFreshGooglePlaceCache } from "./customPlaces.js";
 
 const STORAGE_KEY = "truebites:trip";
 
@@ -26,7 +26,12 @@ export function loadTrip(owner = "guest") {
       window.localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    const stops = Array.isArray(parsed?.stops) ? parsed.stops.map(migrateStop) : null;
+    const stops = Array.isArray(parsed?.stops)
+      ? parsed.stops
+        .map(migrateStop)
+        .filter((stop) => stop.type !== "anchor")
+        .filter((stop) => stop.type !== "custom" || isFreshGooglePlaceCache(stop))
+      : null;
     if (!stops || !stops.every((stop) => isResolvedStop(stop) && typeof stop.id === "string")) return null;
     if (stops.filter((stop) => stop.type === "anchor").length > 1) return null;
     return { stops, travelMode: parsed.travelMode || "DRIVING" };
@@ -37,7 +42,17 @@ export function loadTrip(owner = "guest") {
 
 export function saveTrip(stops, travelMode, owner = "guest") {
   try {
-    const stripped = stops.map(({ id, type, vendorId, name, lat, lng }) => ({ id, type, vendorId, name, lat, lng }));
+    const stripped = stops
+      .filter((stop) => stop.type !== "anchor")
+      .filter((stop) => stop.type !== "custom" || (stop.placeId && isFreshGooglePlaceCache(stop)))
+      .map((stop) => {
+        if (stop.type === "custom") {
+          const { id, type, placeId, lat, lng, cachedAt } = stop;
+          return { id, type, placeId, lat, lng, cachedAt };
+        }
+        const { id, type, vendorId, name, lat, lng } = stop;
+        return { id, type, vendorId, name, lat, lng };
+      });
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ owner, stops: stripped, travelMode }));
     window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   } catch {

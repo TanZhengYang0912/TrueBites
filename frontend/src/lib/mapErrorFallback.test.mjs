@@ -13,7 +13,8 @@ test("map page handles Google Maps authorization failures without rendering a br
   assert.match(source, /This page can't load Google Maps correctly/);
   assert.match(source, /MutationObserver/);
   assert.match(source, /Map temporarily unavailable/);
-  assert.match(source, /onError=\{\(\) => setMapError\("Google Maps failed to load\. Please check the browser key, Maps JavaScript API, and billing settings\."\)\}/);
+  assert.match(source, /<APIProvider[\s\S]*?onError=\{[\s\S]*?setMapError/);
+  assert.match(source, /Google Maps failed to load/);
   assert.match(source, /if \(mapError\) \{\s*return \(/);
   assert.doesNotMatch(source, /\{mapError \? \(/);
 });

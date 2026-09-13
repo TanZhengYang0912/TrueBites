@@ -83,3 +83,40 @@ test("outside-map adds reserve the anchor row inside the 27-stop cap", () => {
   tripStorage.subscribePlannedStopCount((count) => counts.push(count), "guest")();
   assert.deepEqual(counts, [27]);
 });
+
+test("durable trip storage excludes the precise anchor and custom display snapshots", () => {
+  const { values } = installBrowserStorage();
+  const anchor = { id: "anchor-1", type: "anchor", name: "Private home", lat: 3.1, lng: 101.7 };
+  const custom = {
+    id: "custom-1", type: "custom", name: "Cafe Example", lat: 2.2, lng: 102.2,
+    placeId: "google-place-1", cachedAt: 1_800_000_000_000,
+    address: "Private display snapshot", priceLabel: "RM15 – RM30", primaryType: "cafe",
+  };
+  tripStorage.saveTrip([anchor, storedVendor, custom], "WALKING", "guest");
+  const payload = JSON.parse(values.get("truebites:trip"));
+  assert.deepEqual(payload.stops, [
+    storedVendor,
+    {
+      id: "custom-1", type: "custom", placeId: "google-place-1",
+      lat: 2.2, lng: 102.2, cachedAt: 1_800_000_000_000,
+    },
+  ]);
+  assert.equal(JSON.stringify(payload).includes("Private home"), false);
+  assert.equal(JSON.stringify(payload).includes("Private display snapshot"), false);
+});
+
+test("expired or unidentified custom Google stops are removed during restore", () => {
+  const { values } = installBrowserStorage();
+  const now = Date.now();
+  values.set("truebites:trip", JSON.stringify({
+    owner: "guest",
+    travelMode: "DRIVING",
+    stops: [
+      storedVendor,
+      { id: "fresh", type: "custom", placeId: "place-fresh", lat: 2.2, lng: 102.2, cachedAt: now },
+      { id: "expired", type: "custom", placeId: "place-old", lat: 2.2, lng: 102.2, cachedAt: now - (31 * 24 * 60 * 60 * 1000) },
+      { id: "anonymous", type: "custom", lat: 2.2, lng: 102.2, cachedAt: now },
+    ],
+  }));
+  assert.deepEqual(tripStorage.loadTrip("guest").stops.map((stop) => stop.id), ["vendor-stop-1", "fresh"]);
+});

@@ -27,8 +27,8 @@ export function selectRoutingStops(stops, travelMode) {
     return Array.isArray(stops) ? stops : [];
   }
 
-  const origin = stops.find((stop) => stop.isMe) || stops[0];
-  const destination = [...stops].reverse().find((stop) => !stop.isMe && stop !== origin);
+  const origin = stops.find((stop) => stop.type === "anchor") || stops[0];
+  const destination = [...stops].reverse().find((stop) => stop.id !== origin.id);
   return destination ? [origin, destination] : [origin];
 }
 
