@@ -21,6 +21,10 @@ test("MapPage hydrates and saves trips under the resolved session owner", () => 
   assert.match(mapPage, /loadTrip\(owner\)/);
   assert.match(mapPage, /saveTrip\(trip,\s*travelMode,\s*owner\)/);
   assert.match(mapPage, /hydratedOwner\s*!==\s*owner/);
+  assert.match(mapPage, /loadMapOrigin\(\)/);
+  assert.match(mapPage, /saveMapOrigin/);
+  assert.match(mapPage, /createMapOriginSessionBoundary/);
+  assert.match(mapPage, /clearMapOrigin/);
 });
 
 test("global trip count never reads another account's stored trip", () => {

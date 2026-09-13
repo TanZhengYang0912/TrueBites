@@ -15,10 +15,10 @@ test("MapPage owns canonical filters and keeps the result order fixed", () => {
   assert.doesNotMatch(mapPage, /setSort\(/);
 });
 
-test("MapPage derives location-aware distances only from the resolved anchor", () => {
+test("MapPage derives location-aware distances only from the session-safe distance origin", () => {
   assert.match(mapPage, /const vendorsWithDistance = useMemo/);
-  assert.match(mapPage, /searchAnchor\s*\?/);
-  assert.match(mapPage, /haversineKm\(searchAnchor\.lat, searchAnchor\.lng/);
+  assert.match(mapPage, /distanceOrigin\s*\?/);
+  assert.match(mapPage, /haversineKm\(distanceOrigin\.lat, distanceOrigin\.lng/);
   assert.match(mapPage, /distKm:\s*undefined/);
 });
 

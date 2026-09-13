@@ -31,19 +31,14 @@ test("trip stops keep their route number in the same marker shape", async () => 
   assert.doesNotMatch(markerSource, /tripOrder|userStopNumber/);
 });
 
-test("Google custom stops render as numbered route markers outside vendor clusters", async () => {
-  const source = await readFile(markerPath, "utf8");
+test("Google custom stops keep their trip number through TripStopMarkers", async () => {
+  const vendorSource = await readFile(markerPath, "utf8");
+  const stopSource = await readFile(stopMarkerPath, "utf8");
 
-  assert.match(source, /function CustomStopMarker/);
-  assert.match(source, /position=\{\{ lat: stop\.lat, lng: stop\.lng \}\}/);
-  assert.match(source, /title=\{stop\.address \|\| stop\.name \|\| "Google place"\}/);
-  assert.match(source, /<HawkerStallPin stopNum=\{stop\.stopNum\} \/>/);
-  assert.match(source, /customStops\.map\(\(stop\) =>/);
-  const customMarker = source.slice(
-    source.indexOf("function CustomStopMarker"),
-    source.indexOf("export default function VendorMarkers"),
-  );
-  assert.doesNotMatch(customMarker, /setClusterMarker|onMarkerChange/);
+  assert.match(stopSource, /rowsFor\(trip, draftStops\)\.filter\(\(row\) => !row\.draft\)/);
+  assert.match(stopSource, /groupStopsByPosition\(numberedStops\)/);
+  assert.match(stopSource, /<HawkerStallPin stopNum=\{group\.stops\.map/);
+  assert.doesNotMatch(vendorSource, /CustomStopMarker|customStops/);
 });
 
 test("marker refs update clusters without rerendering through an inline ref", async () => {

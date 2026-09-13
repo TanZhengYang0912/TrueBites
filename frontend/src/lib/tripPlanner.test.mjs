@@ -89,7 +89,7 @@ test("storage keeps type/vendorId, strips vendor snapshots, and permits repeats"
   saveTrip([anchor, vendorA, vendorAAgain], "WALKING", "guest");
   const back = loadTrip("guest");
   assert.deepEqual(back.stops.map(({ type, vendorId }) => [type, vendorId]), [
-    ["anchor", undefined], ["vendor", "v1"], ["vendor", "v1"],
+    ["vendor", "v1"], ["vendor", "v1"],
   ]);
   assert.equal(back.stops.some((stop) => "vendor" in stop), false);
   assert.equal(back.travelMode, "WALKING");
@@ -97,7 +97,8 @@ test("storage keeps type/vendorId, strips vendor snapshots, and permits repeats"
 
 test("only the three anchor entry points write the anchor", () => {
   assert.match(mapPage, /function placeAnchor\(place, \{ onlyIfEmpty = false \} = \{\}\)/);
-  assert.doesNotMatch(mapPage, /anchorSeededOwnerRef|setDistanceOrigin/);
+  assert.doesNotMatch(mapPage, /anchorSeededOwnerRef/);
+  assert.match(mapPage, /saveMapOrigin\(origin\)/);
   const entry = mapPage.slice(mapPage.indexOf("locationRequestedRef.current = true"), mapPage.indexOf("locationRequestedRef.current = true") + 700);
   assert.match(entry, /placeAnchor\(labelled, \{ onlyIfEmpty: true \}\)/);
   const fab = mapPage.slice(mapPage.indexOf("function locateMe"), mapPage.indexOf("function locateMe") + 700);
@@ -105,12 +106,12 @@ test("only the three anchor entry points write the anchor", () => {
   assert.doesNotMatch(fab, /setUserPos\(MELAKA_CENTER\)/);
 });
 
-test("storage rejects unresolved rows and duplicate anchors", () => {
+test("storage discards legacy durable anchors and unresolved rows", () => {
   installBrowserStorage();
   window.localStorage.setItem("truebites:trip", JSON.stringify({ owner: "guest", travelMode: "DRIVING", stops: [anchor, newDraft("custom")] }));
-  assert.equal(loadTrip("guest"), null);
+  assert.deepEqual(loadTrip("guest").stops, []);
   window.localStorage.setItem("truebites:trip", JSON.stringify({ owner: "guest", travelMode: "DRIVING", stops: [anchor, { ...anchor, id: "anchor-2" }] }));
-  assert.equal(loadTrip("guest"), null);
+  assert.deepEqual(loadTrip("guest").stops, []);
 });
 
 test("the Google cap counts drafts and the reserved anchor row", () => {
@@ -120,13 +121,14 @@ test("the Google cap counts drafts and the reserved anchor row", () => {
   assert.equal(plannedStopCount([vendorA, vendorAAgain], []), 3, "no anchor stored → one row reserved");
 });
 
-test("Google draws routes and OSRM only optimises", () => {
+test("Google draws routes and optimises for the selected mode", () => {
   assert.doesNotMatch(mapPage, /TripPolyline|tripData/);
-  assert.match(mapPage, /<DirectionsRenderer[\s\S]*?stops=\{trip\}/);
-  const body = mapPage.slice(mapPage.indexOf("async function planTrip"), mapPage.indexOf("async function planTrip") + 700);
-  assert.match(body, /getTrip\(points, true\)/);
-  assert.doesNotMatch(mapPage, /planTrip\([^)]*,\s*false\)/);
-  assert.match(mapPage, /summary=\{dirSummary\}/);
+  assert.doesNotMatch(mapPage, /\bgetTrip\b/);
+  assert.match(mapPage, /const routingStops = useMemo\([\s\S]*selectRoutingStops\(trip, travelMode\)/);
+  assert.match(mapPage, /<DirectionsRenderer[\s\S]*?stops=\{routingStops\}/);
+  assert.match(mapPage, /summary=\{displayedSummary\}/);
+  const directions = read("../components/DirectionsRenderer.jsx");
+  assert.match(directions, /optimizeWaypoints:\s*true/);
 });
 
 test("route choice reuses the cached Google result", () => {
@@ -137,13 +139,14 @@ test("route choice reuses the cached Google result", () => {
 });
 
 test("a failed route keeps stops and explains the failure", () => {
-  assert.match(mapPage, /No route is available for these stops\. Try changing their order or location\./);
+  assert.match(mapPage, /getDirectionsErrorMessage\(dirError, trip\.length\)/);
   assert.match(tripPanel, /buildGoogleMapsUrl\(trip, travelMode\)/);
   const directions = read("../components/DirectionsRenderer.jsx");
   const short = directions.slice(directions.indexOf("stops.length < 2"), directions.indexOf("stops.length < 2") + 500);
-  assert.match(short, /onSummary\?\.\(null\)/);
-  assert.match(short, /onRoutes\?\.\(\[\]\)/);
-  assert.match(short, /onTransitLegs\?\.\(\[\]\)/);
+  assert.match(short, /clearRoute\(identity\)/);
+  assert.match(directions, /publishSummary\?\.\(null\)/);
+  assert.match(directions, /publishRoutes\?\.\(\[\]\)/);
+  assert.match(directions, /publishTransit\?\.\(\[\]\)/);
 });
 
 const stopMarkers = read("../components/TripStopMarkers.jsx");
@@ -229,6 +232,7 @@ test("route controls gate on stop count, not stop type", () => {
   assert.doesNotMatch(tripPanel, /vendorStops/);
   assert.match(tripPanel, /\{trip\.length >= 2 && \([\s\S]{0,80}onSuggestBestOrder/);
   assert.doesNotMatch(tripPanel, /\.length >= 1 &&/);
+  assert.match(tripPanel, /disabled=\{[^}]*travelMode === "TRANSIT"/);
 });
 
 const vendorPanel = read("../components/VendorPanel.jsx");
