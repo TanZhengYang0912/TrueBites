@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STOP_TYPES, newStopId, isResolvedStop, newDraft, rowsFor,
-  nearlySamePlace, groupStopsByPosition, migrateStop,
+  nearlySamePlace, groupStopsByPosition, migrateStop, plannedStopCount,
 } from "./tripStops.js";
 import { loadTrip, saveTrip, reconcileTripOwner } from "./tripStorage.js";
 import { distanceLabel } from "./vendorDisplay.js";
@@ -111,6 +111,13 @@ test("storage rejects unresolved rows and duplicate anchors", () => {
   assert.equal(loadTrip("guest"), null);
   window.localStorage.setItem("truebites:trip", JSON.stringify({ owner: "guest", travelMode: "DRIVING", stops: [anchor, { ...anchor, id: "anchor-2" }] }));
   assert.equal(loadTrip("guest"), null);
+});
+
+test("the Google cap counts drafts and the reserved anchor row", () => {
+  assert.equal(plannedStopCount([], []), 1, "an empty trip still owes the anchor row");
+  assert.equal(plannedStopCount([], [newDraft("anchor")]), 1);
+  assert.equal(plannedStopCount([anchor, vendorA], [newDraft("custom")]), 3);
+  assert.equal(plannedStopCount([vendorA, vendorAAgain], []), 3, "no anchor stored → one row reserved");
 });
 
 test("Google draws routes and OSRM only optimises", () => {

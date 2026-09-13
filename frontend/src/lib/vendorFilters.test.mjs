@@ -10,6 +10,7 @@ import {
   sortVendors,
 } from "./vendorFilters.js";
 import { hoursStatus } from "./vendorDisplay.js";
+import { operatingStatusAt } from "./operatingHours.js";
 
 const NANCY = {
   id: "n",
@@ -150,6 +151,16 @@ test("hours fall back to the legacy field when the raw value is malformed", () =
   };
   assert.equal(matchesFilters(vendor, { hours: "lunch", openNow: true }, { now: instant }), true);
   assert.deepEqual(hoursStatus(vendor, instant), { isOpen: true, label: "09:00 am – 10:00 pm" });
+});
+
+test("arrival-time evaluation preserves existing current, overnight, and 24-hour semantics", () => {
+  const lateNight = new Date("2026-09-02T17:30:00.000Z"); // 01:30 MYT
+  assert.equal(operatingStatusAt({ operating_hours_raw: "24 hours" }, lateNight).kind, "open-24");
+  assert.equal(operatingStatusAt({ operating_hours_raw: "10:00 PM - 02:00 AM" }, lateNight).kind, "closing-soon");
+  assert.deepEqual(
+    hoursStatus({ operating_hours_raw: "10:00 PM - 02:00 AM" }, lateNight),
+    { isOpen: true, label: "10:00 pm – 02:00 am" },
+  );
 });
 
 test("rating requires a known value when active", () => {

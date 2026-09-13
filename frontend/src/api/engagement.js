@@ -108,6 +108,12 @@ export async function uploadReviewPhoto(reviewId, file) {
     body: file,
   });
 }
+export async function deleteReviewPhoto(reviewId, photoId) {
+  return requestJson(`/api/engagement/reviews/${reviewId}/photo/${photoId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+}
 
 // ── Votes ──
 export async function voteReview(id, isLike) {

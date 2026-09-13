@@ -1,6 +1,6 @@
 import { AlertTriangle, Ban, Check, FileDown, ImagePlus, List, MapPinned, Maximize2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import {
   commitVendorPhoto, createAdminVendor, deleteAdminVendor, deleteVendorGalleryImage, getAdminVendorDuplicates,
@@ -20,6 +20,12 @@ import "./vendorMobileFilters.css";
 
 const CATEGORIES = ["Malaysian / Local", "Nyonya / Peranakan", "Chinese", "Cafe / Dessert", "Western"];
 const STATUS_OPTIONS = ["all", "active", "draft", "suspended"];
+// Deep-link flags the admin dashboard's "Needs attention" notifications use
+// (see attentionItems in backend/routes/admin.js) — e.g. /admin/vendors2?flag=missing_hours.
+const FLAG_LABELS = {
+  missing_address: "Missing verified location",
+  missing_hours: "Missing operating hours",
+};
 const SORT_OPTIONS = [
   { value: "default", label: "Default" },
   { value: "az", label: "Name A–Z" },
@@ -1228,9 +1234,21 @@ function AddVendorModal({ onClose, onCreated, notify }) {
 
 export default function AdminVendorManagementPage() {
   const { setTopbarAction } = useOutletContext();
+  // Dashboard notifications link here with ?status=… / ?flag=… (see
+  // FLAG_LABELS above) — read once on mount so landing here from "Draft
+  // vendors waiting for approval" etc. actually applies that filter instead
+  // of dropping the admin on the same, unfiltered list.
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [draftQuery, setDraftQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState(() => {
+    const initial = searchParams.get("status");
+    return STATUS_OPTIONS.includes(initial) ? initial : "all";
+  });
+  const [flag, setFlag] = useState(() => {
+    const initial = searchParams.get("flag");
+    return initial && FLAG_LABELS[initial] ? initial : "";
+  });
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("default");
   const [data, setData] = useState({ items: [], pagination: { page: 1, totalPages: 1, total: 0 } });
@@ -1322,12 +1340,13 @@ export default function AdminVendorManagementPage() {
     setExportingVendors(true);
     try {
       const vendors = await fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
-        params: { status, category, sort, q: query },
+        params: { status, category, sort, q: query, flag },
       });
       const filterBits = [
         status !== "all" ? `Status: ${status}` : null,
         category !== "all" ? `Category: ${category}` : null,
         query ? `Search: "${query}"` : null,
+        flag && FLAG_LABELS[flag] ? FLAG_LABELS[flag] : null,
       ].filter(Boolean);
       await openVendorsPdf({
         title: "Vendor Directory",
@@ -1345,7 +1364,7 @@ export default function AdminVendorManagementPage() {
     const page = overrides.page ?? data.pagination.page ?? 1;
     setLoading(true);
     setError("");
-    return getAdminVendors({ page, pageSize, status, category, sort, q: query })
+    return getAdminVendors({ page, pageSize, status, category, sort, q: query, flag })
       .then((payload) => setData(payload))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -1362,21 +1381,21 @@ export default function AdminVendorManagementPage() {
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setMapLoading(false); });
     return () => { active = false; };
-  }, [viewMode, status, category, sort, query]);
+  }, [viewMode, status, category, sort, query, flag]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
 
-    getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query })
+    getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query, flag })
       .then((payload) => { if (active) setData(payload); })
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.pagination.page, status, category, sort, query, pageSize]);
+  }, [data.pagination.page, status, category, sort, query, pageSize, flag]);
 
   // Selection is scoped to the current page/filter view — clear it whenever the
   // visible set changes so a stale id can't be bulk-acted on off-screen.
@@ -1384,9 +1403,31 @@ export default function AdminVendorManagementPage() {
     setSelectedIds(new Set());
     setConfirmBulkDelete(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.pagination.page, status, category, sort, query, pageSize]);
+  }, [data.pagination.page, status, category, sort, query, pageSize, flag]);
 
   const resetToFirstPage = () => setData((cur) => ({ ...cur, pagination: { ...cur.pagination, page: 1 } }));
+
+  // Clicking a "Needs attention" notification while this page is ALREADY
+  // open (e.g. an admin browsing the vendor list who opens the bell) changes
+  // only the URL's query string — the component stays mounted, so the
+  // useState() lazy initializers above (which only run once, on mount) never
+  // see the new status/flag. This re-applies them on every later navigation
+  // to a differently-queried /admin/vendors2 link too.
+  useEffect(() => {
+    const urlStatus = searchParams.get("status");
+    const urlFlag = searchParams.get("flag");
+    let changed = false;
+    if (urlStatus && STATUS_OPTIONS.includes(urlStatus) && urlStatus !== status) {
+      setStatus(urlStatus);
+      changed = true;
+    }
+    if (urlFlag && FLAG_LABELS[urlFlag] && urlFlag !== flag) {
+      setFlag(urlFlag);
+      changed = true;
+    }
+    if (changed) resetToFirstPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openVendor = (vendor) => {
     setSelectedVendor(vendor);
@@ -1540,11 +1581,11 @@ export default function AdminVendorManagementPage() {
       setPendingGalleryDeletes(failedDeletes);
       setPendingGalleryAdds(new Set());
 
-      const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
+      const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query, flag });
       setData(refreshed);
       if (viewMode === "map") {
         const refreshedMap = await fetchAllPages((pageOpts) => getAdminVendors(pageOpts), {
-          params: { status, category, sort, q: query },
+          params: { status, category, sort, q: query, flag },
         });
         setMapVendors(refreshedMap);
       }
@@ -1628,7 +1669,7 @@ export default function AdminVendorManagementPage() {
       // Clear this as soon as the write succeeds: a refresh failure must not
       // leave a dialog that can repeat a completed deletion.
       setConfirmDelete(null);
-      const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query });
+      const refreshed = await getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query, flag });
       setData(refreshed);
       notify("Vendor deleted.");
     } catch (err) {
@@ -1659,7 +1700,7 @@ export default function AdminVendorManagementPage() {
   };
 
   const refreshList = () =>
-    getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query }).then(setData);
+    getAdminVendors({ page: data.pagination.page, pageSize, status, category, sort, q: query, flag }).then(setData);
 
   // One-click status change straight from a table row (Approve / Suspend) —
   // reuses the partial-PATCH endpoint, no full edit needed.
@@ -1852,6 +1893,19 @@ export default function AdminVendorManagementPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
+          {flag && FLAG_LABELS[flag] ? (
+            <span className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700">
+              {FLAG_LABELS[flag]}
+              <button
+                type="button"
+                aria-label="Clear filter"
+                className="text-blue-500 hover:text-blue-700"
+                onClick={() => { setFlag(""); resetToFirstPage(); }}
+              >
+                ×
+              </button>
+            </span>
+          ) : null}
           <div className="vendor-filter-select relative">
             <select className="h-10 appearance-none rounded-full border border-gray-200 bg-white pl-4 pr-10 text-sm font-semibold text-blue-600 shadow-sm outline-none hover:bg-gray-50 focus:border-gray-300 focus:ring-1 focus:ring-gray-300" value={sort} onChange={(e) => { setSort(e.target.value); resetToFirstPage(); }}>
               {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -1920,6 +1974,7 @@ export default function AdminVendorManagementPage() {
               <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("category")} onClick={() => handleHeaderSort("category")}>
                 Category <span className="text-gray-400">{sortIndicator("category")}</span>
               </th>
+              <th className="px-4 py-4">Location</th>
               <th className="px-4 py-4">Hours</th>
               <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("status")} onClick={() => handleHeaderSort("status")}>
                 Status <span className="text-gray-400">{sortIndicator("status")}</span>
@@ -1931,7 +1986,7 @@ export default function AdminVendorManagementPage() {
             {loading ? (
               Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                 <tr key={`sk-${i}`} className="admin-skeleton-row">
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j} className="px-4 py-4"><div className="h-4 w-full animate-pulse rounded bg-gray-100" /></td>
                   ))}
                 </tr>
@@ -1965,7 +2020,24 @@ export default function AdminVendorManagementPage() {
                     </button>
                   </td>
                   <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
-                  <td className="px-4 py-4 text-gray-500">{vendor.operatingHours || "—"}</td>
+                  <td className="px-4 py-4 text-gray-500">
+                    {vendor.missingAddress ? (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
+                        Missing
+                      </span>
+                    ) : (
+                      <span className="max-w-[180px] truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-gray-500">
+                    {vendor.missingHours ? (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
+                        Missing
+                      </span>
+                    ) : (
+                      vendor.operatingHours
+                    )}
+                  </td>
                   <td className="px-4 py-4">
                     {st === "active" ? (
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">

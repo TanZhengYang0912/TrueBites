@@ -61,3 +61,25 @@ test("logout and account switch clear the previous account trip", () => {
   assert.equal(tripStorage.reconcileTripOwner({ user: { id: "user-b" } }), "cleared");
   assert.equal(tripStorage.loadTrip("user:user-b"), null);
 });
+
+test("Saved and My reviews append a vendor occurrence in the current record shape", () => {
+  installBrowserStorage();
+  const vendor = { id: "db-1", name: "Kedai", latitude: 2.2, longitude: 102.2 };
+  assert.equal(tripStorage.addVendorToTrip(vendor, "guest"), "added");
+  assert.equal(tripStorage.addVendorToTrip(vendor, "guest"), "added", "repeat add is allowed");
+  const stops = tripStorage.loadTrip("guest").stops;
+  assert.deepEqual(stops.map((stop) => [stop.type, stop.vendorId]), [["vendor", "db-1"], ["vendor", "db-1"]]);
+  assert.notEqual(stops[0].id, stops[1].id);
+  assert.equal(tripStorage.addVendorToTrip({ id: "x", name: "No pin" }, "guest"), "no-location");
+});
+
+test("outside-map adds reserve the anchor row inside the 27-stop cap", () => {
+  installBrowserStorage();
+  const vendor = { id: "db-1", name: "Kedai", latitude: 2.2, longitude: 102.2 };
+  for (let index = 0; index < 26; index += 1) assert.equal(tripStorage.addVendorToTrip(vendor, "guest"), "added");
+  assert.equal(tripStorage.addVendorToTrip(vendor, "guest"), "limit", "26 vendors + the anchor row = 27");
+  assert.equal(tripStorage.loadTrip("guest").stops.length, 26);
+  const counts = [];
+  tripStorage.subscribePlannedStopCount((count) => counts.push(count), "guest")();
+  assert.deepEqual(counts, [27]);
+});

@@ -25,6 +25,12 @@ export function rowsFor(trip = [], draftStops = []) {
   return ordered.map((row, index) => ({ ...row, number: index + 1 }));
 }
 
+export function plannedStopCount(trip = [], draftStops = []) {
+  const hasAnchor = trip.some((stop) => stop.type === "anchor")
+    || draftStops.some((draft) => draft.type === "anchor");
+  return trip.length + draftStops.length + (hasAnchor ? 0 : 1);
+}
+
 const EARTH_M = 6371000;
 function metresBetween(a, b) {
   const rad = (degrees) => (degrees * Math.PI) / 180;

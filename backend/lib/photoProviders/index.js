@@ -2,19 +2,20 @@
 // not classes — matches the rest of this codebase's style. Every provider
 // exposes a `findCandidates(vendor) -> candidate[]` shape (see
 // googlePlacesPhotoProvider.js / tiktokOEmbedProvider.js for the exact
-// fields); the discover endpoint calls each registered provider and lets
+// fields); the discover endpoint calls every registered provider and lets
 // photoMatching.js's confidence thresholds decide what's worth showing an
 // admin.
 //
-// Two tiers, tried in priority order (see PROJECT SCOPE section 14, "Cover
-// Image priority" + the "Image Source Priority" cascade this module
-// implements): a vendor with its own AI-Content-Upload source video gets its
-// real frames/thumbnail from THAT video first — an actual photo of this
-// exact vendor beats a "probably nearby" guess — and only falls through to
-// the location-based tier (Google Places Photos, then Wikimedia Commons as
-// the free, name-based fallback) when the video tier comes up empty, or the
-// vendor never had a video to begin with. This also means a vendor with a
-// working video never triggers the paid Google Places calls at all.
+// All four providers run together on every search, merged into one
+// confidence-sorted list — a vendor's own video (video_frame, tiktok_oembed)
+// isn't preferred over the location-based sources (google_places_photo,
+// wikimedia) any more, all four are just more candidates for the admin to
+// choose from. This used to be a two-tier cascade (video first, only
+// falling through to the paid Google Places call when video came up empty)
+// specifically to avoid that paid call when a free video-based photo was
+// already good enough — deliberately traded away here for "show everything
+// found, every time" per project direction; Google Places Photos now gets
+// called on every search a vendor has coordinates for, video or no video.
 //
 // Mapillary and Overpass/OSM used to sit in this tier too — replaced by
 // Google Places Photos everywhere, both this live discovery endpoint and
@@ -34,11 +35,9 @@ import { findWikimediaCandidates } from "./wikimediaProvider.js";
 import { NEEDS_CONFIRMATION_THRESHOLD } from "../photoMatching.js";
 import { photoDebugLog } from "./debugLog.js";
 
-const VIDEO_PROVIDERS = [
+const ALL_PROVIDERS = [
   { name: "video_frame", findCandidates: findVideoFrameCandidates },
   { name: "tiktok_oembed", findCandidates: findTikTokCandidates },
-];
-const LOCATION_PROVIDERS = [
   { name: "google_places_photo", findCandidates: findGooglePlacesCandidates },
   { name: "wikimedia", findCandidates: findWikimediaCandidates },
 ];
@@ -53,12 +52,12 @@ const LOCATION_PROVIDERS = [
 const FOOD_CONTENT_PROVIDERS = new Set(["video_frame", "tiktok_oembed"]);
 const FOOD_CONTENT_BONUS = 8;
 
-// Runs one tier of providers for a vendor IN PARALLEL — video frame
-// extraction (download + ffmpeg) can take tens of seconds, much slower than
-// the other providers' plain API calls, so running providers one after
-// another would make every search wait on the slowest one even when nobody
-// needs it. Each provider's own errors are still caught individually so one
-// dead/rate-limited/unconfigured/slow provider never fails the whole tier —
+// Runs every provider for a vendor IN PARALLEL — video frame extraction
+// (download + ffmpeg) can take tens of seconds, much slower than the other
+// providers' plain API calls, so running providers one after another would
+// make every search wait on the slowest one even when nobody needs it. Each
+// provider's own errors are still caught individually so one
+// dead/rate-limited/unconfigured/slow provider never fails the whole search —
 // the admin still sees results from whatever else worked.
 //
 // `usedKeys` is a Set of "provider::dedupeKey" strings for photos already
@@ -70,8 +69,8 @@ const FOOD_CONTENT_BONUS = 8;
 // searches (a fresh signed CDN URL, a fresh random extraction-job path) even
 // when they represent the exact same underlying photo — see each provider's
 // own dedupeKey comment.
-async function runTier(providers, vendor, usedKeys) {
-  const results = await Promise.allSettled(providers.map(({ findCandidates }) => findCandidates(vendor)));
+async function runProviders(providers, vendor, usedKeys, baseUrl) {
+  const results = await Promise.allSettled(providers.map(({ findCandidates }) => findCandidates(vendor, baseUrl)));
 
   const candidates = [];
   const droppedBelowThreshold = [];
@@ -99,28 +98,29 @@ async function runTier(providers, vendor, usedKeys) {
     }
   });
   if (droppedAlreadyUsed.length) {
-    photoDebugLog("tier", vendor.id, `${droppedAlreadyUsed.length} candidate(s) dropped — already committed for this vendor`, droppedAlreadyUsed);
+    photoDebugLog("search", vendor.id, `${droppedAlreadyUsed.length} candidate(s) dropped — already committed for this vendor`, droppedAlreadyUsed);
   }
   if (droppedBelowThreshold.length) {
-    photoDebugLog("tier", vendor.id, `${droppedBelowThreshold.length} candidate(s) dropped below NEEDS_CONFIRMATION_THRESHOLD=${NEEDS_CONFIRMATION_THRESHOLD}`, droppedBelowThreshold);
+    photoDebugLog("search", vendor.id, `${droppedBelowThreshold.length} candidate(s) dropped below NEEDS_CONFIRMATION_THRESHOLD=${NEEDS_CONFIRMATION_THRESHOLD}`, droppedBelowThreshold);
   }
   return candidates.sort((a, b) => b.confidence - a.confidence);
 }
 
-// `usedKeys`: see runTier's comment above — pass an empty Set when the
+// `usedKeys`: see runProviders' comment above — pass an empty Set when the
 // caller has no prior-commit history to check (e.g. a script running
 // outside the vendor_photos-backed admin panel).
-export async function discoverVendorPhotos(vendor, usedKeys = new Set()) {
+// `baseUrl`: the route's own resolvePublicBaseUrl() result (derived from the
+// incoming request's actual host), threaded down to every provider so a
+// video-frame or Google-Places-proxy URL always points at the real deployed
+// backend the admin's browser can actually reach — not each provider's own
+// PUBLIC_BASE_URL-or-localhost fallback, which is only correct for a script
+// run with no request to derive a host from.
+export async function discoverVendorPhotos(vendor, usedKeys = new Set(), baseUrl) {
   photoDebugLog("discover", vendor.id, `starting — has source_video_url=${Boolean(vendor.source_video_url)} lat=${vendor.latitude} lng=${vendor.longitude} already-used=${usedKeys.size}`);
 
-  if (vendor.source_video_url) {
-    const videoCandidates = await runTier(VIDEO_PROVIDERS, vendor, usedKeys);
-    photoDebugLog("discover", vendor.id, `video tier produced ${videoCandidates.length} candidate(s)`);
-    if (videoCandidates.length) return videoCandidates;
-  }
-  const locationCandidates = await runTier(LOCATION_PROVIDERS, vendor, usedKeys);
-  photoDebugLog("discover", vendor.id, `location tier produced ${locationCandidates.length} candidate(s)`);
-  return locationCandidates;
+  const candidates = await runProviders(ALL_PROVIDERS, vendor, usedKeys, baseUrl);
+  photoDebugLog("discover", vendor.id, `${candidates.length} candidate(s) after merging every provider`);
+  return candidates;
 }
 
 export { describeManualUpload } from "./manualUploadProvider.js";

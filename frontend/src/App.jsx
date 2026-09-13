@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { SessionProvider, useSession } from "./lib/SessionContext";
@@ -43,6 +43,37 @@ const AUTH_PUBLIC_PATHS = [
   "/about", "/terms", "/guidelines", "/contact", "/careers",
 ];
 
+// Marks an admin "View Site" preview for the rest of this browser tab —
+// sessionStorage is per-tab already, which is exactly the lifetime a preview
+// opened in a new tab should have. Wrapped in try/catch: private-browsing
+// modes can throw on access, and losing the preview flag should never break
+// the page it's decorating.
+const PREVIEW_STORAGE_KEY = "tb_admin_preview";
+function readPreviewFlag() {
+  try { return sessionStorage.getItem(PREVIEW_STORAGE_KEY) === "1"; } catch { return false; }
+}
+function writePreviewFlag(value) {
+  try {
+    if (value) sessionStorage.setItem(PREVIEW_STORAGE_KEY, "1");
+    else sessionStorage.removeItem(PREVIEW_STORAGE_KEY);
+  } catch { /* best-effort only */ }
+}
+
+function AdminPreviewBanner({ onExit }) {
+  return (
+    <div className="sticky top-0 z-[9999] flex flex-wrap items-center justify-center gap-3 bg-slate-900 px-4 py-2 text-center text-sm font-semibold text-white">
+      <span>👁 Admin Preview — this is what a customer sees</span>
+      <button
+        type="button"
+        onClick={onExit}
+        className="rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/20"
+      >
+        Exit to Admin
+      </button>
+    </div>
+  );
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -62,6 +93,7 @@ function AuthGate({ children }) {
   // fast route change right after login re-running this effect before the
   // resulting onAuthStateChange event lands).
   const backfillingName = useRef(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     // ponytail: TEMPORARY — auth fully disabled for local testing, see lib/testMode.js
@@ -73,6 +105,7 @@ function AuthGate({ children }) {
     if (loading) return;
 
     if (!session) {
+      setPreviewMode(false);
       if (!AUTH_PUBLIC_PATHS.includes(location.pathname)) {
         navigate("/login", { replace: true });
       }
@@ -86,7 +119,31 @@ function AuthGate({ children }) {
     // /reset-password is the one exception so a recovery link can still
     // land; ResetPasswordPage rejects admins itself, so that link never
     // becomes a passwordless way into the console.
+    //
+    // The one deliberate hole in that rule: AdminLayout's "View Site" button
+    // links to "/?admin_preview=1" (opened in a new tab) so an admin can
+    // sanity-check what a change looks like live without signing out.
+    // Landing on that URL flips a per-tab sessionStorage flag (readPreviewFlag
+    // / writePreviewFlag above) so every later click within the customer
+    // site — switching between /map and /discover, opening a vendor's
+    // detail modal, the footer's static pages, even a guest-only "Sign in"
+    // prompt landing on /login — stays exempt too, instead of only the one
+    // link that carried the query marker. Coming back to /admin (the
+    // sidebar, or the banner's "Exit to Admin") clears the flag, so typing a
+    // customer URL afterwards goes back to bouncing to /admin as normal.
+    // roles.js's customerSession() already treats an admin session as a
+    // guest on customer pages, so none of this leaks admin identity into
+    // reviews/bookmarks/etc.
+    if (admin && location.pathname.startsWith("/admin")) {
+      writePreviewFlag(false);
+    } else if (admin && new URLSearchParams(location.search).get("admin_preview") === "1") {
+      writePreviewFlag(true);
+    }
+    const previewActive = admin && readPreviewFlag();
+    setPreviewMode(previewActive && !location.pathname.startsWith("/admin"));
+
     if (admin
+        && !previewActive
         && !location.pathname.startsWith("/admin")
         && location.pathname !== "/reset-password") {
       navigate("/admin", { replace: true });
@@ -114,9 +171,18 @@ function AuthGate({ children }) {
       supabase.auth.updateUser({ data: { first_name: randomDisplayName() } })
         .finally(() => { backfillingName.current = false; });
     }
-  }, [location.pathname, session, loading]);
+  }, [location.pathname, location.search, session, loading]);
 
-  return children;
+  return (
+    <>
+      {previewMode && (
+        <AdminPreviewBanner
+          onExit={() => { writePreviewFlag(false); setPreviewMode(false); navigate("/admin", { replace: true }); }}
+        />
+      )}
+      {children}
+    </>
+  );
 }
 
 function LegacyEngagementRedirect() {

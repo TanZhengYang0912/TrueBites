@@ -2,7 +2,8 @@
 // or signed-in account. Only id/type/vendorId/name/lat/lng is stored — never
 // the embedded `vendor` object, since that's a point-in-time snapshot that
 // would go stale; MapPage re-hydrates it by vendorId once vendors have loaded.
-import { isResolvedStop, migrateStop } from "./tripStops.js";
+import { isResolvedStop, migrateStop, plannedStopCount, newStopId } from "./tripStops.js";
+import { isTripAtLimit } from "./tripRoutingPolicy.js";
 
 const STORAGE_KEY = "truebites:trip";
 
@@ -81,4 +82,32 @@ export function subscribeTripCount(callback, owner = "guest") {
     window.removeEventListener(CHANGE_EVENT, read);
     window.removeEventListener("storage", read);
   };
+}
+
+export function subscribePlannedStopCount(callback, owner = "guest") {
+  const read = () => callback(plannedStopCount(loadTrip(owner)?.stops || []));
+  read();
+  window.addEventListener(CHANGE_EVENT, read);
+  window.addEventListener("storage", read);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, read);
+    window.removeEventListener("storage", read);
+  };
+}
+
+export function addVendorToTrip(vendor, owner = "guest") {
+  if (vendor.latitude == null || vendor.longitude == null) return "no-location";
+  const stored = loadTrip(owner);
+  const stops = stored?.stops || [];
+  if (isTripAtLimit(plannedStopCount(stops))) return "limit";
+  const stop = {
+    id: newStopId("vendor-stop"),
+    type: "vendor",
+    vendorId: vendor.id,
+    name: vendor.name,
+    lat: vendor.latitude,
+    lng: vendor.longitude,
+  };
+  saveTrip([...stops, stop], stored?.travelMode || "DRIVING", owner);
+  return "added";
 }

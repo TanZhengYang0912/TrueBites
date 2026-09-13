@@ -33,6 +33,7 @@ import {
 } from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
 import { customerSession } from "../lib/roles";
+import { reportSavedCount } from "../lib/savedCount";
 
 const MELAKA_CENTER = { lat: 2.1896, lng: 102.2501 };
 const API_KEY = import.meta.env.VITE_MAPS_BROWSER_KEY;
@@ -256,7 +257,10 @@ export default function MapPage() {
 
   function refreshBookmarks() {
     getFolders().then((f) => setFolders(f.folders)).catch((e) => console.error("failed to load folders:", e.message));
-    getBookmarks().then((b) => setBookmarkRows(b.bookmarks)).catch((e) => console.error("failed to load bookmarks:", e.message));
+    getBookmarks().then((b) => {
+      setBookmarkRows(b.bookmarks);
+      reportSavedCount(b.bookmarks.length);
+    }).catch((e) => console.error("failed to load bookmarks:", e.message));
   }
 
   // Each stop is a normal draggable entry — the anchor too. A vendor can be

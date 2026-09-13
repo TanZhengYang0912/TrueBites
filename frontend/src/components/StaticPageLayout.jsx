@@ -3,6 +3,7 @@ import { useSession } from "../lib/SessionContext";
 import { customerSession } from "../lib/roles";
 import DiscoveryHeader from "./discovery/DiscoveryHeader";
 import Footer from "./Footer";
+import { useSavedCount } from "../lib/savedCount";
 
 // Shared chrome for the static info pages linked from Footer.jsx (About,
 // Terms, Guidelines, Contact, Careers). Content is filler for now — each
@@ -18,6 +19,7 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
   const initials = firstName
     ? (meta.first_name?.[0] || "") + (meta.last_name?.[0] || "")
     : (userEmail ? userEmail.slice(0, 2).toUpperCase() : "?");
+  const savedCount = useSavedCount(Boolean(session));
 
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
@@ -27,7 +29,7 @@ export default function StaticPageLayout({ eyebrow = "TrueBites", title, childre
         initials={initials}
         firstName={firstName}
         avatarUrl={avatarUrl}
-        savedCount={0}
+        savedCount={savedCount}
         activeSection={null}
         onLogin={() => navigate("/login")}
         onSignUp={() => navigate("/login?mode=signup")}

@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import { reconcileTripOwner } from "./tripStorage";
+import { reconcileTripOwner, tripOwner } from "./tripStorage";
+import { clearSavedCount } from "./savedCount";
+import { clearBookmarksCache } from "./bookmarksCache";
+import { clearReviewsCache } from "./reviewsCache";
 
 // Single source of truth for the Supabase session, read once at the app
 // root. Every page used to call supabase.auth.getSession() independently on
@@ -9,24 +12,36 @@ import { reconcileTripOwner } from "./tripStorage";
 // moments before the exchange finished, rendering it as a guest.
 const SessionContext = createContext({ session: null, loading: true });
 
+let lastOwner = null;
+
+function syncIdentity(nextSession) {
+  reconcileTripOwner(nextSession);
+  const nextOwner = tripOwner(nextSession);
+  if (nextOwner === lastOwner) return;
+  lastOwner = nextOwner;
+  clearSavedCount();
+  clearBookmarksCache();
+  clearReviewsCache();
+}
+
 export function SessionProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      reconcileTripOwner(data.session);
+      syncIdentity(data.session);
       setSession(data.session);
       setLoading(false);
     }).catch((error) => {
       console.error("getSession() failed:", error);
-      reconcileTripOwner(null);
+      syncIdentity(null);
       setSession(null);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      reconcileTripOwner(nextSession);
+      syncIdentity(nextSession);
       setSession(nextSession);
       setLoading(false);
     });

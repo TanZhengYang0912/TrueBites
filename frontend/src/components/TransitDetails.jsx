@@ -13,13 +13,7 @@ const MUTED = "#69717A";
 // line's real Google color so KJ Line red / MRT green etc. show through —
 // the one piece of "real world" color let into the app's warm palette.
 export default function TransitDetails({ legs }) {
-  if (!legs || legs.length === 0) {
-    return (
-      <div className="my-2 rounded-lg bg-chalk p-2.5 text-xs text-muted">
-        No transit routes here — try Car or Walk.
-      </div>
-    );
-  }
+  if (!legs || legs.length === 0) return null;
 
   return (
     <div className="my-2">

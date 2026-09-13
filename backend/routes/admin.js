@@ -148,7 +148,14 @@ function buildDashboardAnalytics(vendors, reviews) {
 
   const hiddenReviews = reviews.filter((review) => review.is_hidden).length;
   const draftVendors = statusCounts.get("draft") || 0;
-  const missingAddress = vendors.filter((vendor) => !vendor.address || !vendor.city).length;
+  // address only, not city: vendorActivationIssues (lib/vendorValidation.js —
+  // the actual gate for going Active) never requires city, and the manual
+  // Add Vendor form has no City field at all, so most vendors legitimately
+  // have a blank city despite a complete address. Counting city here flagged
+  // nearly every vendor — including fully-Active, fully-addressed ones — as
+  // "missing verified location", wildly inflating this number for something
+  // that was never actually blocking anything.
+  const missingAddress = vendors.filter((vendor) => !vendor.address).length;
   const missingHours = vendors.filter((vendor) => !vendor.operating_hours_raw).length;
   const aiImported = vendors.filter((vendor) => vendor.source_video_url).length;
   const aiDrafts = vendors.filter((vendor) => vendor.source_video_url && String(vendor.status || "").toLowerCase() === "draft").length;
@@ -159,9 +166,9 @@ function buildDashboardAnalytics(vendors, reviews) {
     .map(([label, value]) => ({ label, value }));
 
   const attentionItems = [
-    { id: "drafts", label: "Draft vendors waiting for approval", value: draftVendors, href: "/admin/vendors2", tone: "warning" },
-    { id: "missing-address", label: "Vendors missing verified location", value: missingAddress, href: "/admin/vendors2", tone: "warning" },
-    { id: "missing-hours", label: "Vendors missing operating hours", value: missingHours, href: "/admin/vendors2", tone: "neutral" },
+    { id: "drafts", label: "Draft vendors waiting for approval", value: draftVendors, href: "/admin/vendors2?status=draft", tone: "warning" },
+    { id: "missing-address", label: "Vendors missing verified location", value: missingAddress, href: "/admin/vendors2?flag=missing_address", tone: "warning" },
+    { id: "missing-hours", label: "Vendors missing operating hours", value: missingHours, href: "/admin/vendors2?flag=missing_hours", tone: "neutral" },
     { id: "hidden-reviews", label: "Hidden reviews to revisit", value: hiddenReviews, href: "/admin/reviews", tone: "danger" },
   ].filter((item) => item.value > 0);
 
@@ -283,6 +290,11 @@ router.get("/vendors", async (req, res) => {
   const category = String(req.query.category || "all");
   const sort = String(req.query.sort || "default").toLowerCase();
   const query = String(req.query.q || "").trim();
+  // Deep-link flags from the dashboard's "Needs attention" notifications
+  // (see attentionItems below) — must mirror the same missing-data checks
+  // used there (missingAddress/missingHours) or the count in the bell won't
+  // match what actually shows up after clicking through.
+  const flag = String(req.query.flag || "").toLowerCase();
 
   try {
     let builder = supabase
@@ -322,6 +334,12 @@ router.get("/vendors", async (req, res) => {
     if (statuses?.length > 1) builder = builder.in("status", statuses);
     if (category !== "all" && ADMIN_CATEGORIES.includes(category)) builder = builder.eq("cuisine_types", category);
     if (query) builder = builder.or(buildVendorSearch(query));
+    if (flag === "missing_address") {
+      // address only — see the comment on missingAddress above.
+      builder = builder.or("address.is.null,address.eq.");
+    } else if (flag === "missing_hours") {
+      builder = builder.or("operating_hours_raw.is.null,operating_hours_raw.eq.");
+    }
 
     const { data, error, count } = await builder;
     if (error) throw error;
@@ -335,6 +353,12 @@ router.get("/vendors", async (req, res) => {
       latitude: vendor.latitude,
       longitude: vendor.longitude,
       fullAddress: vendor.address,
+      // Same definition as attentionItems' missingAddress/missingHours below
+      // and the flag=missing_address/missing_hours filter above — the list
+      // view needs to show exactly what a filtered-in vendor is missing
+      // without every admin re-deriving that from raw fields per row.
+      missingAddress: !vendor.address,
+      missingHours: !vendor.operating_hours_raw,
       status: (vendor.status || "draft").toUpperCase(),
       videos: vendor.source_video_url ? 1 : 0,
       sourceVideoUrl: vendor.source_video_url || null,

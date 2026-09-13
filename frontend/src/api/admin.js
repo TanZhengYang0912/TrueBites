@@ -44,7 +44,7 @@ export async function getAdminDashboard() {
   return requestJson("/api/admin/dashboard");
 }
 
-export async function getAdminVendors({ page = 1, pageSize = 10, status = "all", category = "all", sort = "default", q = "" }) {
+export async function getAdminVendors({ page = 1, pageSize = 10, status = "all", category = "all", sort = "default", q = "", flag = "" }) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
@@ -53,6 +53,9 @@ export async function getAdminVendors({ page = 1, pageSize = 10, status = "all",
     sort,
     q,
   });
+  // Only sent when set — e.g. the admin dashboard's "Draft vendors" /
+  // "Vendors missing operating hours" notifications deep-link with this.
+  if (flag) params.set("flag", flag);
   return requestJson(`/api/admin/vendors?${params}`);
 }
 

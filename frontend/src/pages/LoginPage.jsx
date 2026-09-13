@@ -1,14 +1,14 @@
 // AUTH MODULE — Joshua
 // Login / register UI backed directly by Supabase Auth (no custom Express routes).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
 import PasswordField from "../components/PasswordField";
-import { isAdmin } from "../lib/roles";
+import { isAdmin, customerSession } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
 
 function GoogleIcon() {
@@ -92,10 +92,24 @@ export default function LoginPage() {
     else navigate("/discover");
   }
 
+  // Blocks the one thing customerSession() alone can't make safe: actually
+  // signing in/up here calls supabase.auth.signInWithPassword/signUp/
+  // signInWithOAuth on the SAME client the admin console uses, and Supabase
+  // syncs that auth state to every other same-origin tab automatically —
+  // submitting real customer credentials during a "View Site" preview would
+  // silently replace the admin's own session in their admin tab too. The
+  // preview should only ever let an admin *look* at this form, never
+  // actually complete a sign-in/up through it.
+  const blockedByAdminPreview = isAdmin(session);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg("");
     setInfoMsg("");
+    if (blockedByAdminPreview) {
+      setErrorMsg("You're viewing this as an admin preview. Sign out of the admin console first to actually sign in or create a customer account — submitting here would sign you out of admin everywhere.");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -182,6 +196,10 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setErrorMsg("");
+    if (blockedByAdminPreview) {
+      setErrorMsg("You're viewing this as an admin preview. Sign out of the admin console first to actually sign in with Google — continuing here would sign you out of admin everywhere.");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/discover` },
@@ -189,13 +207,32 @@ export default function LoginPage() {
     if (error) setErrorMsg(error.message);
   }
 
-  // Signed-in customers go back to the app. Admins never reach this line —
-  // AuthGate redirects them to /admin before this page renders.
+  // Signed-in customers go back to the app — but customerSession() (not raw
+  // session) is what decides "signed in" here. An admin mid "View Site"
+  // preview reaches this page too now (clicking a guest-only "Sign in"
+  // prompt), and their real session is still an admin session; customerSession()
+  // reports that as null, same as everywhere else the preview needs to look
+  // like a genuine guest. Using raw `session` here bounced them straight back
+  // to /discover the instant this page mounted — clicking "Log In" during a
+  // preview looked like it did nothing at all, because it didn't: this page
+  // rendered for a single effect tick and immediately redirected away again.
   // Waits for the session context's initial read (and any Google OAuth code
   // exchange it's resolving) before deciding — otherwise a fast redirect back
   // from Google can render this page as logged-out for a frame.
-  if (!sessionLoading && session && !justSignedUp) {
-    navigate("/discover", { replace: true });
+  //
+  // This has to be an effect, not a call during render: App.jsx's AuthGate
+  // (the parent) also calls navigate() in its own effect on this exact route
+  // change, and two navigate() calls racing — one from render, one from an
+  // effect — left this page permanently blank instead of landing anywhere,
+  // the first time an admin preview actually reached this branch.
+  const alreadySignedIn = customerSession(session);
+  useEffect(() => {
+    if (!sessionLoading && alreadySignedIn && !justSignedUp) {
+      navigate("/discover", { replace: true });
+    }
+  }, [sessionLoading, alreadySignedIn, justSignedUp, navigate]);
+
+  if (!sessionLoading && alreadySignedIn && !justSignedUp) {
     return null;
   }
 

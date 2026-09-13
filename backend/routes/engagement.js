@@ -1,9 +1,11 @@
 import { Router } from "express";
 import express from "express";
-import { Filter } from "bad-words";
 import { supabase } from "../supabase.js";
 import { logActivity } from "../lib/auditLog.js";
 import { isSuspended } from "../lib/suspension.js";
+import {
+  parseRating, validateFolderName, validateReviewBody, isProfaneLoose,
+} from "../lib/engagementValidation.js";
 
 const router = Router();
 
@@ -15,58 +17,6 @@ const ALLOWED_IMAGE_TYPES = {
 };
 const MAX_PHOTOS_PER_REVIEW = 4;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-
-const filter = new Filter();
-
-filter.removeWords("god", "hell", "bloody", "sex");
-
-const MALAYSIAN_BADWORDS = [
-  "babi", "sial", "bodoh", "bangang", "bengap", "celaka", "sohai", "bangsat",
-  "tolol", "bongok", "jahanam", "bedebah", "haramjadah", "keparat",
-  "asu", "jalang", "sundal", "gatal", "gian", "gatai", "pundek",
-  "puki", "pukimak", "kimak", "konek", "kote", "pantat", "punai", "bontot",
-  "jubur", "burit", "fuck","cibai", "chibai", "cheebye", "cb", "ccb", "lancau", "lanjiao",
-  "lancaubabi", "diu", "diulei", "diulehlohmo", "knn", "kns", "kanina",
-  "kanasai", "kolomoye", "kaniaseh", "hampalang", "siao", "gau", "lampa", "yier", "laosai",
-  "thevidiya", "otha", "punda", "koothi", "pundachi",
-  "wtf", "stfu", "ffs", "omfg", "af", "asf", "bullshit", "douchebag",
-  "douche", "scumbag", "jackass", "fucktard", "shitface", "fuckface",
-  "dipshit", "cockhead", "cumdumpster", "thot", "simp", "hoe", "coon",
-  "spic", "chink", "gook", "tranny", "dyke",
-];
-filter.addWords(...MALAYSIAN_BADWORDS);
-
-// Multi-word vulgar phrases — checked separately below, since these can't
-// be matched by the single-word list above.
-const MALAYSIAN_BADWORD_PHRASES = [
-  "gila babi", "kepala hotak", "anak haram", "puki mak", "itik puki",
-  "lubang pantat", "chao chee bye", "diu lei lo mo", "kanina lang",
-  "chao chibai", "thevidiya paiya", "otha mavane", "son of a bitch",
-  "motherfucking", "kepala baba kau",
-];
-
-const LEET_MAP = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", $: "s" };
-function normalizeForDetection(word) {
-  return word
-    .toLowerCase()
-    .split("")
-    .map((ch) => LEET_MAP[ch] || ch)
-    .join("")
-    .replace(/(.)\1+/g, "$1");
-}
-
-// Checked against the base list, MALAYSIAN_BADWORDS (word by word), evasive
-// spellings (via normalizeForDetection), and MALAYSIAN_BADWORD_PHRASES
-// (against the full string, since those are multi-word).
-function isProfaneLoose(text) {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  if (MALAYSIAN_BADWORD_PHRASES.some((phrase) => lower.includes(phrase))) return true;
-  return text.split(/[^\p{L}\p{N}]+/u).some((word) => {
-    if (!word) return false;
-    return filter.isProfane(word) || filter.isProfane(normalizeForDetection(word));
-  });
-}
 
 // Local-testing escape hatch: DISABLE_AUTH=true in backend/.env makes every
 // engagement caller act as the fixed TEST_USER below (skips JWT verification
@@ -106,7 +56,11 @@ async function requireActiveUser(req, res) {
   if (TEST_MODE) return user;
 
   const { data, error } = await supabase.auth.admin.getUserById(user.id);
-  if (!error && isSuspended(data?.user?.app_metadata)) {
+  if (error) {
+    res.status(503).json({ error: "Couldn't verify your account status. Please try again." });
+    return null;
+  }
+  if (isSuspended(data?.user?.app_metadata)) {
     res.status(403).json({ error: "Your account is suspended and can't make changes right now." });
     return null;
   }
@@ -190,8 +144,20 @@ router.post("/engagement/folders", async (req, res) => {
   const user = await requireActiveUser(req, res);
   if (!user) return;
 
-  const name = String(req.body?.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Folder name is required." });
+  const { name, error: nameError } = validateFolderName(req.body?.name);
+  if (nameError) return res.status(400).json({ error: nameError });
+
+  // Case-insensitive check up front — the DB's unique constraint (caught
+  // below as 23505) may only be case-sensitive, which would otherwise let
+  // "Food" and "food" both exist for the same user.
+  const { data: existingFolders, error: listErr } = await supabase
+    .from("bookmark_folders")
+    .select("name")
+    .eq("user_id", user.id);
+  if (listErr) return res.status(500).json({ error: "database query failed", details: listErr.message });
+  if ((existingFolders || []).some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+    return res.status(409).json({ error: "A folder with this name already exists." });
+  }
 
   const { data, error } = await supabase
     .from("bookmark_folders")
@@ -244,7 +210,7 @@ const BOOKMARK_SELECT = `
   folder:bookmark_folders(id, name, is_default),
   vendor:vendors(id, vendor_name, address, latitude, longitude, cuisine_types,
     signature_dishes, price_range, ai_review_summary, source_video_url,
-    source_platform, average_rating, review_count, storefront_image_url)
+    source_platform, average_rating, review_count, storefront_image_url, operating_hours_raw)
 `;
 
 router.get("/engagement/bookmarks", async (req, res) => {
@@ -273,6 +239,17 @@ router.post("/engagement/bookmarks", async (req, res) => {
   const vendorId = req.body?.vendor_id;
   if (!vendorId) return res.status(400).json({ error: "vendor_id is required" });
 
+  // Already saved — leave its folder untouched (an upsert here would
+  // silently move it back to whatever folder this call happened to pass,
+  // e.g. Default). Use PATCH /bookmarks/:vendorId to move a bookmark.
+  const { data: existing } = await supabase
+    .from("bookmarks")
+    .select("vendor_id, folder_id, created_at")
+    .eq("user_id", user.id)
+    .eq("vendor_id", vendorId)
+    .maybeSingle();
+  if (existing) return res.status(200).json({ bookmark: existing });
+
   let folderId = req.body?.folder_id || null;
   if (folderId) {
     const { data: folder } = await supabase
@@ -288,10 +265,23 @@ router.post("/engagement/bookmarks", async (req, res) => {
 
   const { data, error } = await supabase
     .from("bookmarks")
-    .upsert({ user_id: user.id, vendor_id: vendorId, folder_id: folderId }, { onConflict: "user_id,vendor_id" })
+    .insert({ user_id: user.id, vendor_id: vendorId, folder_id: folderId })
     .select("vendor_id, folder_id, created_at")
     .single();
-  if (error) return res.status(500).json({ error: "database insert failed", details: error.message });
+  if (error) {
+    // Concurrent duplicate add — the row above didn't exist a moment ago but
+    // does now; treat it the same as the early return, not a failure.
+    if (error.code === "23505") {
+      const { data: raceRow } = await supabase
+        .from("bookmarks")
+        .select("vendor_id, folder_id, created_at")
+        .eq("user_id", user.id)
+        .eq("vendor_id", vendorId)
+        .maybeSingle();
+      return res.status(200).json({ bookmark: raceRow });
+    }
+    return res.status(500).json({ error: "database insert failed", details: error.message });
+  }
 
   await logActivity({ actor: user, action: "bookmark.add", entityType: "vendor", entityId: vendorId, metadata: { folder_id: folderId } });
   res.status(201).json({ bookmark: data });
@@ -300,6 +290,18 @@ router.post("/engagement/bookmarks", async (req, res) => {
 router.patch("/engagement/bookmarks/:vendorId", async (req, res) => {
   const user = await requireActiveUser(req, res);
   if (!user) return;
+
+  // Checked up front: Supabase's .single() on a 0-row update returns an
+  // error rather than empty data, so without this the "not found" case
+  // below would never actually be reached — it'd surface as a generic 500.
+  const { data: existingBookmark, error: findErr } = await supabase
+    .from("bookmarks")
+    .select("vendor_id")
+    .eq("user_id", user.id)
+    .eq("vendor_id", req.params.vendorId)
+    .maybeSingle();
+  if (findErr) return res.status(500).json({ error: "database query failed", details: findErr.message });
+  if (!existingBookmark) return res.status(404).json({ error: "Bookmark not found" });
 
   let folderId = req.body?.folder_id || null;
   folderId = folderId || (await getOrCreateDefaultFolder(user.id));
@@ -396,7 +398,7 @@ router.get("/engagement/reviews/mine", async (req, res) => {
       id, vendor_id, rating, body, is_hidden, hidden_reason, created_at, updated_at, review_photos(id, url),
       vendor:vendors(id, vendor_name, address, latitude, longitude, cuisine_types,
         signature_dishes, price_range, ai_review_summary, source_video_url,
-        source_platform, average_rating, review_count, storefront_image_url)
+        source_platform, average_rating, review_count, storefront_image_url, operating_hours_raw)
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -414,11 +416,12 @@ router.post("/engagement/vendors/:vendorId/reviews", async (req, res) => {
   const user = await requireActiveUser(req, res);
   if (!user) return;
 
-  const rating = Number.parseInt(req.body?.rating, 10);
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+  const rating = parseRating(req.body?.rating);
+  if (rating == null || rating < 1 || rating > 5) {
     return res.status(400).json({ error: "rating must be an integer 1-5" });
   }
-  const body = String(req.body?.body || "").trim() || null;
+  const { body, error: bodyError } = validateReviewBody(req.body?.body);
+  if (bodyError) return res.status(400).json({ error: bodyError });
   const profane = body ? isProfaneLoose(body) : false;
   const isAnonymous = Boolean(req.body?.is_anonymous);
 
@@ -467,14 +470,15 @@ router.patch("/engagement/reviews/:id", async (req, res) => {
 
   const patch = { updated_at: new Date().toISOString() };
   if (req.body?.rating != null) {
-    const rating = Number.parseInt(req.body.rating, 10);
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    const rating = parseRating(req.body.rating);
+    if (rating == null || rating < 1 || rating > 5) {
       return res.status(400).json({ error: "rating must be an integer 1-5" });
     }
     patch.rating = rating;
   }
   if (req.body?.body != null) {
-    const body = String(req.body.body).trim() || null;
+    const { body, error: bodyError } = validateReviewBody(req.body.body);
+    if (bodyError) return res.status(400).json({ error: bodyError });
     patch.body = body;
     const profane = body ? isProfaneLoose(body) : false;
     patch.is_hidden = profane;
@@ -582,6 +586,38 @@ router.post(
     res.status(201).json({ photo: data });
   }
 );
+
+router.delete("/engagement/reviews/:id/photo/:photoId", async (req, res) => {
+  const user = await requireActiveUser(req, res);
+  if (!user) return;
+
+  const { data: review, error: findErr } = await supabase
+    .from("reviews")
+    .select("id, user_id")
+    .eq("id", req.params.id)
+    .maybeSingle();
+  if (findErr) return res.status(500).json({ error: "database query failed", details: findErr.message });
+  if (!review) return res.status(404).json({ error: "Review not found" });
+  if (review.user_id !== user.id) return res.status(403).json({ error: "You can only remove photos from your own review" });
+
+  const { data: photo, error: photoErr } = await supabase
+    .from("review_photos")
+    .select("id, url")
+    .eq("id", req.params.photoId)
+    .eq("review_id", review.id)
+    .maybeSingle();
+  if (photoErr) return res.status(500).json({ error: "database query failed", details: photoErr.message });
+  if (!photo) return res.status(404).json({ error: "Photo not found" });
+
+  const { error } = await supabase.from("review_photos").delete().eq("id", photo.id);
+  if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
+
+  const path = storagePathFromUrl(photo.url);
+  if (path) await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove([path]);
+
+  await logActivity({ actor: user, action: "review.photo_remove", entityType: "review", entityId: review.id });
+  res.json({ deleted: true, id: photo.id });
+});
 
 // ── Votes ───────────────────────────────────────────────────────────────────
 
