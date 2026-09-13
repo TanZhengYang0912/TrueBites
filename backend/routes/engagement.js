@@ -587,6 +587,38 @@ router.post(
   }
 );
 
+router.delete("/engagement/reviews/:id/photo/:photoId", async (req, res) => {
+  const user = await requireActiveUser(req, res);
+  if (!user) return;
+
+  const { data: review, error: findErr } = await supabase
+    .from("reviews")
+    .select("id, user_id")
+    .eq("id", req.params.id)
+    .maybeSingle();
+  if (findErr) return res.status(500).json({ error: "database query failed", details: findErr.message });
+  if (!review) return res.status(404).json({ error: "Review not found" });
+  if (review.user_id !== user.id) return res.status(403).json({ error: "You can only remove photos from your own review" });
+
+  const { data: photo, error: photoErr } = await supabase
+    .from("review_photos")
+    .select("id, url")
+    .eq("id", req.params.photoId)
+    .eq("review_id", review.id)
+    .maybeSingle();
+  if (photoErr) return res.status(500).json({ error: "database query failed", details: photoErr.message });
+  if (!photo) return res.status(404).json({ error: "Photo not found" });
+
+  const { error } = await supabase.from("review_photos").delete().eq("id", photo.id);
+  if (error) return res.status(500).json({ error: "database delete failed", details: error.message });
+
+  const path = storagePathFromUrl(photo.url);
+  if (path) await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove([path]);
+
+  await logActivity({ actor: user, action: "review.photo_remove", entityType: "review", entityId: review.id });
+  res.json({ deleted: true, id: photo.id });
+});
+
 // ── Votes ───────────────────────────────────────────────────────────────────
 
 router.post("/engagement/reviews/:id/vote", async (req, res) => {
