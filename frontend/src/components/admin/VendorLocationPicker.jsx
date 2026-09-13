@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { AdvancedMarker, Map as GMap, Pin, useMap } from "@vis.gl/react-google-maps";
+import { AdvancedMarker, Map as GMap, Pin, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { MAP_COLORS } from "../../lib/mapColors";
 
 // Same default centre/keys as AdminVendorMap.jsx and MapPage.jsx — every map
@@ -41,11 +41,31 @@ function RecenterOnPosition({ position, hasCoords }) {
 // the same `{ target: { name, value } }` shape as every other field in
 // VendorFormFields (see AddressAutocomplete's pick()), so it drops straight
 // into the existing handleChange/setForm wiring with no extra plumbing.
-export default function VendorLocationPicker({ latitude, longitude, onChange, disabled, loadError }) {
+export default function VendorLocationPicker({ latitude, longitude, onChange, disabled, loadError, notify }) {
   const lat = parseCoord(latitude, -90, 90);
   const lng = parseCoord(longitude, -180, 180);
   const hasCoords = lat != null && lng != null;
   const position = hasCoords ? { lat, lng } : MELAKA_CENTER;
+
+  // Reverse-geocodes a drag back into the address field — same "geocoding"
+  // library AddressAutocompleteField's Places widget uses for the forward
+  // direction, so a drag stops being the one path that could leave the
+  // address text describing somewhere other than where the pin actually
+  // sits. Built once per mount and kept in a ref (not state) since the
+  // Geocoder instance itself never needs to trigger a re-render.
+  const geocodingLib = useMapsLibrary("geocoding");
+  const geocoderRef = useRef(null);
+  useEffect(() => {
+    if (geocodingLib) geocoderRef.current = new geocodingLib.Geocoder();
+  }, [geocodingLib]);
+  // onDragEnd is attached once below and must always call the LATEST
+  // onChange/notify — same ref-freshening AddressAutocompleteField uses —
+  // otherwise switching which vendor is being edited without unmounting
+  // this component would keep writing into a stale closure.
+  const onChangeRef = useRef(onChange);
+  const notifyRef = useRef(notify);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { notifyRef.current = notify; }, [notify]);
 
   if (!API_KEY) {
     return (
@@ -91,6 +111,26 @@ export default function VendorLocationPicker({ latitude, longitude, onChange, di
               if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
               onChange({ target: { name: "latitude", value: String(nextLat) } });
               onChange({ target: { name: "longitude", value: String(nextLng) } });
+
+              // Best-effort only: the drag itself already committed the real
+              // signal (the coordinates) above, so a failed/slow lookup here
+              // must never block or revert that — it just leaves the address
+              // text as whatever it was until this resolves (or forever, if
+              // it never does).
+              const geocoder = geocoderRef.current;
+              if (!geocoder) return;
+              geocoder.geocode({ location: { lat: nextLat, lng: nextLng } })
+                .then(({ results }) => {
+                  const label = results?.[0]?.formatted_address;
+                  if (label) {
+                    onChangeRef.current({ target: { name: "address", value: label } });
+                  } else {
+                    notifyRef.current?.("Pin moved, but no address was found for that exact spot — enter one manually if needed.", true);
+                  }
+                })
+                .catch(() => {
+                  notifyRef.current?.("Pin moved, but the address lookup failed — coordinates were still updated.", true);
+                });
             }}
           >
             <Pin background={hasCoords ? MAP_COLORS.success : MAP_COLORS.warning} glyphColor="#fff" borderColor="#fff" />
