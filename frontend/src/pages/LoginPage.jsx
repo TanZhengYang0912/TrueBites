@@ -8,7 +8,7 @@ import { supabase } from "../supabaseClient";
 import { useSession } from "../lib/SessionContext";
 import { randomDisplayName } from "../lib/randomName";
 import PasswordField from "../components/PasswordField";
-import { isAdmin } from "../lib/roles";
+import { isAdmin, customerSession } from "../lib/roles";
 import { logActivity } from "../lib/activityLog";
 
 function GoogleIcon() {
@@ -189,26 +189,32 @@ export default function LoginPage() {
     if (error) setErrorMsg(error.message);
   }
 
-  // Signed-in customers go back to the app. An admin mid "View Site" preview
-  // can land here too now (clicking a guest-only "Sign in" prompt) — same
-  // treatment, bounced onward rather than shown a form for an identity they
-  // already have. Waits for the session context's initial read (and any
-  // Google OAuth code exchange it's resolving) before deciding — otherwise a
-  // fast redirect back from Google can render this page as logged-out for a
-  // frame.
+  // Signed-in customers go back to the app — but customerSession() (not raw
+  // session) is what decides "signed in" here. An admin mid "View Site"
+  // preview reaches this page too now (clicking a guest-only "Sign in"
+  // prompt), and their real session is still an admin session; customerSession()
+  // reports that as null, same as everywhere else the preview needs to look
+  // like a genuine guest. Using raw `session` here bounced them straight back
+  // to /discover the instant this page mounted — clicking "Log In" during a
+  // preview looked like it did nothing at all, because it didn't: this page
+  // rendered for a single effect tick and immediately redirected away again.
+  // Waits for the session context's initial read (and any Google OAuth code
+  // exchange it's resolving) before deciding — otherwise a fast redirect back
+  // from Google can render this page as logged-out for a frame.
   //
   // This has to be an effect, not a call during render: App.jsx's AuthGate
   // (the parent) also calls navigate() in its own effect on this exact route
   // change, and two navigate() calls racing — one from render, one from an
   // effect — left this page permanently blank instead of landing anywhere,
   // the first time an admin preview actually reached this branch.
+  const alreadySignedIn = customerSession(session);
   useEffect(() => {
-    if (!sessionLoading && session && !justSignedUp) {
+    if (!sessionLoading && alreadySignedIn && !justSignedUp) {
       navigate("/discover", { replace: true });
     }
-  }, [sessionLoading, session, justSignedUp, navigate]);
+  }, [sessionLoading, alreadySignedIn, justSignedUp, navigate]);
 
-  if (!sessionLoading && session && !justSignedUp) {
+  if (!sessionLoading && alreadySignedIn && !justSignedUp) {
     return null;
   }
 

@@ -345,6 +345,12 @@ router.get("/vendors", async (req, res) => {
       latitude: vendor.latitude,
       longitude: vendor.longitude,
       fullAddress: vendor.address,
+      // Same definition as attentionItems' missingAddress/missingHours below
+      // and the flag=missing_address/missing_hours filter above — the list
+      // view needs to show exactly what a filtered-in vendor is missing
+      // without every admin re-deriving that from raw fields per row.
+      missingAddress: !vendor.address || !vendor.city,
+      missingHours: !vendor.operating_hours_raw,
       status: (vendor.status || "draft").toUpperCase(),
       videos: vendor.source_video_url ? 1 : 0,
       sourceVideoUrl: vendor.source_video_url || null,

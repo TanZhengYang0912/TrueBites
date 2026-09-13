@@ -1974,6 +1974,7 @@ export default function AdminVendorManagementPage() {
               <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("category")} onClick={() => handleHeaderSort("category")}>
                 Category <span className="text-gray-400">{sortIndicator("category")}</span>
               </th>
+              <th className="px-4 py-4">Location</th>
               <th className="px-4 py-4">Hours</th>
               <th className="cursor-pointer px-4 py-4 hover:text-gray-700" aria-sort={ariaSortFor("status")} onClick={() => handleHeaderSort("status")}>
                 Status <span className="text-gray-400">{sortIndicator("status")}</span>
@@ -1985,7 +1986,7 @@ export default function AdminVendorManagementPage() {
             {loading ? (
               Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                 <tr key={`sk-${i}`} className="admin-skeleton-row">
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j} className="px-4 py-4"><div className="h-4 w-full animate-pulse rounded bg-gray-100" /></td>
                   ))}
                 </tr>
@@ -2019,7 +2020,24 @@ export default function AdminVendorManagementPage() {
                     </button>
                   </td>
                   <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
-                  <td className="px-4 py-4 text-gray-500">{vendor.operatingHours || "—"}</td>
+                  <td className="px-4 py-4 text-gray-500">
+                    {vendor.missingAddress ? (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
+                        Missing
+                      </span>
+                    ) : (
+                      <span className="max-w-[180px] truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-gray-500">
+                    {vendor.missingHours ? (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
+                        Missing
+                      </span>
+                    ) : (
+                      vendor.operatingHours
+                    )}
+                  </td>
                   <td className="px-4 py-4">
                     {st === "active" ? (
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">
