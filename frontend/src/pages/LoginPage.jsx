@@ -92,10 +92,24 @@ export default function LoginPage() {
     else navigate("/discover");
   }
 
+  // Blocks the one thing customerSession() alone can't make safe: actually
+  // signing in/up here calls supabase.auth.signInWithPassword/signUp/
+  // signInWithOAuth on the SAME client the admin console uses, and Supabase
+  // syncs that auth state to every other same-origin tab automatically —
+  // submitting real customer credentials during a "View Site" preview would
+  // silently replace the admin's own session in their admin tab too. The
+  // preview should only ever let an admin *look* at this form, never
+  // actually complete a sign-in/up through it.
+  const blockedByAdminPreview = isAdmin(session);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg("");
     setInfoMsg("");
+    if (blockedByAdminPreview) {
+      setErrorMsg("You're viewing this as an admin preview. Sign out of the admin console first to actually sign in or create a customer account — submitting here would sign you out of admin everywhere.");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -182,6 +196,10 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setErrorMsg("");
+    if (blockedByAdminPreview) {
+      setErrorMsg("You're viewing this as an admin preview. Sign out of the admin console first to actually sign in with Google — continuing here would sign you out of admin everywhere.");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/discover` },

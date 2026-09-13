@@ -20,9 +20,12 @@
 import { computePhotoMatchConfidence } from "../photoMatching.js";
 import { photoDebugLog } from "./debugLog.js";
 
-// Same convention as videoFrameProvider.js's PUBLIC_BASE_URL — the base URL
-// used to build links back to our own backend for the browser to fetch.
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+// Same convention as videoFrameProvider.js's FALLBACK_BASE_URL — falls back
+// to localhost only for a script run outside a request with PUBLIC_BASE_URL
+// unset; a real admin search passes the caller's own resolvePublicBaseUrl()
+// result instead, so the proxy URL always resolves against the actual
+// deployed backend, not the admin's own machine.
+const FALLBACK_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const FIND_PLACE_URL = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json";
 const DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
@@ -32,11 +35,11 @@ const MAX_CANDIDATES = 3;
 // reasoning (see mapillaryProvider.js) rather than Overpass's wider 150m.
 const LOCATION_BIAS_RADIUS_METERS = 75;
 
-function previewUrlFor(vendorId, photoReference) {
-  return `${PUBLIC_BASE_URL}/api/vendors/${vendorId}/photos/google-preview?ref=${encodeURIComponent(photoReference)}`;
+function previewUrlFor(vendorId, photoReference, baseUrl) {
+  return `${baseUrl || FALLBACK_BASE_URL}/api/vendors/${vendorId}/photos/google-preview?ref=${encodeURIComponent(photoReference)}`;
 }
 
-export async function findGooglePlacesCandidates(vendor) {
+export async function findGooglePlacesCandidates(vendor, baseUrl) {
   if (!GOOGLE_API_KEY) {
     photoDebugLog("google_places_photo", vendor.id, "skipped — GOOGLE_API_KEY is not set");
     return [];
@@ -122,7 +125,7 @@ export async function findGooglePlacesCandidates(vendor) {
       ...breakdown,
       note: `Google Places photo${photos.length > 1 ? ` (${i + 1}/${Math.min(photos.length, MAX_CANDIDATES)})` : ""} for "${placeName}" — please verify before confirming`,
     },
-    previewUrl: previewUrlFor(vendor.id, photo.photo_reference),
+    previewUrl: previewUrlFor(vendor.id, photo.photo_reference, baseUrl),
     // Bare Google photo_reference, NOT a URL — routes/vendors.js's
     // /photos/commit rebuilds the real Google Photo URL server-side (with
     // the key) specifically for this provider, same reasoning as
