@@ -18,6 +18,7 @@ import {
   storagePathFromUrl,
 } from "../lib/vendorValidation.js";
 import { discoverVendorPhotos, describeManualUpload, downloadAndStorePhoto } from "../lib/photoProviders/index.js";
+import { resolvePublicBaseUrl } from "../lib/publicBaseUrl.js";
 import { photoDebugLog } from "../lib/photoProviders/debugLog.js";
 const router = Router();
 
@@ -493,7 +494,16 @@ router.post("/vendors/photos/discover-preview", adminOnly, async (req, res) => {
   };
 
   photoDebugLog("route", vendorLike.id, `preview search for "${vendor_name}" lat=${latitude} lng=${longitude}`);
-  const candidates = await discoverVendorPhotos(vendorLike, new Set());
+  // Derived from THIS request's actual host, not each provider's own
+  // PUBLIC_BASE_URL-or-localhost fallback — see the comment on
+  // discoverVendorPhotos in lib/photoProviders/index.js for why that
+  // fallback alone left extracted-frame candidates broken in production.
+  const baseUrl = resolvePublicBaseUrl({
+    configuredBaseUrl: process.env.PUBLIC_BASE_URL,
+    protocol: req.protocol,
+    host: req.get("host"),
+  });
+  const candidates = await discoverVendorPhotos(vendorLike, new Set(), baseUrl);
   photoDebugLog("route", vendorLike.id, `returning ${candidates.length} candidate(s) to the admin panel`);
   res.json({ candidates });
 });
@@ -554,7 +564,12 @@ router.post("/vendors/:id/photos/discover", adminOnly, async (req, res) => {
       .map((row) => `${row.provider}::${row.match_meta.dedupeKey}`)
   );
 
-  const candidates = await discoverVendorPhotos(hasOverride ? { ...vendor, latitude: lat, longitude: lng } : vendor, usedKeys);
+  const baseUrl = resolvePublicBaseUrl({
+    configuredBaseUrl: process.env.PUBLIC_BASE_URL,
+    protocol: req.protocol,
+    host: req.get("host"),
+  });
+  const candidates = await discoverVendorPhotos(hasOverride ? { ...vendor, latitude: lat, longitude: lng } : vendor, usedKeys, baseUrl);
   photoDebugLog("route", vendor.id, `returning ${candidates.length} candidate(s) to the admin panel (${usedKeys.size} previously-committed key(s) excluded)`);
   res.json({ candidates });
 });

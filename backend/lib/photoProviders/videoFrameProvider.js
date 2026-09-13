@@ -14,7 +14,16 @@ import { randomUUID } from "node:crypto";
 import { extractFrames } from "../ai/frameExtractor.js";
 import { photoDebugLog } from "./debugLog.js";
 
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+// Falls back to localhost only for a script run outside a request (e.g.
+// scripts/fetchVendorCoverPhotos.js) with PUBLIC_BASE_URL unset — a real
+// admin search always passes the caller's own resolvePublicBaseUrl() result
+// (routes/vendors.js), derived from the incoming request's actual host, so a
+// deployed backend never bakes "localhost" into a URL the admin's browser
+// has to load. Getting this wrong is exactly why extracted-frame candidates
+// render as broken images in production: the browser tries to fetch
+// http://localhost:4000/outputs/... — the admin's own machine, not the
+// deployed server — and there is nothing listening there.
+const FALLBACK_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
 
 // Extracted directly from the vendor's own confirmed source video, so
 // identity is never in question (unlike Mapillary's coordinate guess) — only
@@ -31,7 +40,8 @@ const BASE_CONFIDENCE = 95;
 // ones instead of every kept frame hitting the ceiling.
 const SHARPNESS_FOR_FULL_CONFIDENCE = 1500;
 
-export async function findVideoFrameCandidates(vendor) {
+export async function findVideoFrameCandidates(vendor, baseUrl) {
+  const publicBaseUrl = baseUrl || FALLBACK_BASE_URL;
   if (!vendor.source_video_url) {
     photoDebugLog("video_frame", vendor.id, "skipped — vendor has no source_video_url");
     return [];
@@ -53,7 +63,7 @@ export async function findVideoFrameCandidates(vendor) {
   const candidates = frames.map((frame) => {
     const qualityFactor = Math.min(1, frame.sharpness / SHARPNESS_FOR_FULL_CONFIDENCE);
     const confidence = Math.round(BASE_CONFIDENCE * qualityFactor);
-    const url = `${PUBLIC_BASE_URL}/outputs/${jobId}/frames/${frame.filename}`;
+    const url = `${publicBaseUrl}/outputs/${jobId}/frames/${frame.filename}`;
     return {
       provider: "video_frame",
       placeName: vendor.vendor_name,

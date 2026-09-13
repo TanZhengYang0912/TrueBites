@@ -70,8 +70,8 @@ const FOOD_CONTENT_BONUS = 8;
 // searches (a fresh signed CDN URL, a fresh random extraction-job path) even
 // when they represent the exact same underlying photo — see each provider's
 // own dedupeKey comment.
-async function runTier(providers, vendor, usedKeys) {
-  const results = await Promise.allSettled(providers.map(({ findCandidates }) => findCandidates(vendor)));
+async function runTier(providers, vendor, usedKeys, baseUrl) {
+  const results = await Promise.allSettled(providers.map(({ findCandidates }) => findCandidates(vendor, baseUrl)));
 
   const candidates = [];
   const droppedBelowThreshold = [];
@@ -110,15 +110,21 @@ async function runTier(providers, vendor, usedKeys) {
 // `usedKeys`: see runTier's comment above — pass an empty Set when the
 // caller has no prior-commit history to check (e.g. a script running
 // outside the vendor_photos-backed admin panel).
-export async function discoverVendorPhotos(vendor, usedKeys = new Set()) {
+// `baseUrl`: the route's own resolvePublicBaseUrl() result (derived from the
+// incoming request's actual host), threaded down to every provider so a
+// video-frame or Google-Places-proxy URL always points at the real deployed
+// backend the admin's browser can actually reach — not each provider's own
+// PUBLIC_BASE_URL-or-localhost fallback, which is only correct for a script
+// run with no request to derive a host from.
+export async function discoverVendorPhotos(vendor, usedKeys = new Set(), baseUrl) {
   photoDebugLog("discover", vendor.id, `starting — has source_video_url=${Boolean(vendor.source_video_url)} lat=${vendor.latitude} lng=${vendor.longitude} already-used=${usedKeys.size}`);
 
   if (vendor.source_video_url) {
-    const videoCandidates = await runTier(VIDEO_PROVIDERS, vendor, usedKeys);
+    const videoCandidates = await runTier(VIDEO_PROVIDERS, vendor, usedKeys, baseUrl);
     photoDebugLog("discover", vendor.id, `video tier produced ${videoCandidates.length} candidate(s)`);
     if (videoCandidates.length) return videoCandidates;
   }
-  const locationCandidates = await runTier(LOCATION_PROVIDERS, vendor, usedKeys);
+  const locationCandidates = await runTier(LOCATION_PROVIDERS, vendor, usedKeys, baseUrl);
   photoDebugLog("discover", vendor.id, `location tier produced ${locationCandidates.length} candidate(s)`);
   return locationCandidates;
 }

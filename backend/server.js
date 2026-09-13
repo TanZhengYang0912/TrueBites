@@ -16,6 +16,16 @@ import { OUTPUTS_DIR } from "./lib/ai/downloader.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Render (like most PaaS) terminates TLS at its own proxy and forwards plain
+// HTTP internally — without this, req.protocol always reports "http" even
+// though the public URL is https, so resolvePublicBaseUrl()'s
+// request-derived fallback (used to build extracted-frame and Google-Places
+// preview URLs — see lib/photoProviders/) would bake an http:// URL into a
+// response served from an https:// page. Browsers block that as mixed
+// content, so the image silently fails to load — same broken-image symptom
+// as PUBLIC_BASE_URL pointing at localhost, just from the other cause.
+app.set("trust proxy", true);
+
 app.use(cors());
 app.use(express.json());
 
