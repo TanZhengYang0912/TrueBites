@@ -248,7 +248,11 @@ export default function AdminLayout() {
                 </section>
               )}
             </div>
-            <Link className="admin-view-site" to="/">
+            {/* New tab + ?admin_preview=1: App.jsx's AuthGate normally bounces
+                any signed-in admin straight back to /admin on every other
+                route, so without the marker this would just redirect back
+                to Overview instead of showing the live customer site. */}
+            <Link className="admin-view-site" to="/?admin_preview=1" target="_blank" rel="noopener noreferrer">
               <SquareArrowOutUpRight size={15} />
               <span>View Site</span>
             </Link>
