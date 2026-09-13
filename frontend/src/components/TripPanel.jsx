@@ -118,7 +118,7 @@ export default function TripPanel({
       </ol>
 
       <button onClick={onAddDraft} className="flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-terracotta">
-        <Plus size={13} /> + Add stop
+        <Plus size={13} /> Add stop
       </button>
 
       {routeError && (

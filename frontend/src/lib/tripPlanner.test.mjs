@@ -72,6 +72,11 @@ test("legacy isMe becomes anchor and legacy vendor id becomes vendorId", () => {
   assert.equal(oldVendor.type, "vendor");
   assert.equal(oldVendor.vendorId, "v1");
   assert.equal("isMe" in oldAnchor, false);
+  assert.equal(oldAnchor.name, "", "legacy placeholder name is dropped so GPS can relabel it");
+  assert.equal(migrateStop({ id: "__me__", name: "Jalan Hang Tuah", lat: 1, lng: 2, isMe: true }).name, "Jalan Hang Tuah");
+  const misfiled = migrateStop({ id: "custom-1", type: "vendor", vendorId: "custom-1", name: "R1, Jalan Tun Razak", lat: 1, lng: 2 });
+  assert.equal(misfiled.type, "custom");
+  assert.equal("vendorId" in misfiled, false);
 });
 
 test("storage keeps type/vendorId, strips vendor snapshots, and permits repeats", () => {
@@ -171,7 +176,8 @@ test("trip rows are inline search inputs", () => {
   assert.match(tripPanel, /row\.type !== "vendor"/);
   assert.match(tripPanel, /draggable=\{!row\.draft\}/);
   assert.match(tripPanel, /data-stop-id=\{row\.id\}/);
-  assert.match(tripPanel, /\+ Add stop/);
+  assert.match(tripPanel, /<Plus size=\{13\} \/> Add stop/);
+  assert.doesNotMatch(tripPanel, /\+ Add stop/); // the icon is the plus; a literal "+" doubled it
 });
 
 test("the anchor row is distinct, editable, draggable when resolved, and undeletable", () => {

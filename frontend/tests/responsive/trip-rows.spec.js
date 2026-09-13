@@ -29,7 +29,7 @@ test("anchor is labelled, editable, and has no remove action", async ({ page }) 
 
 test("Add stop creates one focused custom draft", async ({ page }) => {
   await openTrip(page);
-  await page.getByRole("button", { name: "+ Add stop" }).click();
+  await page.getByRole("button", { name: "Add stop" }).click();
   const custom = page.locator('[data-stop-type="custom"]');
   await expect(custom).toHaveCount(1);
   await expect(custom.getByPlaceholder("Search a place…")).toBeFocused();

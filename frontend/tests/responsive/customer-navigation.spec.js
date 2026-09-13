@@ -45,7 +45,7 @@ test("primary customer navigation uses guarded client-side page links", async ({
 
   const primary = page.getByRole("navigation", { name: "Primary navigation" });
   const savedLink = primary.getByRole("link", { name: /Saved/ });
-  const reviewsLink = primary.getByRole("link", { name: "My reviews" });
+  const reviewsLink = primary.getByRole("link", { name: "My Reviews" });
   const suggestionsLink = primary.getByRole("link", { name: /Suggest/ });
   await expect(primary).not.toHaveAttribute("role", "tablist");
   await expect(savedLink).not.toHaveAttribute("role", "tab");

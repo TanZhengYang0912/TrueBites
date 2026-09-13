@@ -295,8 +295,8 @@ export default function MapPage() {
   function placeAnchor(place, { onlyIfEmpty = false } = {}) {
     const name = place.label || "Your current location";
     setTrip((current) => {
-      const existing = current.some((stop) => stop.type === "anchor");
-      if (existing && onlyIfEmpty) return current;
+      const existing = current.find((stop) => stop.type === "anchor");
+      if (existing?.name && onlyIfEmpty) return current;
       if (!existing) return [anchorStop(place), ...current];
       return current.map((stop) => stop.type === "anchor"
         ? { ...stop, name, lat: place.lat, lng: place.lng }
@@ -434,7 +434,9 @@ export default function MapPage() {
     return new Promise((resolve) => {
       new Geocoder().geocode({ location: pos }, (results, status) => {
         if (status !== "OK" || !results?.length) { resolve(pos); return; }
-        const label = shortPlaceName(results[0]);
+        // Full address, same as a searched stop, so "Your location" reads as a
+        // real place rather than a street name the user has to guess at.
+        const label = results[0].formatted_address || shortPlaceName(results[0]);
         resolve(label ? { ...pos, label } : pos);
       });
     });
@@ -721,7 +723,7 @@ export default function MapPage() {
           aria-label={mapFullscreen ? "Exit fullscreen" : "Fullscreen map"}
           className={mapFullscreen
             ? "absolute right-4 top-4 z-10 grid size-11 place-items-center rounded-lg border border-sand bg-white shadow-[0_2px_8px_rgba(64,84,74,0.12)]"
-            : "absolute right-4 top-44 z-10 grid size-11 place-items-center rounded-lg border border-sand bg-white shadow-[0_2px_8px_rgba(64,84,74,0.12)] md:top-20"}
+            : "absolute right-4 top-[121px] z-10 grid size-11 place-items-center rounded-lg border border-sand bg-white shadow-[0_2px_8px_rgba(64,84,74,0.12)] md:top-20"}
         >
           {mapFullscreen ? <Minimize2 size={16} color={MAP_COLORS.forest} /> : <Maximize2 size={16} color={MAP_COLORS.forest} />}
         </button>
@@ -730,8 +732,8 @@ export default function MapPage() {
           onClick={() => setIsDark((v) => !v)}
           title={isDark ? "Switch to light mode" : "Switch to dark mode"}
           className={isDark
-            ? "absolute left-3 top-44 z-10 flex min-h-11 items-center gap-1.5 rounded-md border border-[#444] bg-[#1f1f1f] px-2.5 text-xs text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] md:top-22"
-            : "absolute left-3 top-44 z-10 flex min-h-11 items-center gap-1.5 rounded-md border border-[#ccc] bg-white px-2.5 text-xs text-[#333] shadow-[0_2px_6px_rgba(0,0,0,0.2)] md:top-22"}
+            ? "absolute left-3 top-[121px] z-10 flex min-h-11 items-center gap-1.5 rounded-md border border-[#444] bg-[#1f1f1f] px-2.5 text-xs text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] md:top-22"
+            : "absolute left-3 top-[121px] z-10 flex min-h-11 items-center gap-1.5 rounded-md border border-[#ccc] bg-white px-2.5 text-xs text-[#333] shadow-[0_2px_6px_rgba(0,0,0,0.2)] md:top-22"}
         >
           {isDark ? "☀️ Light" : "🌙 Dark"}
         </button>

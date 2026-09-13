@@ -55,10 +55,18 @@ export function groupStopsByPosition(numberedStops = [], metres = 15) {
 
 export function migrateStop(stop) {
   if (STOP_TYPES.includes(stop?.type)) {
+    // A typed address that an earlier build stored as a vendor has no database
+    // row to match, so it rendered read-only. Its id still says what it was.
+    if (stop.type === "vendor" && String(stop.vendorId || stop.id).startsWith("custom-")) {
+      const { vendorId, vendor, ...rest } = stop;
+      return { ...rest, type: "custom" };
+    }
     return stop.type === "vendor" && !stop.vendorId ? { ...stop, vendorId: stop.id } : stop;
   }
   const { isMe, source, ...rest } = stop || {};
-  if (isMe) return { ...rest, type: "anchor" };
+  // Legacy anchors were saved as the literal "Your location". Blank the name so
+  // the next GPS fix (or the user) labels it with a real address.
+  if (isMe) return { ...rest, type: "anchor", name: rest.name === "Your location" ? "" : rest.name };
   if (source === "custom" || source === "gps" || String(rest.id).startsWith("custom-")) {
     return { ...rest, type: "custom" };
   }
