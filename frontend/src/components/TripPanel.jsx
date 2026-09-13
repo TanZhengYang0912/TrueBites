@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { GripVertical, X, Pencil, Sparkles, Route, Clock, Plus, ExternalLink, MapPin, LocateFixed, Bike, Bus, Car, Footprints } from "lucide-react";
+import { GripVertical, X, Sparkles, Route, Clock, Plus, ExternalLink, Bike, Bus, Car, Footprints } from "lucide-react";
 import LocationInput from "./LocationInput";
 import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
+import { rowsFor } from "../lib/tripStops";
 import { MAP_COLORS } from "../lib/mapColors";
-import { vendorGallery, priceLabel } from "../lib/vendorDisplay";
+import { placeholderImage, priceLabel, distanceLabel } from "../lib/vendorDisplay";
 import { buildGoogleMapsUrl } from "../lib/googleMapsHandoff";
-import { stopStatusPresentation } from "../lib/tripOptimization";
 
 const NAV_MODES = [
   { mode: "DRIVING",     label: "Car",        Icon: Car },
@@ -22,287 +22,122 @@ const OUTLINE_BTN =
 
 const ICON_BTN = "grid size-11 shrink-0 place-items-center text-muted";
 
-const ARRIVAL_TONE_CLASS = {
-  neutral: "text-muted",
-  success: "text-success",
-  warning: "text-[#B56A18]",
-  danger: "text-terracotta",
-  muted: "text-muted",
-};
-
 // Multi-stop trip planner. Every entry (including "Your location") is a normal
 // draggable stop — nothing is locked as start or end. "Nearby to add" always
 // surfaces vendors near "Your location" (never the last stop) that aren't in
 // the trip yet, one tap to add.
 export default function TripPanel({
-  trip, summary, routeMessage, transitScopeMessage, tripAtLimit,
-  optimizationLoading, optimizationComparison, arrivalRows = [],
-  routeWarnings = [], routeCopyrights,
-  onReorder, onClear, onRemove, onEditStop,
+  trip, draftStops, summary, routeError, loading,
+  onReorder, onClear, onRemove,
+  onAddDraft, onResolveDraft, onRetargetStop, onUseGps, focusDraftId,
   travelMode, onTravelMode,
-  onManualLocation, onLocateMe,
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
-  onAddCustomStop,
-  onTripLimit,
   onSuggestBestOrder,
-  locationBias,
-  onFocusStop,
 }) {
-  const [dragIdx, setDragIdx] = useState(null);
-  const [editingId, setEditingId] = useState(null); // id of the stop whose address is being re-typed
-  const [addingPlace, setAddingPlace] = useState(false);
+  const [dragId, setDragId] = useState(null);
+  const rows = rowsFor(trip, draftStops);
 
-  function handleDrop(i) {
-    if (dragIdx === null || dragIdx === i) return;
+  function handleDrop(targetId, targetIsDraft) {
+    if (!dragId || targetIsDraft || dragId === targetId) return;
+    const from = trip.findIndex((stop) => stop.id === dragId);
+    const to = trip.findIndex((stop) => stop.id === targetId);
+    if (from < 0 || to < 0) return;
     const next = [...trip];
-    const [moved] = next.splice(dragIdx, 1);
-    next.splice(i, 0, moved);
-    setDragIdx(null);
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setDragId(null);
     onReorder(next);
   }
 
-  function startAddingPlace() {
-    if (tripAtLimit) {
-      onTripLimit?.();
-      return;
-    }
-    setAddingPlace(true);
-  }
-
-  const vendorStops = trip.filter((s) => !s.isMe);
   const gmaps = buildGoogleMapsUrl(trip, travelMode);
-  const arrivalsById = new Map(arrivalRows.map((row) => [row.stopId, row]));
-  const customAttributions = [...new Map(
-    trip.flatMap((s) => s.attributions || [])
-      .map((attribution) => [`${attribution.provider}|${attribution.providerURI || ""}`, attribution]),
-  ).values()];
 
   return (
     <>
-      {trip.length > 0 && (
+      {trip.length > 1 && (
         <div className="mb-2.5 mt-1 text-[11px] text-muted">Drag stops to reorder</div>
       )}
 
-      {/* Stop list — "Your location" is a normal draggable row too. Location and
-          custom (typed) stops are editable via the pencil icon; vendor stops
-          aren't (drag + remove only). */}
-      {/* No origin yet. Without this row a user who denies geolocation has no
-          path to a starting point at all — the map's GPS button is the only
-          other entry point. */}
-      {!trip.some((s) => s.isMe) && (
-        <>
-          <div className="mb-2 flex items-center gap-2 rounded-[10px] border border-dashed border-sand bg-chalk px-2.5 py-2">
-            <MapPin size={14} color={MAP_COLORS.muted} className="shrink-0" />
-            <span className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-ink">Set your starting point</div>
-              <div className="text-[11px] text-muted">Type a place or use GPS</div>
-            </span>
-            <button
-              onClick={() => setEditingId((id) => (id === "__me__" ? null : "__me__"))}
-              aria-label="Type a starting address"
-              className={ICON_BTN}
-            >
-              <Pencil size={13} />
-            </button>
-            <button
-              onClick={() => { setEditingId(null); onLocateMe?.(); }}
-              aria-label="Use my current location"
-              className="grid size-11 shrink-0 place-items-center text-success"
-            >
-              <LocateFixed size={14} />
-            </button>
-          </div>
-          {editingId === "__me__" && (
-            <div className="mb-2">
-              <LocationInput
-                placeholder="Search your address…"
-                biasCenter={locationBias}
-                onSelect={(place) => { onManualLocation(place); setEditingId(null); }}
-              />
-            </div>
-          )}
-        </>
-      )}
-      {trip.length === 0 ? (
-        <div className="py-2 text-[13px] text-muted">
-          Tap a pin on the map or <strong>+ Add to Trip</strong> on a vendor card to build your route.
-        </div>
-      ) : (
-        <ol className="m-0 list-none p-0">
-          {trip.map((s, i) => {
-            const editable = s.isMe || s.source === "custom";
-            const arrival = arrivalsById.get(s.id);
-            const statusPresentation = stopStatusPresentation(s.vendor, arrival);
-            const previousStop = trip[i - 1];
-            const routeDistance = arrival?.legDistance
-              ? `${arrival.legDistance} ${arrival.fromStopId === previousStop?.id ? "from previous stop" : "from start"}`
-              : null;
-            const stopName = s.name || (s.source === "custom" ? "Google place" : "Unnamed stop");
-            const stopPrice = s.vendor
-              ? priceLabel(s.vendor)
-              : s.source === "custom"
-                ? s.priceLabel
-                : null;
-            const metadata = [routeDistance, stopPrice].filter(Boolean).join(" · ");
-            return (
-              <li key={s.id}>
-                <div
-                  draggable
-                  onDragStart={() => setDragIdx(i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleDrop(i)}
-                  className={[
-                    "mb-1.5 flex cursor-grab items-center gap-2 rounded-[10px] border px-1.5 py-1.5",
-                    dragIdx === i ? "bg-chalk" : s.isMe ? "bg-[#EAF6EE]" : "bg-transparent",
-                    s.isMe ? "border-[#CDE9D6]" : "border-sand",
-                  ].join(" ")}
-                >
-                  <GripVertical size={14} color={MAP_COLORS.muted} className="shrink-0" />
-                  {/* Every row is numbered, including the origin — the row is
-                      draggable, so an unnumbered dot in the middle of the list
-                      would read as nonsense. */}
-                  <span className={s.isMe
-                    ? "flex size-4.5 shrink-0 items-center justify-center rounded-full bg-success text-[10.5px] text-white"
-                    : "flex size-4.5 shrink-0 items-center justify-center rounded-full bg-forest text-[10.5px] text-white"}>{i + 1}</span>
-                  {s.vendor ? (
-                    <img
-                      src={vendorGallery(s.vendor)[0]} alt=""
-                      className="size-8.5 shrink-0 rounded-full object-cover"
+      <ol className="m-0 list-none p-0">
+        {rows.map((row) => {
+          const isAnchor = row.type === "anchor";
+          const editable = row.draft || row.type !== "vendor";
+          return (
+            <li key={row.id}>
+              <div
+                data-stop-id={row.id}
+                data-stop-type={row.type}
+                draggable={!row.draft}
+                onDragStart={() => setDragId(row.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleDrop(row.id, row.draft)}
+                className={[
+                  "mb-1.5 flex items-center gap-2 rounded-[10px] border px-1.5 py-1.5",
+                  row.draft ? "" : "cursor-grab",
+                  dragId === row.id ? "bg-chalk" : isAnchor ? "bg-[#EAF6EE]" : "bg-transparent",
+                  isAnchor ? "border-[#CDE9D6]" : "border-sand",
+                ].join(" ")}
+              >
+                <GripVertical size={14} color={MAP_COLORS.muted} className={row.draft ? "shrink-0 opacity-30" : "shrink-0"} />
+                <span className={isAnchor
+                  ? "flex size-4.5 shrink-0 items-center justify-center rounded-full bg-success text-[10.5px] text-white"
+                  : "flex size-4.5 shrink-0 items-center justify-center rounded-full bg-forest text-[10.5px] text-white"}
+                >{row.number}</span>
+
+                {editable ? (
+                  <span className="min-w-0 flex-1">
+                    {isAnchor && <span className="mb-0.5 block text-[10.5px] font-semibold text-success">Search area</span>}
+                    <LocationInput
+                      key={`${row.id}:${row.name || ""}`}
+                      defaultValue={row.name || ""}
+                      autoFocus={row.id === focusDraftId}
+                      placeholder={isAnchor ? "Choose search area…" : "Search a place…"}
+                      onSelect={(place) => row.draft ? onResolveDraft(row.id, place) : onRetargetStop(row.id, place)}
+                      onGps={() => onUseGps(row.id, row.draft)}
                     />
-                  ) : s.isMe ? (
-                    // Fills the photo slot so the origin shares a left edge with
-                    // every vendor row. The missing thumbnail — not the green
-                    // tint — was what made this read as a different kind of card.
-                    <span
-                      aria-hidden="true"
-                      className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-[#CDE9D6] text-success"
-                    >
-                      <LocateFixed size={16} />
+                  </span>
+                ) : (
+                  <>
+                    {row.vendor && <img src={placeholderImage(row.vendor)} alt="" className="size-8.5 shrink-0 rounded-full object-cover" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium text-ink">{row.name}</span>
+                      {row.vendor && <span className="block text-[11px] text-muted">{[distanceLabel(row.vendor), priceLabel(row.vendor)].filter(Boolean).join(" · ")}</span>}
                     </span>
-                  ) : s.source === "custom" ? (
-                    <span
-                      aria-hidden="true"
-                      className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-[#EEF3F0] text-forest"
-                    >
-                      <MapPin size={16} />
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => onFocusStop?.(s)}
-                    aria-label={`Focus ${stopName} on map`}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <span className="block truncate text-[13px] font-medium text-ink">
-                      {stopName}
-                    </span>
-                    {metadata && (
-                      <span className="block text-[11px] text-muted">
-                        {metadata}
-                      </span>
-                    )}
-                    {statusPresentation && (
-                      <span
-                        aria-live="polite"
-                        className={`block text-[11px] ${ARRIVAL_TONE_CLASS[statusPresentation.tone] || ARRIVAL_TONE_CLASS.neutral}`}
-                      >
-                        {statusPresentation.text}
-                      </span>
-                    )}
-                  </button>
-                  {editable && (
-                    <button
-                      onClick={() => setEditingId((id) => (id === s.id ? null : s.id))}
-                      aria-label="Edit stop location"
-                      className={ICON_BTN}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onRemove(s.id)}
-                    aria-label="Remove stop"
-                    className={ICON_BTN}
-                  >
+                  </>
+                )}
+
+                {!isAnchor && (
+                  <button onClick={() => onRemove(row.id, row.draft)} aria-label="Remove stop" className={ICON_BTN}>
                     <X size={15} />
                   </button>
-                </div>
-                {editingId === s.id && (
-                  <div className="mb-2">
-                    <LocationInput
-                      placeholder={s.isMe ? "Search your address…" : "Search a place…"}
-                      biasCenter={locationBias}
-                      onSelect={(place) => {
-                        if (s.isMe) onManualLocation(place);
-                        else onEditStop(s.id, place);
-                        setEditingId(null);
-                      }}
-                    />
-                  </div>
                 )}
-              </li>
-            );
-          })}
-        </ol>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      <button onClick={onAddDraft} className="flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-terracotta">
+        <Plus size={13} /> Add stop
+      </button>
+
+      {routeError && (
+        <p role="alert" className="my-2 rounded-lg border border-terracotta/40 bg-terracotta/10 px-3 py-2 text-[12.5px] text-terracotta">{routeError}</p>
       )}
 
-      {/* Add an arbitrary typed place — not tied to a vendor listing */}
-      {onAddCustomStop && (
-        addingPlace ? (
-          <LocationInput
-            placeholder="Search a place to add…"
-            biasCenter={locationBias}
-            onSelect={(place) => { onAddCustomStop(place); setAddingPlace(false); }}
-          />
-        ) : (
-          <button
-            onClick={startAddingPlace}
-            aria-disabled={tripAtLimit}
-            title={tripAtLimit ? "Trip limit reached (27 stops)" : undefined}
-            className={tripAtLimit
-              ? "flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-muted"
-              : "flex min-h-11 items-center gap-1.5 text-[12.5px] font-medium text-terracotta"}
-          >
-            <Plus size={13} /> Add a place
-          </button>
-        )
-      )}
-
-      {routeMessage && (
-        <div role="status" className="my-2 rounded-lg border border-terracotta/30 bg-terracotta/10 px-3 py-2 text-[11.5px] leading-relaxed text-terracotta">
-          {routeMessage}
-        </div>
-      )}
-
-      {transitScopeMessage && (
-        <div role="note" className="my-2 text-[10.5px] leading-relaxed text-muted">
-          {transitScopeMessage}
-        </div>
-      )}
+      {loading && <div className="my-2.5 text-xs text-muted">Calculating route…</div>}
 
       {/* Route summary tiles */}
-      {summary && (
+      {summary && !loading && (
         <div className="my-3 grid grid-cols-2 gap-2">
           <StatTile icon={<Route size={13} color={MAP_COLORS.terracotta} />} value={summary.distance} label="Total Distance" />
           <StatTile icon={<Clock size={13} color={MAP_COLORS.terracotta} />} value={summary.duration} label="Est. Duration" />
         </div>
       )}
 
-      {(optimizationLoading || optimizationComparison) && (
-        <div aria-live="polite" role="status" className="mb-2 text-center text-[11.5px] text-forest">
-          {optimizationLoading ? "Finding best order…" : optimizationComparison.message}
-        </div>
-      )}
-
-      {vendorStops.length >= 2 && (
-        <button
-          onClick={onSuggestBestOrder}
-          disabled={optimizationLoading || Boolean(routeMessage) || travelMode === "TRANSIT"}
-          title={travelMode === "TRANSIT" ? "Best order is unavailable for Transit." : undefined}
-          className={`${OUTLINE_BTN} disabled:cursor-not-allowed disabled:opacity-50`}
-        >
-          <Sparkles size={14} /> {optimizationLoading ? "Finding best order…" : "Suggest Best Order"}
+      {trip.length >= 2 && (
+        <button onClick={onSuggestBestOrder} className={OUTLINE_BTN}>
+          <Sparkles size={14} /> Suggest Best Order
         </button>
       )}
 
@@ -325,7 +160,7 @@ export default function TripPanel({
               aria-checked={active}
               aria-label={label}
               title={label}
-              onClick={() => onTravelMode(active ? null : mode)}
+              onClick={() => onTravelMode(mode)}
               className={active
                 ? "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-forest px-3 text-[12.5px] font-semibold text-white transition-all motion-reduce:transition-none"
                 : "flex size-11 min-h-11 shrink-0 items-center justify-center rounded-full text-muted transition-all hover:text-forest motion-reduce:transition-none"}
@@ -338,8 +173,8 @@ export default function TripPanel({
       </div>
       )}
 
-      {travelMode === "TRANSIT" && vendorStops.length >= 1 && <TransitDetails legs={transitLegs} />}
-      {travelMode === "DRIVING" && vendorStops.length >= 1 && (
+      {travelMode === "TRANSIT" && trip.length >= 2 && <TransitDetails legs={transitLegs} />}
+      {travelMode === "DRIVING" && trip.length >= 2 && (
         <RouteOptions routes={routeOptions} selectedIndex={routeIndex} onSelect={onSelectRoute} />
       )}
 
@@ -360,34 +195,6 @@ export default function TripPanel({
           Google Maps supports up to 9 stops after your start — the rest are left out.
         </div>
       )}
-
-      <div id="google-place-attributions" className="mt-1 text-center text-xs leading-relaxed text-muted" />
-      {customAttributions.length > 0 && (
-        <div className="mt-1 text-center text-xs leading-relaxed text-muted">
-          Place data: {customAttributions.map((attribution, index) => (
-            <span key={`${attribution.provider}|${attribution.providerURI || ""}`}>
-              {index > 0 ? ", " : ""}
-              {attribution.providerURI ? (
-                <a href={attribution.providerURI} target="_blank" rel="noopener noreferrer" className="underline">
-                  {attribution.provider}
-                </a>
-              ) : attribution.provider}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {routeCopyrights && (
-        <div className="mt-1 text-center text-[10px] leading-relaxed text-muted">
-          {routeCopyrights}
-        </div>
-      )}
-
-      {routeWarnings.map((warning) => (
-        <div key={warning} role="note" className="mt-1 text-center text-[9.5px] leading-relaxed text-muted">
-          {warning}
-        </div>
-      ))}
 
       {trip.length > 0 && (
         <button

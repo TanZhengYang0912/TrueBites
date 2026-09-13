@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const mapPage = read("../pages/MapPage.jsx");
-const sessionContext = read("./SessionContext.jsx");
 const dashboard = read("../components/Dashboard.jsx");
 const vendorPanel = read("../components/VendorPanel.jsx");
 const vendorMarkers = read("../components/VendorMarkers.jsx");
@@ -16,35 +15,16 @@ test("MapPage owns canonical filters and keeps the result order fixed", () => {
   assert.doesNotMatch(mapPage, /setSort\(/);
 });
 
-test("MapPage derives location-aware distances only from a user origin", () => {
+test("MapPage derives location-aware distances only from the resolved anchor", () => {
   assert.match(mapPage, /const vendorsWithDistance = useMemo/);
-  assert.match(mapPage, /distanceOrigin\s*\?/);
-  assert.match(mapPage, /haversineKm\(distanceOrigin\.lat, distanceOrigin\.lng/);
+  assert.match(mapPage, /searchAnchor\s*\?/);
+  assert.match(mapPage, /haversineKm\(searchAnchor\.lat, searchAnchor\.lng/);
   assert.match(mapPage, /distKm:\s*undefined/);
 });
 
-test("MapPage keeps Melaka-centre fallback separate from a real distance origin", () => {
-  assert.match(mapPage, /loadMapOrigin/);
-  assert.match(mapPage, /saveMapOrigin/);
-  assert.doesNotMatch(mapPage, /setDistanceOrigin\(MELAKA_CENTER\)/);
+test("MapPage keeps Melaka-centre fallback separate from the real anchor", () => {
+  assert.match(mapPage, /const searchAnchor = useMemo\(\s*\(\) => trip\.find\(\(stop\) => stop\.type === "anchor"\) \|\| null,/);
   assert.doesNotMatch(mapPage, /setUserPos\(MELAKA_CENTER\)/);
-  assert.match(mapPage, /const anchor = distanceOrigin \|\| \(meIndex >= 0 \? trip\[meIndex\] : null\)/);
-});
-
-test("restored session origin waits for account trip hydration before updating stops", () => {
-  assert.match(mapPage, /if \(hydratedOwner !== owner\) return;/);
-  assert.match(mapPage, /setTrip\(\(current\) =>/);
-  assert.match(mapPage, /useLayoutEffect\(\(\) => \{[\s\S]{0,120}loadTrip\(owner\)/);
-});
-
-test("auth keeps Guest location on login but clears it on logout or account switch", () => {
-  assert.match(sessionContext, /createMapOriginSessionBoundary/);
-  assert.match(sessionContext, /clearMapOrigin/);
-  assert.match(mapPage, /subscribeMapOriginClear/);
-  assert.match(
-    mapPage,
-    /subscribeMapOriginClear\(\(\) => \{\s*setUserPos\(null\);\s*setDistanceOrigin\(null\);\s*setLocateTarget\(null\);\s*setTrip\(\(current\) => current\.filter\(\(stop\) => !stop\.isMe\)\);/,
-  );
 });
 
 test("MapPage derives one filtered sorted collection and shares it with both views", () => {
@@ -57,13 +37,14 @@ test("MapPage derives one filtered sorted collection and shares it with both vie
 
 test("map pins and nearby rows reuse the shared result instead of matching again", () => {
   assert.match(mapPage, /const filteredIds = new Set\(filteredVendors\.map/);
-  assert.match(mapPage, /const nearbyToAdd = anchor\s*\? filteredVendors/);
+  assert.match(mapPage, /const nearbyVendors = useMemo\(\(\) => \{/);
+  assert.match(mapPage, /sortVendors\(\s*filteredVendors\.filter/);
   const sharedPipeline = mapPage.slice(mapPage.indexOf("const filteredIds"));
   assert.doesNotMatch(sharedPipeline, /matchesFilters\(/);
 });
 
 test("a focused vendor cannot bypass active discovery filters", () => {
-  assert.match(mapPage, /const visibleFocusVendor = focusVendor && \(stopIds\.has\(focusVendor\.id\) \|\| filteredIds\.has\(focusVendor\.id\)\)/);
+  assert.match(mapPage, /const visibleFocusVendor = focusVendor && \(tripVendorIds\.has\(focusVendor\.id\) \|\| filteredIds\.has\(focusVendor\.id\)\)/);
   assert.match(mapPage, /focusVendor: visibleFocusVendor/);
   assert.match(mapPage, /<FocusOnVendor vendor=\{visibleFocusVendor\}/);
 });

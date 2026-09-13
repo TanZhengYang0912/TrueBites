@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import { clearTrip, createTripSessionBoundary } from "./tripStorage";
-import { clearMapOrigin, createMapOriginSessionBoundary } from "./mapOriginSession";
+import { reconcileTripOwner, tripOwner } from "./tripStorage";
 import { clearSavedCount } from "./savedCount";
 import { clearBookmarksCache } from "./bookmarksCache";
 import { clearReviewsCache } from "./reviewsCache";
@@ -13,47 +12,41 @@ import { clearReviewsCache } from "./reviewsCache";
 // moments before the exchange finished, rendering it as a guest.
 const SessionContext = createContext({ session: null, loading: true });
 
+let lastOwner = null;
+
+function syncIdentity(nextSession) {
+  reconcileTripOwner(nextSession);
+  const nextOwner = tripOwner(nextSession);
+  if (nextOwner === lastOwner) return;
+  lastOwner = nextOwner;
+  clearSavedCount();
+  clearBookmarksCache();
+  clearReviewsCache();
+}
+
 export function SessionProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const tripSessionBoundary = useRef(null);
-  const mapOriginSessionBoundary = useRef(null);
-  if (!tripSessionBoundary.current) {
-    tripSessionBoundary.current = createTripSessionBoundary(() => {
-      clearTrip();
-      clearSavedCount();
-      clearBookmarksCache();
-      clearReviewsCache();
-    });
-  }
-  if (!mapOriginSessionBoundary.current) {
-    mapOriginSessionBoundary.current = createMapOriginSessionBoundary(clearMapOrigin);
-  }
-  const observeTripSession = tripSessionBoundary.current;
-  const observeMapOriginSession = mapOriginSessionBoundary.current;
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data }) => {
-        observeTripSession(data.session);
-        observeMapOriginSession(data.session);
-        setSession(data.session);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("getSession() failed:", err);
-        observeTripSession(null);
-        observeMapOriginSession(null);
-        setLoading(false);
-      });
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => {
-      observeTripSession(s);
-      observeMapOriginSession(s);
-      setSession(s);
+    supabase.auth.getSession().then(({ data }) => {
+      syncIdentity(data.session);
+      setSession(data.session);
+      setLoading(false);
+    }).catch((error) => {
+      console.error("getSession() failed:", error);
+      syncIdentity(null);
+      setSession(null);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      syncIdentity(nextSession);
+      setSession(nextSession);
       setLoading(false);
     });
     return () => listener.subscription.unsubscribe();
-  }, [observeTripSession, observeMapOriginSession]);
+  }, []);
 
   return (
     <SessionContext.Provider value={{ session, loading }}>

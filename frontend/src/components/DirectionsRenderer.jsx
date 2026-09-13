@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
-import { normalizeLegMetrics, tripFingerprint } from "../lib/tripOptimization";
 
 function formatDistance(meters) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${meters} m`;
@@ -9,47 +8,6 @@ function formatDuration(seconds) {
   return seconds >= 3600
     ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min`
     : `${Math.floor(seconds / 60)} min`;
-}
-
-function routeMetrics(route) {
-  const metrics = normalizeLegMetrics(route?.legs);
-  if (!metrics) throw new Error("INVALID_ROUTE_METRICS");
-  return metrics;
-}
-
-function routeKey(route) {
-  const metrics = routeMetrics(route);
-  return `${route?.summary || ""}|${metrics.meters}|${metrics.seconds}`;
-}
-
-function mergeDrivingResults(primaryResult, tollFreeResult) {
-  const primaryRoutes = primaryResult?.routes || [];
-  const tollFreeRoutes = tollFreeResult?.routes || [];
-  const tollFreeKeys = new Set(tollFreeRoutes.map(routeKey));
-  const routes = [...primaryRoutes];
-  const routeKeys = new Set(routes.map(routeKey));
-
-  for (const route of tollFreeRoutes) {
-    const key = routeKey(route);
-    if (!routeKeys.has(key)) {
-      routes.push(route);
-      routeKeys.add(key);
-    }
-  }
-
-  return { result: { ...primaryResult, routes }, tollFreeKeys };
-}
-
-function directionsRequest(stops, travelMode) {
-  return {
-    origin: { lat: stops[0].lat, lng: stops[0].lng },
-    destination: { lat: stops.at(-1).lat, lng: stops.at(-1).lng },
-    waypoints: stops.slice(1, -1).map((stop) => ({
-      location: { lat: stop.lat, lng: stop.lng },
-      stopover: true,
-    })),
-    travelMode: google.maps.TravelMode[travelMode] || travelMode,
-  };
 }
 
 // Extracts a flat, ribbon-friendly list of legs (walk + transit legs in order)
@@ -85,26 +43,30 @@ function extractTransitLegs(route) {
   return legs;
 }
 
-export default function DirectionsRenderer({
-  stops,
-  travelMode,
-  routeIndex = 0,
-  optimizationRequest,
-  onSummary,
-  onRoutes,
-  onTransitLegs,
-  onRouteDetails,
-  onWarnings,
-  onCopyrights,
-  onOptimizationResult,
-  onOptimizationError,
-  onError,
-}) {
+// Google Directions is the sole route drawer (OSRM only optimises stop order —
+// see MapPage's planTrip). A route request is fired once per [map, stops,
+// travelMode] change and its result cached in resultRef; picking a different
+// alternative (routeIndex) is pure presentation and re-renders the cached
+// result instead of firing a new Google request.
+export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, onSummary, onRoutes, onTransitLegs }) {
   const map = useMap();
   const rendererRef = useRef(null);
-  // Which travel mode we have already centred for. Recentring belongs to
-  // "navigation started", not "the route was recomputed" — reordering stops
-  // recomputes the route and used to drag the camera with it.
+  const resultRef = useRef(null);
+  const callbacksRef = useRef({});
+  callbacksRef.current = { onSummary, onRoutes, onTransitLegs };
+
+  function publishRoute(result, index, mode) {
+    if (!result?.routes?.length) return;
+    const safeIndex = Math.min(index, result.routes.length - 1);
+    const route = result.routes[safeIndex];
+    rendererRef.current?.setMap(map);
+    rendererRef.current?.setDirections(result);
+    rendererRef.current?.setRouteIndex(safeIndex);
+    const distance = route.legs.reduce((sum, leg) => sum + leg.distance.value, 0);
+    const duration = route.legs.reduce((sum, leg) => sum + leg.duration.value, 0);
+    callbacksRef.current.onSummary?.({ distance: formatDistance(distance), duration: formatDuration(duration) });
+    callbacksRef.current.onTransitLegs?.(mode === "TRANSIT" ? extractTransitLegs(route) : []);
+  }
 
   useEffect(() => {
     if (!map) return;
@@ -117,107 +79,81 @@ export default function DirectionsRenderer({
       rendererRef.current = new google.maps.DirectionsRenderer({ suppressMarkers: true, preserveViewport: true });
     }
 
-    const identity = {
-      mode: travelMode,
-      routeIndex,
-      tripFingerprint: tripFingerprint(stops, travelMode),
-    };
+    resultRef.current = null;
 
     if (!stops || stops.length < 2 || !travelMode) {
       rendererRef.current.setMap(null);
-      onSummary?.(null);
-      onError?.(null);
-      onRoutes?.([]);
-      onTransitLegs?.([]);
-      onRouteDetails?.(null, identity);
-      onWarnings?.([], identity);
-      onCopyrights?.("", identity);
+      callbacksRef.current.onSummary?.(null);
+      callbacksRef.current.onRoutes?.([]);
+      callbacksRef.current.onTransitLegs?.([]);
       return;
     }
 
+    // Hide the previous route and clear its summary while the new one loads —
+    // a route failure below must never leave a stale summary on screen.
+    rendererRef.current.setMap(null);
+    callbacksRef.current.onSummary?.(null);
+    callbacksRef.current.onRoutes?.([]);
+    callbacksRef.current.onTransitLegs?.([]);
+
+    const origin = { lat: stops[0].lat, lng: stops[0].lng };
+    const destination = { lat: stops[stops.length - 1].lat, lng: stops[stops.length - 1].lng };
+    const waypoints = stops.slice(1, -1).map((s) => ({ location: { lat: s.lat, lng: s.lng }, stopover: true }));
     const directionsService = new google.maps.DirectionsService();
     let cancelled = false;
 
-    const baseRequest = directionsRequest(stops, travelMode);
-    const requestedAt = Date.now();
-    onError?.(null);
-
-    function applyResult(result) {
-      const route = result.routes[Math.min(routeIndex, result.routes.length - 1)];
-      rendererRef.current?.setMap(map);
-      rendererRef.current?.setDirections(result);
-      rendererRef.current?.setRouteIndex(Math.min(routeIndex, result.routes.length - 1));
-      // The camera is not ours to move. Every change made in the trip panel —
-      // reordering, adding, removing, switching travel mode — recomputes this
-      // route, and panning on any of them threw away wherever the user had
-      // scrolled to. Centring on the user is the GPS button's job.
-
-      const metrics = routeMetrics(route);
-      const { legDistancesMeters } = metrics;
-      onError?.(null);
-      onSummary?.({ distance: formatDistance(metrics.meters), duration: formatDuration(metrics.seconds) });
-      onRouteDetails?.({ ...metrics, legDistancesMeters, calculatedAt: requestedAt, ...identity });
-      onWarnings?.(route.warnings || [], identity);
-      onCopyrights?.(route.copyrights || "", identity);
-
-      if (travelMode === "TRANSIT") {
-        onTransitLegs?.(extractTransitLegs(route));
-      }
-    }
+    const baseRequest = {
+      origin,
+      destination,
+      waypoints,
+      travelMode: google.maps.TravelMode[travelMode],
+    };
 
     if (travelMode === "DRIVING") {
-      // Google does not return ordinary alternatives when a request includes
-      // intermediate waypoints. Request alternatives only for two-point trips,
-      // then merge a distinct avoid-tolls result so multi-stop trips can still
-      // offer a genuine toll-free choice when Google finds one.
+      // Two requests: one with alternatives (default, may include toll roads),
+      // one forced off tolls. A route whose summary (the road names Google
+      // returns, e.g. "AKLEH/E13") doesn't match the toll-free route is
+      // flagged as using tolls — approximate, but needs no paid toll-pricing API.
       Promise.all([
-        directionsService.route({
-          ...baseRequest,
-          provideRouteAlternatives: baseRequest.waypoints.length === 0,
-        }),
+        directionsService.route({ ...baseRequest, provideRouteAlternatives: true }),
         directionsService.route({ ...baseRequest, avoidTolls: true }),
       ])
         .then(([withAlts, tollFree]) => {
           if (cancelled) return;
-          const { result, tollFreeKeys } = mergeDrivingResults(withAlts, tollFree);
-          const routes = result.routes.map((r, i) => {
-            const metrics = routeMetrics(r);
+          const tollFreeSummaries = new Set(tollFree.routes.map((r) => r.summary));
+          const routes = withAlts.routes.map((r, i) => {
+            const dist = r.legs.reduce((a, l) => a + l.distance.value, 0);
+            const dur = r.legs.reduce((a, l) => a + l.duration.value, 0);
             return {
               index: i,
-              distance: formatDistance(metrics.meters),
-              duration: formatDuration(metrics.seconds),
-              hasTolls: !tollFreeKeys.has(routeKey(r)),
+              distance: formatDistance(dist),
+              duration: formatDuration(dur),
+              hasTolls: !tollFreeSummaries.has(r.summary),
             };
           });
-          onRoutes?.(routes);
-          applyResult(result);
+          resultRef.current = withAlts;
+          callbacksRef.current.onRoutes?.(routes);
+          publishRoute(withAlts, routeIndex, travelMode);
         })
-        .catch((error) => {
+        .catch(() => {
           if (cancelled) return;
-          rendererRef.current?.setMap(null);
-          onSummary?.({ distance: "—", duration: "—" });
-          onError?.(error);
-          onRoutes?.([]);
-          onRouteDetails?.(null, identity);
-          onWarnings?.([], identity);
-          onCopyrights?.("", identity);
+          resultRef.current = null;
+          callbacksRef.current.onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          callbacksRef.current.onRoutes?.([]);
         });
     } else {
       directionsService
         .route(baseRequest)
         .then((result) => {
           if (cancelled) return;
-          applyResult(result);
+          resultRef.current = result;
+          publishRoute(result, routeIndex, travelMode);
         })
-        .catch((error) => {
+        .catch(() => {
           if (cancelled) return;
-          rendererRef.current?.setMap(null);
-          onSummary?.({ distance: "—", duration: "—" });
-          onError?.(error);
-          onRouteDetails?.(null, identity);
-          onWarnings?.([], identity);
-          onCopyrights?.("", identity);
-          if (travelMode === "TRANSIT") onTransitLegs?.([]);
+          resultRef.current = null;
+          callbacksRef.current.onSummary?.({ error: true, distance: "—", duration: "No route available" });
+          if (travelMode === "TRANSIT") callbacksRef.current.onTransitLegs?.([]);
         });
     }
 
@@ -225,49 +161,14 @@ export default function DirectionsRenderer({
       cancelled = true;
       rendererRef.current?.setMap(null);
     };
-  }, [map, stops, travelMode, routeIndex]);
+  }, [map, stops, travelMode]);
 
+  // Picking an alternative route (or a mode already routed) is presentation
+  // only — it re-renders the cached Google result and makes zero new requests.
   useEffect(() => {
-    if (!map || !optimizationRequest) return;
-
-    const requestedStops = optimizationRequest.stops;
-    const requestedMode = optimizationRequest.mode;
-    if (!Array.isArray(requestedStops) || requestedStops.length < 3 || requestedMode === "TRANSIT") return;
-
-    const directionsService = new google.maps.DirectionsService();
-    const baseRequest = directionsRequest(requestedStops, requestedMode);
-    let cancelled = false;
-
-    Promise.all([
-      directionsService.route(baseRequest),
-      directionsService.route({ ...baseRequest, optimizeWaypoints: true }),
-    ])
-      .then(([baselineResult, optimizedResult]) => {
-        if (cancelled) return;
-        const baselineRoute = baselineResult.routes?.[0];
-        const optimizedRoute = optimizedResult.routes?.[0];
-        if (!baselineRoute || !optimizedRoute) throw new Error("ZERO_RESULTS");
-        onOptimizationResult?.({
-          id: optimizationRequest.id,
-          mode: requestedMode,
-          tripFingerprint: optimizationRequest.tripFingerprint,
-          waypointOrder: optimizedRoute.waypoint_order,
-          baseline: routeMetrics(baselineRoute),
-          optimized: routeMetrics(optimizedRoute),
-        });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        onOptimizationError?.({
-          id: optimizationRequest.id,
-          mode: requestedMode,
-          tripFingerprint: optimizationRequest.tripFingerprint,
-          error,
-        });
-      });
-
-    return () => { cancelled = true; };
-  }, [map, optimizationRequest]);
+    if (!resultRef.current) return;
+    publishRoute(resultRef.current, routeIndex, travelMode);
+  }, [routeIndex, travelMode]);
 
   return null;
 }

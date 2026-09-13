@@ -6,10 +6,13 @@ const sessionContext = readFileSync(new URL("./SessionContext.jsx", import.meta.
 const mapPage = readFileSync(new URL("../pages/MapPage.jsx", import.meta.url), "utf8");
 const tripFab = readFileSync(new URL("../components/TripFab.jsx", import.meta.url), "utf8");
 
-test("SessionProvider clears trip persistence only across real identity boundaries", () => {
-  assert.match(sessionContext, /createTripSessionBoundary/);
-  assert.match(sessionContext, /clearTrip/);
-  assert.match(sessionContext, /observeTripSession\(s\)/);
+test("SessionProvider reconciles ownership before publishing auth state", () => {
+  assert.match(sessionContext, /function syncIdentity\(nextSession\) \{\s*reconcileTripOwner\(nextSession\);\s*const nextOwner = tripOwner\(nextSession\);/);
+  assert.match(sessionContext, /syncIdentity\(data\.session\);\s*setSession\(data\.session\)/);
+  assert.match(sessionContext, /syncIdentity\(nextSession\);\s*setSession\(nextSession\)/);
+  assert.match(sessionContext, /if \(nextOwner === lastOwner\) return;\s*lastOwner = nextOwner;\s*clearSavedCount\(\);\s*clearBookmarksCache\(\);\s*clearReviewsCache\(\);/);
+  assert.doesNotMatch(sessionContext, /outcome === "cleared"/, "caches clear on any owner change, not only when a foreign trip was removed");
+  assert.doesNotMatch(sessionContext, /createTripSessionBoundary|clearTrip|mapOriginSession/);
 });
 
 test("MapPage hydrates and saves trips under the resolved session owner", () => {

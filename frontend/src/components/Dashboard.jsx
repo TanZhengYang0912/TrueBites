@@ -33,8 +33,6 @@ export default function Dashboard({
   onRetryLoad,
   bookmarks,
   onToggleBookmark,
-  tripVendorIds,
-  tripAtLimit,
   onAddStop,
   onVendorUpdated,
   focusVendorId,
@@ -104,7 +102,6 @@ export default function Dashboard({
   useEffect(() => {
     if (page > pageData.totalPages) setPage(pageData.totalPages);
   }, [page, pageData.totalPages]);
-  const isInTrip = (id) => tripVendorIds?.has(id) ?? false;
   const changePage = (nextPage) => {
     setPage(nextPage);
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -217,8 +214,7 @@ export default function Dashboard({
                   {pageData.items.map((v) => (
                     <VendorCard
                       key={v.id} vendor={v}
-                      inTrip={isInTrip(v.id)} bookmarked={bookmarks.has(v.id)}
-                      tripAtLimit={tripAtLimit}
+                      bookmarked={bookmarks.has(v.id)}
                       onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
                       onOpenDetail={setDetailVendor}
                     />
@@ -241,8 +237,7 @@ export default function Dashboard({
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={isInTrip(detailVendor.id)} bookmarked={bookmarks.has(detailVendor.id)}
-          tripAtLimit={tripAtLimit}
+          bookmarked={bookmarks.has(detailVendor.id)}
           onToggleBookmark={guardedToggleBookmark} onAddStop={onAddStop}
           onClose={() => setDetailVendor(null)}
           onVendorUpdated={(vendorId, patch) => {

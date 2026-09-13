@@ -18,7 +18,7 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 const TERRACOTTA = "#A35D47";
 const MUTED = "#69717A";
 
-export default function VendorDetailModal({ vendor, inTrip, tripAtLimit, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated, onReviewsChanged }) {
+export default function VendorDetailModal({ vendor, bookmarked, onToggleBookmark, onAddStop, onClose, onVendorUpdated, onReviewsChanged }) {
   const { session: authSession } = useSession();
   const session = customerSession(authSession);
   const [reviews, setReviews] = useState([]);
@@ -101,7 +101,6 @@ export default function VendorDetailModal({ vendor, inTrip, tripAtLimit, bookmar
 
   const handle = creatorHandle(vendor);
   const price = priceLabel(vendor);
-  const addAtLimit = !inTrip && tripAtLimit;
   const tags = (vendor.cuisine_types || vendor.signature_dishes || "")
     .split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -198,14 +197,9 @@ export default function VendorDetailModal({ vendor, inTrip, tripAtLimit, bookmar
               button beside Add to Trip was two affordances for one action. */}
           <button
             onClick={() => onAddStop(vendor)}
-            disabled={inTrip}
-            aria-disabled={addAtLimit}
-            title={addAtLimit ? "Trip limit reached (27 stops)" : undefined}
-            className={inTrip || addAtLimit
-              ? "min-h-11 w-full rounded-full border-[1.5px] border-sand bg-chalk px-4 text-[14.5px] font-semibold text-forest"
-              : "min-h-11 w-full rounded-full border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"}
+            className="min-h-11 w-full rounded-full border-[1.5px] border-forest bg-forest px-4 text-[14.5px] font-semibold text-white transition-colors hover:bg-forest-light motion-reduce:transition-none"
           >
-            {inTrip ? "✓ Already in Your Trip" : "+ Add to Trip"}
+            + Add to Trip
           </button>
 
           {/* Reviews */}

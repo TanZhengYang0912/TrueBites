@@ -3458,6 +3458,7 @@
 /* Hides the scrollbar on the horizontally-scrollable category tab strip
    while keeping native scroll/drag/wheel behaviour intact. */
 @layer components {
+  .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 }
 

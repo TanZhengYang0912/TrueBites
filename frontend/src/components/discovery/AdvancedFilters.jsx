@@ -122,12 +122,7 @@ export default function AdvancedFilters({
     + (filters.openNow ? 1 : 0);
 
   return (
-    <section
-      data-testid="advanced-filters"
-      className={compact
-        ? "filter-glass rounded-lg p-3"
-        : "filter-glass rounded p-4 md:p-5"}
-    >
+    <section data-testid="advanced-filters" className={compact ? "" : "mb-2"}>
       <div className={compact
         ? "flex flex-col gap-2.5"
         : "flex flex-col gap-2.5 sm:flex-row sm:items-center"}
@@ -139,7 +134,7 @@ export default function AdvancedFilters({
             onChange={(event) => onChange({ search: event.target.value })}
             placeholder="Search Nasi Lemak, Jonker, Kopitiam…"
             aria-label="Search places"
-            className="min-h-11 w-full rounded-md border border-sand bg-white pl-10 pr-3 text-sm text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
+            className="min-h-11 w-full rounded-full border border-sand bg-white pl-10 pr-3 text-sm text-ink outline-none placeholder:text-[#8B9197] focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)]"
           />
         </label>
 
@@ -152,8 +147,8 @@ export default function AdvancedFilters({
             <select
               data-testid="filter-creator"
               className={compact
-                ? "min-h-11 w-full appearance-none rounded-md border border-sand bg-white pl-9 pr-9 text-sm text-ink outline-none focus:border-forest"
-                : "min-h-11 w-full appearance-none rounded-md border border-sand bg-white pl-9 pr-9 text-sm text-ink outline-none focus:border-forest sm:w-auto sm:min-w-[190px]"}
+                ? "min-h-11 w-full appearance-none rounded-full border border-sand bg-white pl-9 pr-9 text-sm text-ink outline-none focus:border-forest"
+                : "min-h-11 w-full appearance-none rounded-full border border-sand bg-white pl-9 pr-9 text-sm text-ink outline-none focus:border-forest sm:w-auto sm:min-w-[190px]"}
               value={filters.creator}
               onChange={(event) => onChange({ creator: event.target.value })}
               aria-label="Recommended by"
@@ -173,8 +168,8 @@ export default function AdvancedFilters({
             aria-label="Filters"
             onClick={() => setExpanded((current) => !current)}
             className={expanded
-              ? "relative grid size-11 shrink-0 place-items-center rounded-md border border-forest bg-forest text-white"
-              : "relative grid size-11 shrink-0 place-items-center rounded-md border border-sand bg-white text-forest transition-colors hover:border-forest motion-reduce:transition-none"}
+              ? "relative grid size-11 shrink-0 place-items-center rounded-full border border-forest bg-forest text-white"
+              : "relative grid size-11 shrink-0 place-items-center rounded-full border border-sand bg-white text-forest transition-colors hover:border-forest motion-reduce:transition-none"}
           >
             <SlidersHorizontal size={18} strokeWidth={1.8} aria-hidden="true" />
             {activeCount > 0 && (
@@ -260,7 +255,7 @@ export default function AdvancedFilters({
             type="button"
             disabled={!active}
             onClick={onClear}
-            className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-[13px] font-semibold text-muted transition-colors hover:bg-chalk hover:text-forest disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold text-muted transition-colors hover:bg-chalk hover:text-forest disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
           >
             <RotateCcw size={15} strokeWidth={1.8} aria-hidden="true" />
             Clear all

@@ -8,9 +8,9 @@ import { ENGAGEMENT_TEST_MODE } from "../../lib/testMode";
 // Shared customer header for discovery and map surfaces. Search lives in the
 // discovery hero so the top bar stays quiet and consistent across screens.
 // Below md the primary nav drops to its own scrollable row beneath the brand.
-const NAV_LINK = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-semibold no-underline transition-colors motion-reduce:transition-none";
+const NAV_LINK = "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-semibold no-underline transition-colors motion-reduce:transition-none";
 const NAV_IDLE = `${NAV_LINK} text-muted hover:text-forest`;
-const NAV_ACTIVE = `${NAV_LINK} font-bold text-forest`;
+const NAV_ACTIVE = `${NAV_LINK} text-forest`;
 
 const AVATAR = "grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-forest text-sm font-semibold text-white";
 
@@ -72,16 +72,16 @@ export default function DiscoveryHeader({
   return (
     <header className="sticky top-0 z-30 flex min-h-[72px] flex-wrap items-center gap-2 border-b border-sand bg-chalk/95 px-4 py-2 font-body backdrop-blur lg:flex-nowrap lg:gap-6 md:px-10">
       <Link
-        to="/map"
-        aria-label="Back to Discover"
-        title="Back to Discover"
+        to="/discover"
+        aria-label="Go to Discover"
+        title="Go to Discover"
         className="flex shrink-0 items-center no-underline"
       >
         <img src="/assets/truebites-logo.png" alt="TrueBites" className="h-8 w-auto object-contain md:h-9" />
       </Link>
 
       <nav
-        className="order-3 flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:order-none lg:w-auto lg:overflow-visible"
+        className="no-scrollbar order-3 flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:order-none lg:w-auto lg:overflow-visible"
         aria-label="Primary navigation"
       >
         <Link
@@ -119,7 +119,7 @@ export default function DiscoveryHeader({
           aria-current={activeSection === "reviews" ? "page" : undefined}
         >
           <Star size={14} strokeWidth={1.7} />
-          <span>My reviews</span>
+          <span>My Reviews</span>
         </Link>
         <Link
           to="/suggestions"

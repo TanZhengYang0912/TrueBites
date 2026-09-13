@@ -10,7 +10,7 @@ import {
   getMyReviews,
   removeBookmark,
 } from "../api/engagement";
-import { addVendorToTrip, subscribeTripStopIds, tripOwner } from "../lib/tripStorage";
+import { addVendorToTrip, subscribePlannedStopCount, tripOwner } from "../lib/tripStorage";
 import { reportSavedCount, useSavedCount } from "../lib/savedCount";
 import { getCachedBookmarks, getCachedFolders, setCachedBookmarks, setCachedFolders } from "../lib/bookmarksCache";
 import { getCachedReviews, setCachedReviews } from "../lib/reviewsCache";
@@ -48,10 +48,10 @@ export default function ReviewsPage() {
   const [pendingSaveVendor, setPendingSaveVendor] = useState(null);
   const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null);
   const [toast, notify] = useToast();
-  const [tripStopIds, setTripStopIds] = useState(new Set());
-  const tripAtLimit = isTripAtLimit(tripStopIds.size);
+  const [plannedStops, setPlannedStops] = useState(0);
   const bookmarkedVendorIds = new Set(bookmarks.map((bookmark) => bookmark.vendor_id));
   const owner = tripOwner(session);
+  const tripAtLimit = isTripAtLimit(plannedStops);
   const savedCount = useSavedCount(false);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function ReviewsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  useEffect(() => subscribeTripStopIds(setTripStopIds, owner), [owner]);
+  useEffect(() => subscribePlannedStopCount(setPlannedStops, owner), [owner]);
 
   function handleAddStop(vendor) {
     const result = addVendorToTrip(vendor, owner);
@@ -244,7 +244,6 @@ export default function ReviewsPage() {
                   <div key={review.id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                     <VendorCard
                       vendor={review.vendor}
-                      inTrip={tripStopIds.has(review.vendor.id)}
                       tripAtLimit={tripAtLimit}
                       bookmarked={bookmarkedVendorIds.has(review.vendor.id)}
                       onToggleBookmark={() => toggleBookmarkForVendor(review.vendor)}
@@ -270,7 +269,6 @@ export default function ReviewsPage() {
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={tripStopIds.has(detailVendor.id)}
           tripAtLimit={tripAtLimit}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={toggleBookmarkFromDetail}
