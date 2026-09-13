@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const mapPage = read("../pages/MapPage.jsx");
+const sessionContext = read("./SessionContext.jsx");
 const dashboard = read("../components/Dashboard.jsx");
 const vendorPanel = read("../components/VendorPanel.jsx");
 const vendorMarkers = read("../components/VendorMarkers.jsx");
@@ -23,8 +24,27 @@ test("MapPage derives location-aware distances only from a user origin", () => {
 });
 
 test("MapPage keeps Melaka-centre fallback separate from a real distance origin", () => {
-  assert.match(mapPage, /const \[distanceOrigin, setDistanceOrigin\] = useState\(null\)/);
+  assert.match(mapPage, /loadMapOrigin/);
+  assert.match(mapPage, /saveMapOrigin/);
   assert.doesNotMatch(mapPage, /setDistanceOrigin\(MELAKA_CENTER\)/);
+  assert.doesNotMatch(mapPage, /setUserPos\(MELAKA_CENTER\)/);
+  assert.match(mapPage, /const anchor = distanceOrigin \|\| \(meIndex >= 0 \? trip\[meIndex\] : null\)/);
+});
+
+test("restored session origin waits for account trip hydration before updating stops", () => {
+  assert.match(mapPage, /if \(hydratedOwner !== owner\) return;/);
+  assert.match(mapPage, /setTrip\(\(current\) =>/);
+  assert.match(mapPage, /useLayoutEffect\(\(\) => \{[\s\S]{0,120}loadTrip\(owner\)/);
+});
+
+test("auth keeps Guest location on login but clears it on logout or account switch", () => {
+  assert.match(sessionContext, /createMapOriginSessionBoundary/);
+  assert.match(sessionContext, /clearMapOrigin/);
+  assert.match(mapPage, /subscribeMapOriginClear/);
+  assert.match(
+    mapPage,
+    /subscribeMapOriginClear\(\(\) => \{\s*setUserPos\(null\);\s*setDistanceOrigin\(null\);\s*setLocateTarget\(null\);\s*setTrip\(\(current\) => current\.filter\(\(stop\) => !stop\.isMe\)\);/,
+  );
 });
 
 test("MapPage derives one filtered sorted collection and shares it with both views", () => {

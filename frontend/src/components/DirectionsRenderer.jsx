@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
+import { normalizeLegMetrics, tripFingerprint } from "../lib/tripOptimization";
 
 function formatDistance(meters) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${meters} m`;
@@ -8,6 +9,47 @@ function formatDuration(seconds) {
   return seconds >= 3600
     ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min`
     : `${Math.floor(seconds / 60)} min`;
+}
+
+function routeMetrics(route) {
+  const metrics = normalizeLegMetrics(route?.legs);
+  if (!metrics) throw new Error("INVALID_ROUTE_METRICS");
+  return metrics;
+}
+
+function routeKey(route) {
+  const metrics = routeMetrics(route);
+  return `${route?.summary || ""}|${metrics.meters}|${metrics.seconds}`;
+}
+
+function mergeDrivingResults(primaryResult, tollFreeResult) {
+  const primaryRoutes = primaryResult?.routes || [];
+  const tollFreeRoutes = tollFreeResult?.routes || [];
+  const tollFreeKeys = new Set(tollFreeRoutes.map(routeKey));
+  const routes = [...primaryRoutes];
+  const routeKeys = new Set(routes.map(routeKey));
+
+  for (const route of tollFreeRoutes) {
+    const key = routeKey(route);
+    if (!routeKeys.has(key)) {
+      routes.push(route);
+      routeKeys.add(key);
+    }
+  }
+
+  return { result: { ...primaryResult, routes }, tollFreeKeys };
+}
+
+function directionsRequest(stops, travelMode) {
+  return {
+    origin: { lat: stops[0].lat, lng: stops[0].lng },
+    destination: { lat: stops.at(-1).lat, lng: stops.at(-1).lng },
+    waypoints: stops.slice(1, -1).map((stop) => ({
+      location: { lat: stop.lat, lng: stop.lng },
+      stopover: true,
+    })),
+    travelMode: google.maps.TravelMode[travelMode] || travelMode,
+  };
 }
 
 // Extracts a flat, ribbon-friendly list of legs (walk + transit legs in order)
@@ -43,7 +85,21 @@ function extractTransitLegs(route) {
   return legs;
 }
 
-export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, onSummary, onRoutes, onTransitLegs, onError }) {
+export default function DirectionsRenderer({
+  stops,
+  travelMode,
+  routeIndex = 0,
+  optimizationRequest,
+  onSummary,
+  onRoutes,
+  onTransitLegs,
+  onRouteDetails,
+  onWarnings,
+  onCopyrights,
+  onOptimizationResult,
+  onOptimizationError,
+  onError,
+}) {
   const map = useMap();
   const rendererRef = useRef(null);
   // Which travel mode we have already centred for. Recentring belongs to
@@ -61,27 +117,29 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       rendererRef.current = new google.maps.DirectionsRenderer({ suppressMarkers: true, preserveViewport: true });
     }
 
+    const identity = {
+      mode: travelMode,
+      routeIndex,
+      tripFingerprint: tripFingerprint(stops, travelMode),
+    };
+
     if (!stops || stops.length < 2 || !travelMode) {
       rendererRef.current.setMap(null);
       onSummary?.(null);
       onError?.(null);
       onRoutes?.([]);
       onTransitLegs?.([]);
+      onRouteDetails?.(null, identity);
+      onWarnings?.([], identity);
+      onCopyrights?.("", identity);
       return;
     }
 
-    const origin = { lat: stops[0].lat, lng: stops[0].lng };
-    const destination = { lat: stops[stops.length - 1].lat, lng: stops[stops.length - 1].lng };
-    const waypoints = stops.slice(1, -1).map((s) => ({ location: { lat: s.lat, lng: s.lng }, stopover: true }));
     const directionsService = new google.maps.DirectionsService();
     let cancelled = false;
 
-    const baseRequest = {
-      origin,
-      destination,
-      waypoints,
-      travelMode: google.maps.TravelMode[travelMode],
-    };
+    const baseRequest = directionsRequest(stops, travelMode);
+    const requestedAt = Date.now();
     onError?.(null);
 
     function applyResult(result) {
@@ -94,10 +152,13 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       // route, and panning on any of them threw away wherever the user had
       // scrolled to. Centring on the user is the GPS button's job.
 
-      const dist = route.legs.reduce((a, l) => a + l.distance.value, 0);
-      const dur = route.legs.reduce((a, l) => a + l.duration.value, 0);
+      const metrics = routeMetrics(route);
+      const { legDistancesMeters } = metrics;
       onError?.(null);
-      onSummary?.({ distance: formatDistance(dist), duration: formatDuration(dur) });
+      onSummary?.({ distance: formatDistance(metrics.meters), duration: formatDuration(metrics.seconds) });
+      onRouteDetails?.({ ...metrics, legDistancesMeters, calculatedAt: requestedAt, ...identity });
+      onWarnings?.(route.warnings || [], identity);
+      onCopyrights?.(route.copyrights || "", identity);
 
       if (travelMode === "TRANSIT") {
         onTransitLegs?.(extractTransitLegs(route));
@@ -105,29 +166,31 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
     }
 
     if (travelMode === "DRIVING") {
-      // Two requests: one with alternatives (default, may include toll roads),
-      // one forced off tolls. A route whose summary (the road names Google
-      // returns, e.g. "AKLEH/E13") doesn't match the toll-free route is
-      // flagged as using tolls — approximate, but needs no paid toll-pricing API.
+      // Google does not return ordinary alternatives when a request includes
+      // intermediate waypoints. Request alternatives only for two-point trips,
+      // then merge a distinct avoid-tolls result so multi-stop trips can still
+      // offer a genuine toll-free choice when Google finds one.
       Promise.all([
-        directionsService.route({ ...baseRequest, provideRouteAlternatives: true }),
+        directionsService.route({
+          ...baseRequest,
+          provideRouteAlternatives: baseRequest.waypoints.length === 0,
+        }),
         directionsService.route({ ...baseRequest, avoidTolls: true }),
       ])
         .then(([withAlts, tollFree]) => {
           if (cancelled) return;
-          const tollFreeSummaries = new Set(tollFree.routes.map((r) => r.summary));
-          const routes = withAlts.routes.map((r, i) => {
-            const dist = r.legs.reduce((a, l) => a + l.distance.value, 0);
-            const dur = r.legs.reduce((a, l) => a + l.duration.value, 0);
+          const { result, tollFreeKeys } = mergeDrivingResults(withAlts, tollFree);
+          const routes = result.routes.map((r, i) => {
+            const metrics = routeMetrics(r);
             return {
               index: i,
-              distance: formatDistance(dist),
-              duration: formatDuration(dur),
-              hasTolls: !tollFreeSummaries.has(r.summary),
+              distance: formatDistance(metrics.meters),
+              duration: formatDuration(metrics.seconds),
+              hasTolls: !tollFreeKeys.has(routeKey(r)),
             };
           });
           onRoutes?.(routes);
-          applyResult(withAlts);
+          applyResult(result);
         })
         .catch((error) => {
           if (cancelled) return;
@@ -135,6 +198,9 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
           onSummary?.({ distance: "—", duration: "—" });
           onError?.(error);
           onRoutes?.([]);
+          onRouteDetails?.(null, identity);
+          onWarnings?.([], identity);
+          onCopyrights?.("", identity);
         });
     } else {
       directionsService
@@ -148,6 +214,9 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
           rendererRef.current?.setMap(null);
           onSummary?.({ distance: "—", duration: "—" });
           onError?.(error);
+          onRouteDetails?.(null, identity);
+          onWarnings?.([], identity);
+          onCopyrights?.("", identity);
           if (travelMode === "TRANSIT") onTransitLegs?.([]);
         });
     }
@@ -157,6 +226,48 @@ export default function DirectionsRenderer({ stops, travelMode, routeIndex = 0, 
       rendererRef.current?.setMap(null);
     };
   }, [map, stops, travelMode, routeIndex]);
+
+  useEffect(() => {
+    if (!map || !optimizationRequest) return;
+
+    const requestedStops = optimizationRequest.stops;
+    const requestedMode = optimizationRequest.mode;
+    if (!Array.isArray(requestedStops) || requestedStops.length < 3 || requestedMode === "TRANSIT") return;
+
+    const directionsService = new google.maps.DirectionsService();
+    const baseRequest = directionsRequest(requestedStops, requestedMode);
+    let cancelled = false;
+
+    Promise.all([
+      directionsService.route(baseRequest),
+      directionsService.route({ ...baseRequest, optimizeWaypoints: true }),
+    ])
+      .then(([baselineResult, optimizedResult]) => {
+        if (cancelled) return;
+        const baselineRoute = baselineResult.routes?.[0];
+        const optimizedRoute = optimizedResult.routes?.[0];
+        if (!baselineRoute || !optimizedRoute) throw new Error("ZERO_RESULTS");
+        onOptimizationResult?.({
+          id: optimizationRequest.id,
+          mode: requestedMode,
+          tripFingerprint: optimizationRequest.tripFingerprint,
+          waypointOrder: optimizedRoute.waypoint_order,
+          baseline: routeMetrics(baselineRoute),
+          optimized: routeMetrics(optimizedRoute),
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        onOptimizationError?.({
+          id: optimizationRequest.id,
+          mode: requestedMode,
+          tripFingerprint: optimizationRequest.tripFingerprint,
+          error,
+        });
+      });
+
+    return () => { cancelled = true; };
+  }, [map, optimizationRequest]);
 
   return null;
 }

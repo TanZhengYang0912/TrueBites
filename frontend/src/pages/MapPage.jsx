@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
-import { getRestaurants, getTrip } from "../api";
+import { getRestaurants } from "../api";
 import { useSession } from "../lib/SessionContext";
 import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
@@ -10,8 +10,8 @@ import MelakaHighlight from "../components/MelakaHighlight";
 import TripPanel from "../components/TripPanel";
 import MapPanel from "../components/MapPanel";
 import VendorPanel from "../components/VendorPanel";
-import TripPolyline from "../components/TripPolyline";
 import DirectionsRenderer from "../components/DirectionsRenderer";
+import CustomPlaceDetailsLoader from "../components/CustomPlaceDetailsLoader";
 import TransitLayer from "../components/TransitLayer";
 import Dashboard from "../components/Dashboard";
 import DiscoveryHeader from "../components/discovery/DiscoveryHeader";
@@ -25,6 +25,12 @@ import { loadTrip, saveTrip, tripOwner } from "../lib/tripStorage";
 import { reportSavedCount, useSavedCount } from "../lib/savedCount";
 import { getCachedBookmarks, getCachedFolders, setCachedBookmarks, setCachedFolders } from "../lib/bookmarksCache";
 import { loadPanelTab, savePanelTab } from "../lib/panelPrefs";
+import {
+  clearMapOrigin,
+  loadMapOrigin,
+  saveMapOrigin,
+  subscribeMapOriginClear,
+} from "../lib/mapOriginSession";
 import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
 import {
@@ -33,6 +39,7 @@ import {
   sortVendors,
 } from "../lib/vendorFilters";
 import { shortPlaceName } from "../lib/placeName";
+import { customStopsForMap, customStopFromPlace } from "../lib/customPlaces";
 import { customerSession } from "../lib/roles";
 import {
   EMPTY_ROUTE_SUMMARY,
@@ -40,7 +47,16 @@ import {
   getDirectionsErrorMessage,
   getRouteConstraint,
   isTripAtLimit,
+  selectRoutingStops,
+  formatTransitScopeMessage,
 } from "../lib/tripRoutingPolicy";
+import {
+  applyWaypointOrder,
+  buildArrivalTimeline,
+  buildOptimizationComparison,
+  matchesTripIdentity,
+  tripFingerprint,
+} from "../lib/tripOptimization";
 
 const MELAKA_CENTER = { lat: 2.1896, lng: 102.2501 };
 const API_KEY = import.meta.env.VITE_MAPS_BROWSER_KEY;
@@ -65,6 +81,16 @@ function FocusOnUser({ pos }) {
       map.setZoom(14);
     }
   }, [map, pos]);
+  return null;
+}
+
+function FocusOnTripStop({ stop }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !stop) return;
+    map.panTo({ lat: stop.lat, lng: stop.lng });
+    map.setZoom(16);
+  }, [map, stop]);
   return null;
 }
 
@@ -98,12 +124,14 @@ export default function MapPage() {
   const [focusVendor, setFocusVendor] = useState(null);
   const [selected, setSelected] = useState(null);
   const [openId, setOpenId] = useState(null); // vendor id whose InfoWindow is open
-  const [userPos, setUserPos] = useState(null);
+  const [initialMapOrigin] = useState(() => loadMapOrigin());
+  const [userPos, setUserPos] = useState(initialMapOrigin);
   // Kept separate from userPos because the map may fall back to Melaka centre
   // after a denied/failed geolocation request. That fallback is useful for the
-  // camera and nearby panel, but it must never masquerade as the user's origin.
-  const [distanceOrigin, setDistanceOrigin] = useState(null);
+  // camera, but it must never masquerade as the user's origin.
+  const [distanceOrigin, setDistanceOrigin] = useState(initialMapOrigin);
   const [locateTarget, setLocateTarget] = useState(null);
+  const [focusTripStop, setFocusTripStop] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
   const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
   const updateFilters = (partial) => setFilters((current) => ({ ...current, ...partial }));
@@ -119,8 +147,6 @@ export default function MapPage() {
   // other. Hydration waits for Supabase to resolve the current identity so a
   // logged-in trip can never be mistaken for a guest trip during startup.
   const [trip, setTrip] = useState([]);              // unified draggable stops
-  const [tripData, setTripData] = useState(null);
-  const [tripLoading, setTripLoading] = useState(false);
   const [travelMode, setTravelMode] = useState(null);   // null | "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
   const [hydratedOwner, setHydratedOwner] = useState(null);
   const [dirSummary, setDirSummary] = useState(null);
@@ -128,26 +154,53 @@ export default function MapPage() {
   const [routeIndex, setRouteIndex] = useState(0);       // selected alt route (DRIVING)
   const [routeOptions, setRouteOptions] = useState([]);  // alt routes + toll flags (DRIVING)
   const [transitLegs, setTransitLegs] = useState([]);    // itinerary legs (TRANSIT)
+  const [optimizationRequest, setOptimizationRequest] = useState(null);
+  const [optimizationComparison, setOptimizationComparison] = useState(null);
+  const [arrivalRows, setArrivalRows] = useState([]);
+  const [routeWarnings, setRouteWarnings] = useState([]);
+  const [routeCopyrights, setRouteCopyrights] = useState("");
+  const optimizationIdRef = useRef(0);
   const [isDark, setIsDark] = useState(false);
   const [toast, notify] = useToast();
   const [mapError, setMapError] = useState("");
   const tripAtLimit = isTripAtLimit(trip.length);
+  // Keep the Transit start/final pair referentially stable between unrelated
+  // renders so DirectionsRenderer does not repeat the same Google request.
+  const routingStops = useMemo(
+    () => selectRoutingStops(trip, travelMode),
+    [trip, travelMode],
+  );
   const routeConstraint = getRouteConstraint(travelMode, trip.length);
   const routeMessage = routeConstraint?.message || getDirectionsErrorMessage(dirError, trip.length);
-  const displayedSummary = routeConstraint ? EMPTY_ROUTE_SUMMARY : travelMode ? dirSummary : tripData;
+  const transitScopeMessage = travelMode === "TRANSIT"
+    ? formatTransitScopeMessage(trip, routingStops)
+    : null;
+  const displayedSummary = routeConstraint ? EMPTY_ROUTE_SUMMARY : travelMode ? dirSummary : null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (sessionLoading) return;
     const stored = loadTrip(owner);
     setTrip(stored?.stops || []);
     setTravelMode(stored?.travelMode || null);
-    setTripData(null);
     setDirSummary(null);
     setDirError(null);
     setRouteOptions([]);
     setTransitLegs([]);
+    setOptimizationRequest(null);
+    setOptimizationComparison(null);
+    setArrivalRows([]);
+    setRouteWarnings([]);
+    setRouteCopyrights("");
+    optimizationIdRef.current += 1;
     setHydratedOwner(owner);
   }, [owner, sessionLoading]);
+
+  useEffect(() => subscribeMapOriginClear(() => {
+    setUserPos(null);
+    setDistanceOrigin(null);
+    setLocateTarget(null);
+    setTrip((current) => current.filter((stop) => !stop.isMe));
+  }), []);
 
   useEffect(() => {
     const mapAuthFailure = () => {
@@ -243,16 +296,6 @@ export default function MapPage() {
     });
   }, [vendors]);
 
-  // Recompute the route for a trip restored from storage — path/distance/
-  // duration are never persisted (they're cheap to recompute and would
-  // otherwise go stale). Runs once; DirectionsRenderer already handles this
-  // reactively when a travelMode was also restored.
-  useEffect(() => {
-    if (hydratedOwner !== owner) return;
-    if (trip.length >= 2 && !travelMode) planTrip(trip, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydratedOwner, owner]);
-
   // Bookmarks are server-backed and auth-gated — an anonymous browser sees
   // none, and any local state is dropped the moment the session disappears.
   useEffect(() => {
@@ -273,66 +316,86 @@ export default function MapPage() {
   const meStop = (pos) => ({ id: "__me__", name: pos.label || "Your location", lat: pos.lat, lng: pos.lng, isMe: true });
   function showTripLimit() { notify(TRIP_LIMIT_ADD_MESSAGE, true); }
 
-  async function planTrip(list, optimize) {
-    if (list.length < 2) { setTripData(null); return; }
-    if (getRouteConstraint(null, list.length)) { setTripData(null); return; }
-    setTripLoading(true);
-    try {
-      const points = list.map((s) => ({ lat: s.lat, lng: s.lng }));
-      const res = await getTrip(points, optimize);
-      if (optimize) setTrip(res.order.map((i) => list[i]));
-      setTripData({ path: res.path, distance: res.distance, duration: res.duration });
-    } catch (e) {
-      console.error(e);
-      setTripData(null);
-      notify("Trip planning failed (the free routing server may be busy). Please try again.", true);
-    } finally {
-      setTripLoading(false);
-    }
+  function invalidateOptimizationFeedback() {
+    optimizationIdRef.current += 1;
+    setOptimizationRequest(null);
+    setOptimizationComparison(null);
+    setArrivalRows([]);
+    setRouteWarnings([]);
+    setRouteCopyrights("");
   }
 
   useEffect(() => {
-    if (!userPos) return;
+    if (!userPos || hydratedOwner !== owner) return;
     const hasMe = trip.some((s) => s.isMe);
     if (!hasMe && isTripAtLimit(trip.length)) {
       showTripLimit();
       return;
     }
-    const next = hasMe
-      ? trip.map((s) => (s.isMe ? { ...s, lat: userPos.lat, lng: userPos.lng, name: userPos.label || "Your location" } : s))
-      : [meStop(userPos), ...trip];
-    setTrip(next);
-    planTrip(next, true);
+    invalidateOptimizationFeedback();
+    setTrip((current) => {
+      const currentHasMe = current.some((stop) => stop.isMe);
+      if (!currentHasMe) return [meStop(userPos), ...current];
+      let changed = false;
+      const next = current.map((stop) => {
+        if (!stop.isMe) return stop;
+        const name = userPos.label || "Your location";
+        if (stop.lat === userPos.lat && stop.lng === userPos.lng && stop.name === name) return stop;
+        changed = true;
+        return { ...stop, lat: userPos.lat, lng: userPos.lng, name };
+      });
+      return changed ? next : current;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userPos]);
+  }, [userPos, hydratedOwner, owner, trip.length]);
 
   function addStop(vendor) {
     if (trip.some((s) => s.id === vendor.id)) return;
     if (isTripAtLimit(trip.length)) { showTripLimit(); return; }
     const list = [...trip, vendorStop(vendor)];
+    invalidateOptimizationFeedback();
     setTrip(list);
-    planTrip(list, true);
     notify(`${vendor.name} added to your trip.`);
   }
   // A typed place (not a vendor) — e.g. "pick up a friend on the way".
   function addCustomStop(place) {
     if (isTripAtLimit(trip.length)) { showTripLimit(); return; }
-    const stop = { id: `custom-${Date.now()}`, name: place.label, lat: place.lat, lng: place.lng, isMe: false, source: "custom" };
+    const stop = customStopFromPlace(`custom-${Date.now()}`, place);
     const list = [...trip, stop];
+    invalidateOptimizationFeedback();
     setTrip(list);
-    planTrip(list, true);
+    setFocusTripStop(stop);
     notify(`${place.label} added to your trip.`);
   }
-  function reorderTrip(newList) { setTrip(newList); planTrip(newList, false); }
-  function removeStop(id) { const list = trip.filter((s) => s.id !== id); setTrip(list); planTrip(list, false); }
+  function reorderTrip(newList) { invalidateOptimizationFeedback(); setTrip(newList); }
+  function removeStop(id) { invalidateOptimizationFeedback(); setTrip(trip.filter((s) => s.id !== id)); }
   // Re-typing the address of a custom stop already on the trip (vendor stops
   // aren't editable — they're removed and re-added if wrong; "Your location"
   // uses setManualLocation instead, since that also updates userPos/GPS state).
   function editStop(id, place) {
-    const list = trip.map((s) => (s.id === id ? { ...s, name: place.label, lat: place.lat, lng: place.lng } : s));
+    const updated = customStopFromPlace(id, place);
+    const list = trip.map((s) => (s.id === id ? updated : s));
+    invalidateOptimizationFeedback();
     setTrip(list);
-    planTrip(list, false);
+    setFocusTripStop(updated);
   }
+
+  const refreshCustomStopDetails = useCallback((id, expectedPlaceId, details) => {
+    setTrip((current) => current.map((stop) => {
+      if (stop.id !== id || stop.source !== "custom" || stop.placeId !== expectedPlaceId) return stop;
+      try {
+        return customStopFromPlace(id, {
+          ...stop,
+          ...details,
+          label: details.label || stop.name || "Google place",
+          lat: details.lat ?? stop.lat,
+          lng: details.lng ?? stop.lng,
+        });
+      } catch {
+        return stop;
+      }
+    }));
+  }, []);
 
   function selectNearby(vendor) {
     setFocusVendor(vendor);
@@ -345,17 +408,102 @@ export default function MapPage() {
   // start building a new trip from where they are without resetting mode/GPS.
   function clearTrip() {
     const list = trip.filter((s) => s.isMe);
+    invalidateOptimizationFeedback();
     setTrip(list);
-    setTripData(null);
     setDirSummary(null);
     setDirError(null);
     setRouteOptions([]);
     setTransitLegs([]);
   }
 
+  function changeTravelMode(mode) {
+    invalidateOptimizationFeedback();
+    setTravelMode(mode);
+  }
+
+  function optimizationModeLabel(mode) {
+    if (mode === "TWO_WHEELER") return "Motorcycle";
+    if (mode === "WALKING") return "Walking";
+    return "Car";
+  }
+
+  function handleSuggestBestOrder() {
+    const mode = travelMode || "DRIVING";
+    if (mode === "TRANSIT" || getRouteConstraint(mode, trip.length)) return;
+
+    setOptimizationComparison(null);
+    if (!travelMode) setTravelMode("DRIVING");
+    if (trip.length < 3) {
+      optimizationIdRef.current += 1;
+      setOptimizationRequest(null);
+      setOptimizationComparison(buildOptimizationComparison(
+        { meters: 0, seconds: 0 },
+        { meters: 0, seconds: 0 },
+      ));
+      return;
+    }
+
+    const id = optimizationIdRef.current + 1;
+    optimizationIdRef.current = id;
+    setOptimizationRequest({
+      id,
+      mode,
+      tripFingerprint: tripFingerprint(trip, mode),
+      stops: trip.map((stop) => ({ ...stop })),
+    });
+  }
+
+  function handleOptimizationResult(result) {
+    if (!optimizationRequest || result.id !== optimizationRequest.id) return;
+    if (result.id !== optimizationIdRef.current) return;
+    if (result.mode !== optimizationRequest.mode) return;
+    if (result.tripFingerprint !== optimizationRequest.tripFingerprint) return;
+    if (!matchesTripIdentity(result, trip, result.mode)) return;
+
+    const reordered = applyWaypointOrder(trip, result.waypointOrder);
+    if (!reordered) {
+      handleOptimizationError(result);
+      return;
+    }
+    setOptimizationRequest(null);
+    if (reordered.some((stop, index) => stop !== trip[index])) setTrip(reordered);
+    setOptimizationComparison(buildOptimizationComparison(result.baseline, result.optimized));
+  }
+
+  function handleOptimizationError(result) {
+    if (!optimizationRequest || result.id !== optimizationRequest.id) return;
+    if (result.id !== optimizationIdRef.current) return;
+    setOptimizationRequest(null);
+    notify(`Couldn’t suggest an order for ${optimizationModeLabel(result.mode)}. Your current order was kept.`, true);
+  }
+
+  function handleRouteDetails(details, identity) {
+    const routeIdentity = details || identity;
+    if (routeIdentity && !matchesTripIdentity(routeIdentity, routingStops, travelMode, routeIndex)) return;
+    setArrivalRows(details
+      ? buildArrivalTimeline(
+        routingStops,
+        details.legDurationsSeconds,
+        new Date(details.calculatedAt),
+        details.legDistancesMeters,
+      )
+      : []);
+  }
+
+  function handleRouteWarnings(warnings, identity) {
+    if (identity && !matchesTripIdentity(identity, routingStops, travelMode, routeIndex)) return;
+    setRouteWarnings(warnings);
+  }
+
+  function handleRouteCopyrights(copyrights, identity) {
+    if (identity && !matchesTripIdentity(identity, routingStops, travelMode, routeIndex)) return;
+    setRouteCopyrights(copyrights);
+  }
+
   // Manual start location typed via Places Autocomplete — same effect as
   // geolocation resolving, just fed a chosen address instead of GPS.
   function setManualLocation(pos) {
+    saveMapOrigin(pos);
     setUserPos(pos);
     setDistanceOrigin(pos);
     setLocateTarget(pos);
@@ -369,12 +517,26 @@ export default function MapPage() {
     setDirSummary(null);
     setRouteOptions([]);
     setTransitLegs([]);
+    setArrivalRows([]);
+    setRouteWarnings([]);
+    setRouteCopyrights("");
   }, [travelMode, trip]);
+
+  useEffect(() => {
+    setDirError(null);
+    setDirSummary(null);
+    setArrivalRows([]);
+    setRouteWarnings([]);
+    setRouteCopyrights("");
+  }, [routeIndex]);
 
   useEffect(() => {
     if (!routeConstraint) return;
     setRouteOptions([]);
     setTransitLegs([]);
+    setArrivalRows([]);
+    setRouteWarnings([]);
+    setRouteCopyrights("");
   }, [routeConstraint?.code]);
 
   // Un-saving is a plain delete; saving opens the folder picker (rendered by
@@ -432,16 +594,17 @@ export default function MapPage() {
       (p) => {
         const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
         if (!silent) setLocateTarget(pos);
-        // Label first, then set userPos once. The [userPos] effect re-plans the
-        // trip with optimize=true, so setting it twice would silently reorder
-        // the user's stops the moment the geocode came back.
+        // Label first, then set userPos once so the [userPos] effect updates the
+        // origin once and triggers only one Google route recalculation.
         labelForPosition(pos).then((labelled) => {
+          saveMapOrigin(labelled);
           setUserPos(labelled);
           setDistanceOrigin(labelled);
         });
       },
       () => {
-        setUserPos(MELAKA_CENTER);
+        clearMapOrigin();
+        setUserPos(null);
         setDistanceOrigin(null);
         if (!silent) {
           setLocateTarget(MELAKA_CENTER);
@@ -460,12 +623,14 @@ export default function MapPage() {
     navigator.geolocation.getCurrentPosition(
       (p) => {
         const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        saveMapOrigin(pos);
         setUserPos(pos);
         setDistanceOrigin(pos);
         setLocateTarget(pos);
       },
       () => {
-        setUserPos(MELAKA_CENTER);
+        clearMapOrigin();
+        setUserPos(null);
         setDistanceOrigin(null);
         setLocateTarget(MELAKA_CENTER);
         notify("Couldn't get your location — showing vendors near Melaka centre.", true);
@@ -582,13 +747,14 @@ export default function MapPage() {
   const meIndex = trip.findIndex((s) => s.isMe);
   const vendorStopOrder = new Map();
   trip.forEach((s, i) => { if (!s.isMe) vendorStopOrder.set(s.id, i + 1); });
+  const customStops = customStopsForMap(trip);
 
   // One anchor drives the radius circle, the nearby list and the visible pins,
   // so the three can't disagree about what "nearby" means. It is always "Your
   // location" and nothing else: the map camera centres there on entry, so
   // anchoring anywhere else renders a viewport with no pins in it. With no
   // location set there is no anchor, and the panel says so.
-  const anchor = userPos || null;
+  const anchor = distanceOrigin || (meIndex >= 0 ? trip[meIndex] : null);
 
   // "all" means no distance limit for the nearby add-to-trip list.
   const effectiveRadiusKm = radiusKm === "all" ? Infinity : radiusKm;
@@ -630,9 +796,11 @@ export default function MapPage() {
   return (
     <APIProvider
       apiKey={API_KEY}
+      version="beta"
       libraries={["geometry", "marker", "places"]}
-      onError={(error) => setMapError(`Google Maps failed to load: ${error?.message || "authorization or billing error."}`)}
+      onError={() => setMapError("Google Maps failed to load. Please check the browser key, Maps JavaScript API, and billing settings.")}
     >
+      <CustomPlaceDetailsLoader stops={trip} onDetails={refreshCustomStopDetails} />
       <div className="relative h-dvh w-full overflow-hidden bg-chalk">
         <GMap
           defaultCenter={MELAKA_CENTER}
@@ -650,8 +818,10 @@ export default function MapPage() {
                   me" would win and undo the "focus on the vendor I picked" zoom. */}
               <FocusOnUser pos={locateTarget} />
               <FocusOnVendor vendor={visibleFocusVendor} />
+              <FocusOnTripStop stop={focusTripStop} />
               <VendorMarkers
                 vendors={visibleVendors}
+                customStops={customStops}
                 userPos={userPos}
                 onSelect={setSelected}
                 onAddStop={addStop}
@@ -666,20 +836,23 @@ export default function MapPage() {
                 radiusKm={radiusKm}
               />
               {travelMode === "TRANSIT" && !routeConstraint && <TransitLayer />}
-              {travelMode && !routeConstraint
-                ? (
-                  <DirectionsRenderer
-                    stops={trip}
-                    travelMode={travelMode}
-                    routeIndex={routeIndex}
-                    onSummary={setDirSummary}
-                    onRoutes={setRouteOptions}
-                    onTransitLegs={setTransitLegs}
-                    onError={setDirError}
-                  />
-                )
-                : !travelMode && !routeConstraint && tripData?.path && <TripPolyline path={tripData.path} />
-              }
+              {travelMode && !routeConstraint && (
+                <DirectionsRenderer
+                  stops={routingStops}
+                  travelMode={travelMode}
+                  routeIndex={routeIndex}
+                  optimizationRequest={optimizationRequest}
+                  onSummary={setDirSummary}
+                  onRoutes={setRouteOptions}
+                  onTransitLegs={setTransitLegs}
+                  onRouteDetails={handleRouteDetails}
+                  onWarnings={handleRouteWarnings}
+                  onCopyrights={handleRouteCopyrights}
+                  onOptimizationResult={handleOptimizationResult}
+                  onOptimizationError={handleOptimizationError}
+                  onError={setDirError}
+                />
+              )}
         </GMap>
 
         {!mapFullscreen && (
@@ -740,14 +913,19 @@ export default function MapPage() {
                 trip={trip}
                 summary={displayedSummary}
                 routeMessage={routeMessage}
+                transitScopeMessage={transitScopeMessage}
                 tripAtLimit={tripAtLimit}
-                loading={tripLoading}
+                optimizationLoading={Boolean(optimizationRequest)}
+                optimizationComparison={optimizationComparison}
+                arrivalRows={arrivalRows}
+                routeWarnings={routeWarnings}
+                routeCopyrights={routeCopyrights}
                 onReorder={reorderTrip}
                 onClear={clearTrip}
                 onRemove={removeStop}
                 onEditStop={editStop}
                 travelMode={travelMode}
-                onTravelMode={setTravelMode}
+                onTravelMode={changeTravelMode}
                 onManualLocation={setManualLocation}
                 onLocateMe={() => locateMe()}
                 routeOptions={routeOptions}
@@ -756,7 +934,9 @@ export default function MapPage() {
                 transitLegs={transitLegs}
                 onAddCustomStop={addCustomStop}
                 onTripLimit={showTripLimit}
-                onSuggestBestOrder={() => planTrip(trip, true)}
+                onSuggestBestOrder={handleSuggestBestOrder}
+                locationBias={anchor || MELAKA_CENTER}
+                onFocusStop={setFocusTripStop}
               />
             ) : (
               <VendorPanel

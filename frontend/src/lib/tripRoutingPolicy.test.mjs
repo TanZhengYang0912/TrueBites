@@ -8,7 +8,16 @@ import {
   formatTripOverflowMessage,
   getRouteConstraint,
   getDirectionsErrorMessage,
+  selectRoutingStops,
+  formatTransitScopeMessage,
 } from "./tripRoutingPolicy.js";
+
+const routeStops = [
+  { id: "me", isMe: true, lat: 3.1, lng: 101.7 },
+  { id: "middle-a", isMe: false, lat: 2.4, lng: 102.0 },
+  { id: "middle-b", isMe: false, lat: 2.3, lng: 102.1 },
+  { id: "final", isMe: false, lat: 2.2, lng: 102.2 },
+];
 
 test("capacity counts origin and destination", () => {
   assert.equal(MAX_GOOGLE_TRIP_STOPS, 27);
@@ -32,22 +41,48 @@ test("a restored 35-stop trip is preserved but reports eight excess stops", () =
   });
 });
 
-test("valid Google modes pass preflight while multi-stop transit does not", () => {
+test("valid Google modes, including multi-stop transit scope, pass preflight", () => {
   assert.equal(getRouteConstraint("DRIVING", 27), null);
   assert.equal(getRouteConstraint("WALKING", 27), null);
   assert.equal(getRouteConstraint("TRANSIT", 2), null);
-  assert.deepEqual(getRouteConstraint("TRANSIT", 4), {
-    code: "TRANSIT_WAYPOINTS_UNSUPPORTED",
-    message: "Transit routing supports only a start and destination. Remove 2 intermediate stops to calculate this route.",
-  });
-  assert.deepEqual(getRouteConstraint("TRANSIT", 3), {
-    code: "TRANSIT_WAYPOINTS_UNSUPPORTED",
-    message: "Transit routing supports only a start and destination. Remove 1 intermediate stop to calculate this route.",
-  });
+  assert.equal(getRouteConstraint("TRANSIT", 27), null);
 });
 
 test("the global 27-stop cap takes precedence for oversized transit trips", () => {
   assert.equal(getRouteConstraint("TRANSIT", 35)?.code, "MAX_WAYPOINTS_EXCEEDED");
+});
+
+test("transit routes from Your location to the final non-start stop", () => {
+  assert.equal(selectRoutingStops(routeStops, "DRIVING"), routeStops);
+  assert.deepEqual(
+    selectRoutingStops(routeStops, "TRANSIT").map((stop) => stop.id),
+    ["me", "final"],
+  );
+
+  const misplacedOrigin = [routeStops[1], routeStops[0], routeStops[2], routeStops[3]];
+  assert.deepEqual(
+    selectRoutingStops(misplacedOrigin, "TRANSIT").map((stop) => stop.id),
+    ["me", "final"],
+  );
+});
+
+test("transit falls back to the first stop and rejects a missing destination", () => {
+  const withoutOrigin = routeStops.slice(1);
+  assert.deepEqual(
+    selectRoutingStops(withoutOrigin, "TRANSIT").map((stop) => stop.id),
+    ["middle-a", "final"],
+  );
+  assert.deepEqual(selectRoutingStops([], "TRANSIT"), []);
+  assert.deepEqual(selectRoutingStops([routeStops[0]], "TRANSIT"), [routeStops[0]]);
+});
+
+test("transit scope copy reports only omitted intermediate stops", () => {
+  const selected = selectRoutingStops(routeStops, "TRANSIT");
+  assert.equal(
+    formatTransitScopeMessage(routeStops, selected),
+    "Transit route includes only the start and final destination. 2 intermediate stops are not included.",
+  );
+  assert.equal(formatTransitScopeMessage(routeStops.slice(0, 2), routeStops.slice(0, 2)), null);
 });
 
 test("Google failures map to exact messages", () => {
