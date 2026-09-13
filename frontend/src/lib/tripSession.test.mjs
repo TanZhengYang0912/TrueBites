@@ -129,8 +129,8 @@ test("expired Google coordinate caches and legacy custom stops without Place IDs
     owner: "user:user-a",
     travelMode: "DRIVING",
     stops: [
-      { id: "expired", name: "Expired", lat: 2.2, lng: 102.2, source: "custom", placeId: "p-old", cachedAt: now - (30 * day) - 1 },
-      { id: "fresh", name: "Fresh", lat: 2.21, lng: 102.21, source: "custom", placeId: "p-new", cachedAt: now - (30 * day) },
+      { id: "expired", name: "Expired", lat: 2.2, lng: 102.2, source: "custom", placeId: "p-old", cachedAt: now - (30 * day) - 1000 },
+      { id: "fresh", name: "Fresh", lat: 2.21, lng: 102.21, source: "custom", placeId: "p-new", cachedAt: now - (30 * day) + 1000 },
       { id: "legacy", name: "Legacy", lat: 2.22, lng: 102.22, source: "custom", placeId: "p-legacy" },
       { id: "unrefreshable", name: "Old Google content", lat: 2.23, lng: 102.23, source: "custom" },
     ],
