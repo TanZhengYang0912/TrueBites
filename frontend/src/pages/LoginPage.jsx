@@ -1,7 +1,7 @@
 // AUTH MODULE — Joshua
 // Login / register UI backed directly by Supabase Auth (no custom Express routes).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -189,13 +189,26 @@ export default function LoginPage() {
     if (error) setErrorMsg(error.message);
   }
 
-  // Signed-in customers go back to the app. Admins never reach this line —
-  // AuthGate redirects them to /admin before this page renders.
-  // Waits for the session context's initial read (and any Google OAuth code
-  // exchange it's resolving) before deciding — otherwise a fast redirect back
-  // from Google can render this page as logged-out for a frame.
+  // Signed-in customers go back to the app. An admin mid "View Site" preview
+  // can land here too now (clicking a guest-only "Sign in" prompt) — same
+  // treatment, bounced onward rather than shown a form for an identity they
+  // already have. Waits for the session context's initial read (and any
+  // Google OAuth code exchange it's resolving) before deciding — otherwise a
+  // fast redirect back from Google can render this page as logged-out for a
+  // frame.
+  //
+  // This has to be an effect, not a call during render: App.jsx's AuthGate
+  // (the parent) also calls navigate() in its own effect on this exact route
+  // change, and two navigate() calls racing — one from render, one from an
+  // effect — left this page permanently blank instead of landing anywhere,
+  // the first time an admin preview actually reached this branch.
+  useEffect(() => {
+    if (!sessionLoading && session && !justSignedUp) {
+      navigate("/discover", { replace: true });
+    }
+  }, [sessionLoading, session, justSignedUp, navigate]);
+
   if (!sessionLoading && session && !justSignedUp) {
-    navigate("/discover", { replace: true });
     return null;
   }
 
