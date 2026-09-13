@@ -5,6 +5,9 @@ import { useSession } from "../lib/SessionContext";
 import {
   getBookmarks, getFolders, addBookmark, removeBookmark, moveBookmark, createFolder, deleteFolder,
 } from "../api/engagement";
+import { addVendorToTrip, subscribeTripStopIds, tripOwner } from "../lib/tripStorage";
+import { reportSavedCount, useSavedCount } from "../lib/savedCount";
+import { getCachedBookmarks, getCachedFolders, setCachedBookmarks, setCachedFolders } from "../lib/bookmarksCache";
 import Toast from "../components/engagement/Toast";
 import DiscoveryPageShell from "../components/discovery/DiscoveryPageShell";
 import DiscoveryPageIntro from "../components/discovery/DiscoveryPageIntro";
@@ -35,8 +38,8 @@ export default function SavedPage() {
   const { session: authSession, loading: sessionLoading } = useSession();
   const session = customerSession(authSession);
 
-  const [bookmarks, setBookmarks] = useState([]);
-  const [folders, setFolders] = useState([]);
+  const [bookmarks, setBookmarks] = useState(() => getCachedBookmarks() ?? []);
+  const [folders, setFolders] = useState(() => getCachedFolders() ?? []);
   const [activeFolder, setActiveFolder] = useState("all");
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -47,7 +50,10 @@ export default function SavedPage() {
   const [pendingDeleteFolder, setPendingDeleteFolder] = useState(null); // folder awaiting delete confirmation
   const [pendingUnbookmarkVendor, setPendingUnbookmarkVendor] = useState(null); // vendor awaiting unbookmark confirmation
   const [toast, notify] = useToast();
+  const [tripStopIds, setTripStopIds] = useState(new Set());
   const bookmarkedVendorIds = new Set(bookmarks.map((b) => b.vendor_id));
+  const owner = tripOwner(session);
+  const savedCount = useSavedCount(false);
 
   useEffect(() => {
     if (!session && !ENGAGEMENT_TEST_MODE) return;
@@ -55,11 +61,19 @@ export default function SavedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  useEffect(() => subscribeTripStopIds(setTripStopIds, owner), [owner]);
+
+  function handleAddStop(vendor) {
+    const result = addVendorToTrip(vendor, owner);
+    if (result === "added") notify(`${vendor.name} added to your trip.`);
+    else if (result === "no-location") notify("This vendor doesn't have a location yet.", true);
+  }
+
   useEffect(() => { setBookmarkPage(1); }, [activeFolder]);
 
   function refreshBookmarks() {
-    getFolders().then((f) => setFolders(f.folders)).catch((e) => { console.error(e.message); notify("Couldn't load your folders.", true); });
-    getBookmarks().then((b) => setBookmarks(b.bookmarks)).catch((e) => { console.error(e.message); notify("Couldn't load your bookmarks.", true); });
+    getFolders().then((f) => { setFolders(f.folders); setCachedFolders(f.folders); }).catch((e) => { console.error(e.message); notify("Couldn't load your folders.", true); });
+    getBookmarks().then((b) => { setBookmarks(b.bookmarks); setCachedBookmarks(b.bookmarks); reportSavedCount(b.bookmarks.length); }).catch((e) => { console.error(e.message); notify("Couldn't load your bookmarks.", true); });
   }
   if (sessionLoading) return null;
 
@@ -186,7 +200,7 @@ export default function SavedPage() {
         initials,
         firstName,
         avatarUrl,
-        savedCount: bookmarks.length,
+        savedCount,
         activeSection: "saved",
         onLogin: () => navigate("/login"),
         onSignUp: () => navigate("/login?mode=signup"),
@@ -259,10 +273,10 @@ export default function SavedPage() {
                       <div key={b.vendor_id} className={`flex flex-col ${CARD_STRETCH} ${CARD_MERGE_FOOTER}`}>
                         <VendorCard
                           vendor={b.vendor}
-                          inTrip={false}
+                          inTrip={tripStopIds.has(b.vendor.id)}
                           bookmarked={true}
                           onToggleBookmark={() => setPendingUnbookmarkVendor(b.vendor)}
-                          onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+                          onAddStop={handleAddStop}
                           onOpenDetail={setDetailVendor}
                         />
                         <FolderMoveSelect row={b} folders={folders} onMove={(folderId) => handleMoveBookmark(b.vendor_id, folderId)} />
@@ -280,10 +294,10 @@ export default function SavedPage() {
         <VendorDetailModal
           key={detailVendor.id}
           vendor={detailVendor}
-          inTrip={false}
+          inTrip={tripStopIds.has(detailVendor.id)}
           bookmarked={bookmarkedVendorIds.has(detailVendor.id)}
           onToggleBookmark={() => toggleBookmarkFromDetail(detailVendor.id)}
-          onAddStop={() => notify("Open this vendor from the map to add it to your trip.")}
+          onAddStop={handleAddStop}
           onClose={() => setDetailVendor(null)}
           onVendorUpdated={patchVendorStats}
         />

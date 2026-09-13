@@ -16,6 +16,7 @@ import { customerSession } from "../lib/roles";
 import { getAccountStatus } from "../api/engagement";
 import { humanizeDuration } from "../lib/suspension";
 import { hasSeenWelcome, markWelcomeSeen } from "../lib/welcomePrefs";
+import { useSavedCount } from "../lib/savedCount";
 
 const PAGE_SIZE = 12;
 
@@ -50,6 +51,7 @@ export default function Dashboard({
   const [showWelcome, setShowWelcome] = useState(() => !hasSeenWelcome());
   const navigate = useNavigate();
   const bookmarked = vendors.filter((v) => bookmarks.has(v.id));
+  const savedCount = useSavedCount(false);
 
   function closeWelcome() {
     markWelcomeSeen();
@@ -110,7 +112,7 @@ export default function Dashboard({
   return (
     <div className="min-h-dvh bg-chalk font-body text-ink">
       <DiscoveryHeader
-        session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl} savedCount={bookmarked.length}
+        session={session} userEmail={userEmail} initials={initials} firstName={firstName} avatarUrl={avatarUrl} savedCount={savedCount}
         onLogin={() => navigate("/login")} onOpenProfile={() => navigate("/profile")}
         activeSection="discover"
         onSignUp={() => navigate("/login?mode=signup")}
