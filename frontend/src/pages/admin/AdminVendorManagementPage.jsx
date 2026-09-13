@@ -641,7 +641,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         </label>
       </div>
 
-      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} loadError={mapsError} />
+      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} loadError={mapsError} notify={notify} />
 
       <div className="admin-modal-grid admin-modal-grid-3">
         <label>
@@ -715,7 +715,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
   return (
     <APIProvider
       apiKey={API_KEY}
-      libraries={["marker", "places"]}
+      libraries={["marker", "places", "geocoding"]}
       onError={(err) => setMapsError(err?.message || "authorization or billing error")}
     >
       {fields}
