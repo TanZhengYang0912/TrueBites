@@ -159,9 +159,9 @@ function buildDashboardAnalytics(vendors, reviews) {
     .map(([label, value]) => ({ label, value }));
 
   const attentionItems = [
-    { id: "drafts", label: "Draft vendors waiting for approval", value: draftVendors, href: "/admin/vendors2", tone: "warning" },
-    { id: "missing-address", label: "Vendors missing verified location", value: missingAddress, href: "/admin/vendors2", tone: "warning" },
-    { id: "missing-hours", label: "Vendors missing operating hours", value: missingHours, href: "/admin/vendors2", tone: "neutral" },
+    { id: "drafts", label: "Draft vendors waiting for approval", value: draftVendors, href: "/admin/vendors2?status=draft", tone: "warning" },
+    { id: "missing-address", label: "Vendors missing verified location", value: missingAddress, href: "/admin/vendors2?flag=missing_address", tone: "warning" },
+    { id: "missing-hours", label: "Vendors missing operating hours", value: missingHours, href: "/admin/vendors2?flag=missing_hours", tone: "neutral" },
     { id: "hidden-reviews", label: "Hidden reviews to revisit", value: hiddenReviews, href: "/admin/reviews", tone: "danger" },
   ].filter((item) => item.value > 0);
 
@@ -283,6 +283,11 @@ router.get("/vendors", async (req, res) => {
   const category = String(req.query.category || "all");
   const sort = String(req.query.sort || "default").toLowerCase();
   const query = String(req.query.q || "").trim();
+  // Deep-link flags from the dashboard's "Needs attention" notifications
+  // (see attentionItems below) — must mirror the same missing-data checks
+  // used there (missingAddress/missingHours) or the count in the bell won't
+  // match what actually shows up after clicking through.
+  const flag = String(req.query.flag || "").toLowerCase();
 
   try {
     let builder = supabase
@@ -322,6 +327,11 @@ router.get("/vendors", async (req, res) => {
     if (statuses?.length > 1) builder = builder.in("status", statuses);
     if (category !== "all" && ADMIN_CATEGORIES.includes(category)) builder = builder.eq("cuisine_types", category);
     if (query) builder = builder.or(buildVendorSearch(query));
+    if (flag === "missing_address") {
+      builder = builder.or("address.is.null,address.eq.,city.is.null,city.eq.");
+    } else if (flag === "missing_hours") {
+      builder = builder.or("operating_hours_raw.is.null,operating_hours_raw.eq.");
+    }
 
     const { data, error, count } = await builder;
     if (error) throw error;

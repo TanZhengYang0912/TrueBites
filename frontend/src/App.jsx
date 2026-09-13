@@ -86,7 +86,20 @@ function AuthGate({ children }) {
     // /reset-password is the one exception so a recovery link can still
     // land; ResetPasswordPage rejects admins itself, so that link never
     // becomes a passwordless way into the console.
+    //
+    // The one deliberate hole in that rule: AdminLayout's "View Site" button
+    // links to "/?admin_preview=1" (opened in a new tab) so an admin can
+    // sanity-check what a change looks like live without signing out. It
+    // only exempts the exact root path with that marker — every other
+    // customer route (typed directly, or reached by clicking around once
+    // there) still bounces back here. roles.js's customerSession() already
+    // treats an admin session as a guest on customer pages, so this preview
+    // never leaks admin identity into reviews/bookmarks/etc.
+    const isAdminPreview = location.pathname === "/"
+      && new URLSearchParams(location.search).get("admin_preview") === "1";
+
     if (admin
+        && !isAdminPreview
         && !location.pathname.startsWith("/admin")
         && location.pathname !== "/reset-password") {
       navigate("/admin", { replace: true });
