@@ -35,6 +35,18 @@ export function applyWaypointOrder(stops, order) {
   return [stops[0], ...order.map((index) => intermediates[index]), stops.at(-1)];
 }
 
+export function isValidFixedEndpointOrder(order, stopCount) {
+  return isValidWaypointOrder(order, stopCount)
+    && stopCount >= 2
+    && order[0] === 0
+    && order.at(-1) === stopCount - 1;
+}
+
+export function applyFixedEndpointOrder(stops, order) {
+  if (!Array.isArray(stops) || !isValidFixedEndpointOrder(order, stops.length)) return null;
+  return order.map((index) => stops[index]);
+}
+
 export function calculateRouteSavings(baseline, optimized) {
   const baselineMeters = Number(baseline?.meters);
   const baselineSeconds = Number(baseline?.seconds);

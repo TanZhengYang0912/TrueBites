@@ -4,6 +4,8 @@ import {
   tripFingerprint,
   isValidWaypointOrder,
   applyWaypointOrder,
+  isValidFixedEndpointOrder,
+  applyFixedEndpointOrder,
   calculateRouteSavings,
   formatDistanceMeters,
   formatDurationSeconds,
@@ -66,6 +68,23 @@ test("applying a waypoint order preserves exact endpoints", () => {
   assert.equal(result.at(-1), stops.at(-1));
   assert.equal(applyWaypointOrder(stops, [0, 0]), null);
   assert.equal(applyWaypointOrder([], []), null);
+});
+
+test("OSRM full order must be a complete permutation with fixed endpoints", () => {
+  assert.equal(isValidFixedEndpointOrder([0, 2, 1, 3], 4), true);
+  assert.equal(isValidFixedEndpointOrder([1, 2, 0, 3], 4), false);
+  assert.equal(isValidFixedEndpointOrder([0, 3, 2, 1], 4), false);
+  assert.equal(isValidFixedEndpointOrder([0, 1, 1, 3], 4), false);
+  assert.equal(isValidFixedEndpointOrder([0, 1, 3], 4), false);
+  assert.equal(isValidFixedEndpointOrder([0, 1, 2, 4], 4), false);
+});
+
+test("applying an OSRM full order moves only intermediate stops", () => {
+  const result = applyFixedEndpointOrder(stops, [0, 2, 1, 3]);
+  assert.deepEqual(result.map((stop) => stop.id), ["start", "b", "a", "end"]);
+  assert.equal(result[0], stops[0]);
+  assert.equal(result.at(-1), stops.at(-1));
+  assert.equal(applyFixedEndpointOrder(stops, [1, 2, 0, 3]), null);
 });
 
 test("savings and approved copy use numeric Google totals", () => {

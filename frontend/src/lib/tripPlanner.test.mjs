@@ -121,14 +121,16 @@ test("the Google cap counts drafts and the reserved anchor row", () => {
   assert.equal(plannedStopCount([vendorA, vendorAAgain], []), 3, "no anchor stored → one row reserved");
 });
 
-test("Google draws routes and optimises for the selected mode", () => {
+test("Google draws every route while OSRM optimises only Car stop order", () => {
   assert.doesNotMatch(mapPage, /TripPolyline|tripData/);
-  assert.doesNotMatch(mapPage, /\bgetTrip\b/);
+  assert.match(mapPage, /travelMode === "DRIVING"[\s\S]*getTrip/);
   assert.match(mapPage, /const routingStops = useMemo\([\s\S]*selectRoutingStops\(trip, travelMode\)/);
   assert.match(mapPage, /<DirectionsRenderer[\s\S]*?stops=\{routingStops\}/);
   assert.match(mapPage, /summary=\{displayedSummary\}/);
   const directions = read("../components/DirectionsRenderer.jsx");
   assert.match(directions, /optimizeWaypoints:\s*true/);
+  assert.match(directions, /requestedMode === "TRANSIT" \|\| requestedMode === "DRIVING"/);
+  assert.match(directions, /avoidTolls:\s*true/);
 });
 
 test("route choice reuses the cached Google result", () => {

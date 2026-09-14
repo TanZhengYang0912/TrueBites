@@ -233,7 +233,8 @@ export default function DirectionsRenderer({
     if (!map || !optimizationRequest) return;
     const requestedStops = optimizationRequest.stops;
     const requestedMode = optimizationRequest.mode;
-    if (!Array.isArray(requestedStops) || requestedStops.length < 3 || requestedMode === "TRANSIT") return;
+    if (!Array.isArray(requestedStops) || requestedStops.length < 3
+        || requestedMode === "TRANSIT" || requestedMode === "DRIVING") return;
 
     const directionsService = new google.maps.DirectionsService();
     const baseRequest = directionsRequest(requestedStops, requestedMode);
