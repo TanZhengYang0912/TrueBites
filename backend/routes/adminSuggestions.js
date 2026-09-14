@@ -248,7 +248,7 @@ router.post("/suggestions/:id/publish", async (req, res) => {
     // before Publish, not discover the listing is half-empty after the fact.
     const { data: vendorRow, error: findErr } = await supabase
       .from("vendors")
-      .select("id, status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes")
+      .select("id, status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
       .eq("id", suggestion.vendor_id)
       .maybeSingle();
     if (findErr) throw findErr;

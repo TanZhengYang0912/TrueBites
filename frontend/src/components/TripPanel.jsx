@@ -5,7 +5,7 @@ import TransitDetails from "./TransitDetails";
 import RouteOptions from "./RouteOptions";
 import { rowsFor } from "../lib/tripStops";
 import { MAP_COLORS } from "../lib/mapColors";
-import { placeholderImage, priceLabel } from "../lib/vendorDisplay";
+import { vendorGallery, priceLabel } from "../lib/vendorDisplay";
 import { buildGoogleMapsUrl } from "../lib/googleMapsHandoff";
 import { stopStatusPresentation } from "../lib/tripOptimization";
 import { sanitizeGoogleAttributions } from "../lib/customPlaces";
@@ -139,7 +139,7 @@ export default function TripPanel({
                   </span>
                 ) : (
                   <>
-                    {row.vendor && <img src={placeholderImage(row.vendor)} alt="" className="size-8.5 shrink-0 rounded-full object-cover" />}
+                    {row.vendor && <img src={vendorGallery(row.vendor)[0]} alt="" className="size-8.5 shrink-0 rounded-full object-cover" />}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-medium text-ink">{row.name}</span>
                       {metadata && <span className="block text-[11px] text-muted">{metadata}</span>}

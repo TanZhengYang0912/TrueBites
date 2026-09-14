@@ -641,7 +641,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
         </label>
       </div>
 
-      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} loadError={mapsError} />
+      <VendorLocationPicker latitude={form.latitude} longitude={form.longitude} onChange={onChange} disabled={disabled} loadError={mapsError} notify={notify} />
 
       <div className="admin-modal-grid admin-modal-grid-3">
         <label>
@@ -655,10 +655,10 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
           <span>Price Range (RM / Person)<RequiredMark /></span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>RM</span>
-            <input type="number" min="0" name="priceMin" value={form.priceMin} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 56 }} />
+            <input type="number" min="0" name="priceMin" value={form.priceMin} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 76 }} />
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>–</span>
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>RM</span>
-            <input type="number" min="0" name="priceMax" value={form.priceMax} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 56 }} />
+            <input type="number" min="0" name="priceMax" value={form.priceMax} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 76 }} />
           </div>
           <FieldError message={errors?.priceMin || errors?.priceMax} />
         </label>
@@ -715,7 +715,7 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
   return (
     <APIProvider
       apiKey={API_KEY}
-      libraries={["marker", "places"]}
+      libraries={["marker", "places", "geocoding"]}
       onError={(err) => setMapsError(err?.message || "authorization or billing error")}
     >
       {fields}
@@ -1483,6 +1483,11 @@ export default function AdminVendorManagementPage() {
 
   const handlePageChange = (page) => {
     setData((cur) => ({ ...cur, pagination: { ...cur.pagination, page } }));
+    // App.jsx's <ScrollToTop /> only fires on a route change — switching
+    // pages here is local state on the same /admin/vendors2 URL, so without
+    // this an admin who scrolled down a long list stays scrolled down after
+    // Next/Previous, looking at the bottom of a page they haven't read yet.
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSave = () => {
@@ -1534,9 +1539,11 @@ export default function AdminVendorManagementPage() {
     const { vendor, form: savedForm, fieldsChanged, coverChanged, pendingGalleryDeletes: savedDeletes } = snapshot;
     setSaving(true);
     setError("");
+    let demotedToDraft = false;
+    let demotedIssues = [];
     try {
       if (fieldsChanged) {
-        await updateAdminVendor(vendor.id, {
+        const saved = await updateAdminVendor(vendor.id, {
           vendor_name: savedForm.vendor_name,
           address: savedForm.address,
           cuisine_types: savedForm.cuisine_types,
@@ -1549,6 +1556,14 @@ export default function AdminVendorManagementPage() {
           status: savedForm.status,
           source_video_url: savedForm.source_video_url,
         });
+        // The backend silently drops an already-Active vendor back to Draft
+        // if this save left it failing the same completeness check that
+        // gates activation (see routes/admin.js's PATCH /vendors/:id) —
+        // never blocks the save itself, but the admin submitted `status:
+        // "active"` and got something else back, so say so instead of
+        // letting the refreshed list's Status badge be the only clue.
+        demotedToDraft = Boolean(saved?.demotedToDraft);
+        demotedIssues = Array.isArray(saved?.demotedIssues) ? saved.demotedIssues : [];
         // Persisted — if a gallery-delete failure below keeps the modal
         // open for a retry, a second Save click must not resend this.
         // Preserve coverUrl/coverLocked from the original snapshot (not part
@@ -1601,7 +1616,11 @@ export default function AdminVendorManagementPage() {
         setSelectedVendor(null);
         setEditing(false);
         setEditSnapshot(null);
-        notify("Changes saved successfully.");
+        if (demotedToDraft) {
+          notify(`Changes saved, but this vendor was moved back to Draft — missing or invalid: ${demotedIssues.join(", ")}.`, true);
+        } else {
+          notify("Changes saved successfully.");
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -2020,22 +2039,22 @@ export default function AdminVendorManagementPage() {
                     </button>
                   </td>
                   <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
-                  <td className="px-4 py-4 text-gray-500">
+                  <td className="max-w-[160px] px-4 py-4 text-gray-500">
                     {vendor.missingAddress ? (
                       <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
                         Missing
                       </span>
                     ) : (
-                      <span className="max-w-[180px] truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
+                      <span className="block truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
                     )}
                   </td>
-                  <td className="px-4 py-4 text-gray-500">
+                  <td className="max-w-[130px] px-4 py-4 text-gray-500">
                     {vendor.missingHours ? (
                       <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
                         Missing
                       </span>
                     ) : (
-                      vendor.operatingHours
+                      <span className="block truncate" title={vendor.operatingHours}>{vendor.operatingHours}</span>
                     )}
                   </td>
                   <td className="px-4 py-4">

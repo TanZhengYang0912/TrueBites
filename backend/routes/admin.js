@@ -423,15 +423,28 @@ router.patch("/vendors/:id", async (req, res) => {
   // actually result from this patch — existing fields overridden by
   // whatever this request also changes — so a save that fixes the gap in
   // the same request is never falsely blocked.
+  //
+  // `current` is fetched unconditionally now, not just when this request is
+  // explicitly setting status to "active": the old `if (clean.status ===
+  // "active")` guard only re-checked completeness on a request that touched
+  // status itself, so an edit to an ALREADY-active vendor that happened to
+  // blank out its address/coordinates (a bad map drag, a cleared field, a
+  // suggestion re-publish, ...) sailed through with no check at all —
+  // status stayed "Active" in the admin console while GET
+  // /restaurants/nearby silently dropped it from the customer map the whole
+  // time, with no warning anywhere that anything had gone wrong.
+  const { data: current, error: findErr } = await supabase
+    .from("vendors")
+    .select("status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
+  if (!current) return res.status(404).json({ error: "Vendor not found" });
+
   let activationType = null;
+  let demotedToDraft = false;
+  let demotedIssues = [];
   if (clean.status === "active") {
-    const { data: current, error: findErr } = await supabase
-      .from("vendors")
-      .select("status, published_at, vendor_name, address, latitude, longitude, cuisine_types, operating_hours_raw, operating_hours, phone, price_range, signature_dishes, storefront_image_url")
-      .eq("id", id)
-      .maybeSingle();
-    if (findErr) return res.status(500).json({ error: "Failed to update vendor", details: findErr.message });
-    if (!current) return res.status(404).json({ error: "Vendor not found" });
     activationType = notificationTypeForActivation({
       previousStatus: current.status,
       nextStatus: clean.status,
@@ -442,6 +455,20 @@ router.patch("/vendors/:id", async (req, res) => {
       return res.status(400).json({
         error: `Cannot activate — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
       });
+    }
+  } else if (clean.status == null && current.status === "active") {
+    // Not an explicit (re-)activation, but the vendor is already Active and
+    // this save didn't touch status — if the resulting row would now fail
+    // the same completeness bar, don't leave it phantom-Active: demote it
+    // to Draft instead of silently saving broken data under a status that
+    // promises customers a real, usable listing. Never blocks the save
+    // itself (the admin's edit still goes through) — it just stops
+    // pretending everything is fine.
+    const issues = vendorActivationIssues({ ...current, ...clean });
+    if (issues.length) {
+      clean.status = "draft";
+      demotedToDraft = true;
+      demotedIssues = issues;
     }
   }
 
@@ -480,8 +507,22 @@ router.patch("/vendors/:id", async (req, res) => {
         await notifyVendorLifecycle({ type: activationType, ...data });
       }
     }
+    if (demotedToDraft) {
+      await logActivity({
+        actor: req.callerUser,
+        action: "vendor.auto_demote_incomplete",
+        entityType: "vendor",
+        entityId: id,
+        metadata: { issues: demotedIssues },
+      });
+    }
     await logActivity({ actor: req.callerUser, action: "vendor.update", entityType: "vendor", entityId: id });
-    res.json(data);
+    // `demotedToDraft`/`demotedIssues` let the admin panel explain *why* the
+    // status it just submitted as unchanged came back different, and
+    // exactly what to fix — same detail level as the "Cannot activate"
+    // error above, just delivered as a warning on a save that still went
+    // through instead of a blocked request.
+    res.json({ ...data, demotedToDraft, demotedIssues });
   } catch (error) {
     console.error("PATCH /vendors/:id failed:", error);
     res.status(500).json({ error: "Failed to update vendor" });
