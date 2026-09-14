@@ -63,7 +63,7 @@ export default function SuggestionFormPage() {
         eyebrow="Community discoveries · reviewed by TrueBites"
         title="Share what the community should know about."
         description="Recommend a Melaka vendor or a food creator. Our admin team checks every submission before deciding whether to publish it."
-        action={<button type="button" onClick={handleBack} aria-label="Back" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded bg-forest px-4 text-sm font-semibold text-white"><ArrowLeft size={16} aria-hidden="true" /> Back</button>}
+        action={<button type="button" onClick={handleBack} aria-label="Back" className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-full bg-forest px-6 text-sm font-semibold text-white"><ArrowLeft size={16} aria-hidden="true" /> Back</button>}
       />
 
         <section className="border border-sand bg-white p-5 shadow-[0_16px_40px_rgba(54,61,65,0.06)] md:p-8">

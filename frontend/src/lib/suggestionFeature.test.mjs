@@ -33,6 +33,7 @@ test("the new suggestion form offers a real back action", () => {
   assert.match(formPage, /location\.key === "default"/);
   assert.match(formPage, /navigate\(-1\)/);
   assert.match(formPage, /navigate\("\/suggestions"\)/);
+  assert.match(formPage, /aria-label="Back"[^>]*min-h-12[^>]*rounded-full[^>]*px-6/);
   assert.doesNotMatch(formPage, />My suggestions</);
 });
 
