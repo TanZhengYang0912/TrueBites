@@ -197,14 +197,17 @@ export default function TripPanel({
       )}
 
       {trip.length >= 2 && (
-        <button
-          onClick={onSuggestBestOrder}
-          disabled={optimizationLoading || bestOrderDisabled || Boolean(routeError) || travelMode === "TRANSIT"}
-          title={travelMode === "TRANSIT" ? "Best order is unavailable for Transit." : undefined}
-          className={`${OUTLINE_BTN} disabled:cursor-not-allowed disabled:opacity-50`}
-        >
-          <Sparkles size={14} /> {optimizationLoading ? "Finding best order…" : "Suggest Best Order"}
-        </button>
+        <div className="mb-2">
+          <button
+            onClick={onSuggestBestOrder}
+            disabled={optimizationLoading || bestOrderDisabled || Boolean(routeError) || travelMode === "TRANSIT"}
+            title={travelMode === "TRANSIT" ? "Best order is unavailable for Transit." : undefined}
+            className={`${OUTLINE_BTN} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <Sparkles size={14} /> {optimizationLoading ? "Finding best order…" : "Suggest Best Order"}
+          </button>
+          <p className="m-0 text-center text-[10.5px] leading-relaxed text-muted">Your first and final stops stay fixed. We’ll reorder the stops in between.</p>
+        </div>
       )}
 
       {/* Travel mode. Always visible: it used to hide behind a "Start

@@ -21,6 +21,7 @@ test("best order feedback keeps the existing control and disables Transit", () =
   assert.match(source, /travelMode === "TRANSIT"/);
   assert.match(source, /disabled=\{[^}]*travelMode === "TRANSIT"/);
   assert.match(source, /Suggest Best Order/);
+  assert.match(source, /Your first and final stops stay fixed\. We’ll reorder the stops in between\./);
 });
 
 test("Transit scope and Google attribution stay compact without the removed notice card", () => {
