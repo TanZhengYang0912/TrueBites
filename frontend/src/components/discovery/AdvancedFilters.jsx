@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Circle,
   Clock3,
+  DoorOpen,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -226,7 +227,10 @@ export default function AdvancedFilters({
           onChange={(rating) => onChange({ rating })}
           />
           <div>
-            <span className="mb-2 block text-[13px] font-semibold text-ink">Availability</span>
+            <span className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink">
+              <DoorOpen size={16} strokeWidth={1.8} className="text-muted" aria-hidden="true" />
+              Availability
+            </span>
             <button
             data-testid="filter-open-now"
             type="button"
