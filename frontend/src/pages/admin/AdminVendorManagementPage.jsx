@@ -655,10 +655,10 @@ function VendorFormFields({ form, errors, onChange, onFileChange, disabled, noti
           <span>Price Range (RM / Person)<RequiredMark /></span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>RM</span>
-            <input type="number" min="0" name="priceMin" value={form.priceMin} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 56 }} />
+            <input type="number" min="0" name="priceMin" value={form.priceMin} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 76 }} />
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>–</span>
             <span style={{ fontSize: 12.5, color: "var(--admin-muted)", flexShrink: 0 }}>RM</span>
-            <input type="number" min="0" name="priceMax" value={form.priceMax} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 56 }} />
+            <input type="number" min="0" name="priceMax" value={form.priceMax} onChange={onChange} disabled={disabled} style={{ minWidth: 0, width: 76 }} />
           </div>
           <FieldError message={errors?.priceMin || errors?.priceMax} />
         </label>
