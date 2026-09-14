@@ -1539,9 +1539,11 @@ export default function AdminVendorManagementPage() {
     const { vendor, form: savedForm, fieldsChanged, coverChanged, pendingGalleryDeletes: savedDeletes } = snapshot;
     setSaving(true);
     setError("");
+    let demotedToDraft = false;
+    let demotedIssues = [];
     try {
       if (fieldsChanged) {
-        await updateAdminVendor(vendor.id, {
+        const saved = await updateAdminVendor(vendor.id, {
           vendor_name: savedForm.vendor_name,
           address: savedForm.address,
           cuisine_types: savedForm.cuisine_types,
@@ -1554,6 +1556,14 @@ export default function AdminVendorManagementPage() {
           status: savedForm.status,
           source_video_url: savedForm.source_video_url,
         });
+        // The backend silently drops an already-Active vendor back to Draft
+        // if this save left it failing the same completeness check that
+        // gates activation (see routes/admin.js's PATCH /vendors/:id) —
+        // never blocks the save itself, but the admin submitted `status:
+        // "active"` and got something else back, so say so instead of
+        // letting the refreshed list's Status badge be the only clue.
+        demotedToDraft = Boolean(saved?.demotedToDraft);
+        demotedIssues = Array.isArray(saved?.demotedIssues) ? saved.demotedIssues : [];
         // Persisted — if a gallery-delete failure below keeps the modal
         // open for a retry, a second Save click must not resend this.
         // Preserve coverUrl/coverLocked from the original snapshot (not part
@@ -1606,7 +1616,11 @@ export default function AdminVendorManagementPage() {
         setSelectedVendor(null);
         setEditing(false);
         setEditSnapshot(null);
-        notify("Changes saved successfully.");
+        if (demotedToDraft) {
+          notify(`Changes saved, but this vendor was moved back to Draft — missing or invalid: ${demotedIssues.join(", ")}.`, true);
+        } else {
+          notify("Changes saved successfully.");
+        }
       }
     } catch (err) {
       setError(err.message);

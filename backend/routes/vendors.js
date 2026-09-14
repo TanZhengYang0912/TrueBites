@@ -194,7 +194,16 @@ router.post("/vendors", adminOnly, async (req, res) => {
     return res.status(400).json({ error: "validation failed", fields: errors });
   }
 
-  const row = normaliseVendorHoursFields(clean);
+  // Every new vendor starts as "draft" regardless of what the request asked
+  // for — same reasoning as POST /api/admin/vendors (routes/admin.js): a
+  // brand-new row can never have a cover photo yet (that needs a vendorId,
+  // which doesn't exist until after this insert), so it can never pass the
+  // vendorActivationIssues completeness bar every other "make it active"
+  // path enforces. This route isn't called by the admin UI (it uses
+  // /api/admin/vendors instead) but a direct API call with a valid admin
+  // token could otherwise mint an incomplete "active" vendor that GET
+  // /restaurants/nearby then silently drops from the customer map forever.
+  const row = normaliseVendorHoursFields({ ...clean, status: "draft" });
   const { data, error } = await supabase
     .from("vendors")
     .insert(row)
@@ -213,6 +222,32 @@ router.put("/vendors/:id", adminOnly, async (req, res) => {
   const { errors, clean } = validateVendor(req.body);
   if (Object.keys(errors).length) {
     return res.status(400).json({ error: "validation failed", fields: errors });
+  }
+
+  // Same completeness bar as every other "make it active" path (see PATCH
+  // /vendors/:id/status below and PATCH /api/admin/vendors/:id in
+  // routes/admin.js) — validateVendor only checks each field's own shape,
+  // not whether this vendor is actually complete enough to show up on the
+  // public site. Without this, this route (unused by the admin UI, but
+  // reachable by any caller with a valid admin token) could set a vendor
+  // "active" with, say, no cover photo — and GET /restaurants/nearby would
+  // then silently drop it from the customer map with no warning anywhere.
+  if (clean.status === "active") {
+    // storefront_image_url is set only through /vendors/:id/image, never a
+    // field validateVendor itself produces — checking `clean` alone would
+    // always report "cover photo" missing, even for a vendor that already
+    // has one, so this reads the existing row for that one field.
+    const { data: currentCover } = await supabase
+      .from("vendors")
+      .select("storefront_image_url")
+      .eq("id", req.params.id)
+      .maybeSingle();
+    const issues = vendorActivationIssues({ storefront_image_url: currentCover?.storefront_image_url, ...clean });
+    if (issues.length) {
+      return res.status(400).json({
+        error: `Cannot activate — missing or invalid: ${issues.join(", ")}. Complete these in Edit Vendor first.`,
+      });
+    }
   }
 
   const patch = normaliseVendorHoursFields(clean);
