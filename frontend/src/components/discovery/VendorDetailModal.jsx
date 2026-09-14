@@ -143,7 +143,14 @@ export default function VendorDetailModal({ vendor, bookmarked, onToggleBookmark
 
         {/* Body */}
         <div className="flex flex-col gap-3.5 px-5 pb-5 pt-4.5">
-          {/* Meta row */}
+          {vendor.address && (
+            <div className="flex items-start gap-1.5 text-[13px] text-muted">
+              <MapPin size={14} color={TERRACOTTA} className="mt-0.5 shrink-0" />
+              <span className="min-w-0 break-words">{vendor.address}</span>
+            </div>
+          )}
+
+          {/* Rating and price follow the full-width location row. */}
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-muted">
             {stats.review_count > 0 && (
               <MetaItem
@@ -153,13 +160,6 @@ export default function VendorDetailModal({ vendor, bookmarked, onToggleBookmark
             )}
             {price && <MetaItem icon={<Wallet size={14} color={TERRACOTTA} />} text={`${price}/person`} />}
           </div>
-
-          {vendor.address && (
-            <div className="flex items-start gap-1.5 text-[13px] text-muted">
-              <MapPin size={14} color={TERRACOTTA} className="mt-0.5 shrink-0" />
-              <span className="min-w-0 break-words">{vendor.address}</span>
-            </div>
-          )}
 
           {/* Cuisine/dish tags */}
           {tags.length > 0 && (

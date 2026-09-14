@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import {
+  ArrowUpDown,
   ChevronDown,
   Circle,
   Clock3,
@@ -20,10 +21,10 @@ import {
   categoryMatches,
   creatorHandle,
 } from "../../lib/vendorDisplay";
-import { DEFAULT_VENDOR_FILTERS, filtersActive } from "../../lib/vendorFilters";
+import { DEFAULT_VENDOR_FILTERS, DEFAULT_VENDOR_SORT, filtersActive } from "../../lib/vendorFilters";
 
 const PRICE_OPTIONS = [
-  { value: "all", label: "Any price" },
+  { value: "all", label: "All" },
   { value: "under-10", label: "Under RM10" },
   { value: "10-20", label: "RM10 – RM20" },
   { value: "20-40", label: "RM20 – RM40" },
@@ -31,7 +32,7 @@ const PRICE_OPTIONS = [
 ];
 
 const HOURS_OPTIONS = [
-  { value: "any", label: "Anytime" },
+  { value: "any", label: "All" },
   { value: "breakfast", label: "Breakfast · 6–11am" },
   { value: "lunch", label: "Lunch · 11am–3pm" },
   { value: "dinner", label: "Dinner · 5–10pm" },
@@ -39,10 +40,17 @@ const HOURS_OPTIONS = [
 ];
 
 const RATING_OPTIONS = [
-  { value: "any", label: "Any rating" },
+  { value: "any", label: "All" },
   { value: "3", label: "3.0+" },
   { value: "4", label: "4.0+" },
   { value: "4.5", label: "4.5+" },
+];
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "az", label: "A – Z" },
+  { value: "za", label: "Z – A" },
 ];
 
 const CONTROL = "min-h-11 w-full appearance-none rounded-full border border-sand bg-white px-4 pr-9 text-sm text-ink outline-none transition-colors focus:border-forest focus:shadow-[0_0_0_3px_rgba(64,84,74,0.1)] disabled:cursor-not-allowed disabled:bg-chalk disabled:text-muted/60";
@@ -55,7 +63,7 @@ function categoryOptions(vendors) {
   const more = MORE_CATEGORY_OPTIONS.filter((option) => countFor(vendors, option.key) > 0);
   return [...CATEGORY_FILTERS, ...more].map((option) => ({
     value: option.key,
-    label: option.key === "all" ? "All categories" : `${option.label} (${countFor(vendors, option.key)})`,
+    label: option.key === "all" ? "All" : `${option.label} (${countFor(vendors, option.key)})`,
   }));
 }
 
@@ -105,7 +113,9 @@ function FilterSelect({ label, icon: Icon, options, value, onChange, "data-testi
 
 export default function AdvancedFilters({
   filters,
+  sort = DEFAULT_VENDOR_SORT,
   onChange,
+  onSort,
   onClear,
   vendors = [],
   compact = false,
@@ -114,12 +124,13 @@ export default function AdvancedFilters({
   // toggle's badge says whether anything is hidden behind it.
   const [expanded, setExpanded] = useState(false);
   const regionId = useId();
-  const active = filtersActive(filters);
-  // Only the four controls behind the toggle. Search and creator live in the
+  const active = filtersActive(filters, sort);
+  // All six controls behind the toggle count when non-default. Search and creator live in the
   // visible row, so counting them would label the badge for filters the user
   // can already see.
   const activeCount = ["category", "price", "hours", "rating"]
     .filter((key) => filters[key] !== DEFAULT_VENDOR_FILTERS[key]).length
+    + (sort !== DEFAULT_VENDOR_SORT ? 1 : 0)
     + (filters.openNow ? 1 : 0);
 
   return (
@@ -192,7 +203,7 @@ export default function AdvancedFilters({
       >
         <div className={compact
           ? "grid grid-cols-1 gap-3"
-          : "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"}
+          : "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6"}
         >
           <FilterSelect
           data-testid="filter-category"
@@ -225,6 +236,14 @@ export default function AdvancedFilters({
           options={RATING_OPTIONS}
           value={filters.rating}
           onChange={(rating) => onChange({ rating })}
+          />
+          <FilterSelect
+          data-testid="filter-sort"
+          label="Sort by"
+          icon={ArrowUpDown}
+          options={SORT_OPTIONS}
+          value={sort}
+          onChange={onSort}
           />
           <div>
             <span className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink">

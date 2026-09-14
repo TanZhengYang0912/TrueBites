@@ -26,7 +26,9 @@ export default function Dashboard({
   vendors,
   filteredVendors,
   filters,
+  sort,
   onFilters,
+  onSort,
   onClearFilters,
   loading,
   loadError,
@@ -79,7 +81,7 @@ export default function Dashboard({
 
   useEffect(() => {
     setPage(1);
-  }, [filters]);
+  }, [filters, sort]);
 
   // Arrived from a notification: open that vendor's detail once the list has
   // loaded, then clear the param so it doesn't reopen on refresh.
@@ -194,7 +196,9 @@ export default function Dashboard({
             <div className="mb-8">
               <AdvancedFilters
                 filters={filters}
+                sort={sort}
                 onChange={onFilters}
+                onSort={onSort}
                 onClear={onClearFilters}
                 vendors={vendors}
               />

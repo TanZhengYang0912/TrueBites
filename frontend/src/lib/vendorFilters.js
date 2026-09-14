@@ -21,7 +21,7 @@ export const DEFAULT_VENDOR_FILTERS = Object.freeze({
   openNow: false,
 });
 
-export const DEFAULT_VENDOR_SORT = "relevant";
+export const DEFAULT_VENDOR_SORT = "newest";
 
 const PRICE_BUCKETS = Object.freeze({
   "under-10": { min: 0, max: 9.999 },
@@ -100,6 +100,13 @@ export function filtersActive(filters = {}, sort = DEFAULT_VENDOR_SORT) {
     || sort !== DEFAULT_VENDOR_SORT;
 }
 
+function vendorPublicationTimestamp(vendor) {
+  const publishedAt = Date.parse(vendor?.published_at);
+  if (Number.isFinite(publishedAt)) return publishedAt;
+  const createdAt = Date.parse(vendor?.created_at);
+  return Number.isFinite(createdAt) ? createdAt : NaN;
+}
+
 export function sortVendors(vendors, sort = DEFAULT_VENDOR_SORT) {
   const rows = vendors.map((vendor, index) => ({ vendor, index }));
 
@@ -114,6 +121,19 @@ export function sortVendors(vendors, sort = DEFAULT_VENDOR_SORT) {
     return comparison || (stable ? left.index - right.index : 0);
   };
 
+  const compareNames = (left, right, descending = false) => {
+    const leftName = String(left.vendor?.name || "").trim();
+    const rightName = String(right.vendor?.name || "").trim();
+    if (Boolean(leftName) !== Boolean(rightName)) return leftName ? -1 : 1;
+    const byName = leftName.localeCompare(rightName, undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+    const directed = descending ? -byName : byName;
+    return directed
+      || String(left.vendor?.id || "").localeCompare(String(right.vendor?.id || ""));
+  };
+
   if (sort === "rating") {
     rows.sort((left, right) =>
       compareKnown(left, right, (vendor) => vendor.average_rating, { descending: true, stable: false })
@@ -122,6 +142,20 @@ export function sortVendors(vendors, sort = DEFAULT_VENDOR_SORT) {
     rows.sort((left, right) => compareKnown(left, right, (vendor) => vendor.distKm));
   } else if (sort === "price-low") {
     rows.sort((left, right) => compareKnown(left, right, (vendor) => parsePriceRange(vendor.price_range)?.min));
+  } else if (sort === "oldest") {
+    rows.sort((left, right) =>
+      compareKnown(left, right, vendorPublicationTimestamp, { stable: false })
+      || String(left.vendor?.id || "").localeCompare(String(right.vendor?.id || "")));
+  } else if (sort === "az") {
+    rows.sort((left, right) => compareNames(left, right));
+  } else if (sort === "za") {
+    rows.sort((left, right) => compareNames(left, right, true));
+  } else {
+    // `newest` is also the safe fallback for an absent or unknown sort value.
+    // A reactivated vendor moves to the same position in Discover and New places.
+    rows.sort((left, right) =>
+      compareKnown(left, right, vendorPublicationTimestamp, { descending: true, stable: false })
+      || String(left.vendor?.id || "").localeCompare(String(right.vendor?.id || "")));
   }
 
   return rows.map(({ vendor }) => vendor);

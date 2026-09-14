@@ -9,7 +9,7 @@ const RADII = [1, 2, 5, "all"];
 // predicate decides which pins the map draws — see the pin rule in MapPage.
 export default function VendorPanel({
   vendors, filteredVendors, nearby,
-  filters, onFilters, onClearFilters,
+  filters, sort, onFilters, onSort, onClearFilters,
   radiusKm, onRadiusChange,
   showAllVendors, onToggleAllVendors,
   onAddStop, onSelectNearby,
@@ -22,7 +22,9 @@ export default function VendorPanel({
       <AdvancedFilters
         compact
         filters={filters}
+        sort={sort}
         onChange={onFilters}
+        onSort={onSort}
         onClear={onClearFilters}
         vendors={vendors}
       />

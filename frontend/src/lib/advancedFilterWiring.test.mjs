@@ -8,11 +8,12 @@ const dashboard = read("../components/Dashboard.jsx");
 const vendorPanel = read("../components/VendorPanel.jsx");
 const vendorMarkers = read("../components/VendorMarkers.jsx");
 
-test("MapPage owns canonical filters and keeps the result order fixed", () => {
+test("MapPage owns canonical filters and the controlled customer sort", () => {
   assert.match(mapPage, /useState\(DEFAULT_VENDOR_FILTERS\)/);
+  assert.match(mapPage, /useState\(DEFAULT_VENDOR_SORT\)/);
   assert.match(mapPage, /setFilters\(DEFAULT_VENDOR_FILTERS\)/);
-  assert.doesNotMatch(mapPage, /useState\(DEFAULT_VENDOR_SORT\)/);
-  assert.doesNotMatch(mapPage, /setSort\(/);
+  assert.match(mapPage, /setSort\(DEFAULT_VENDOR_SORT\)/);
+  assert.match(mapPage, /sortVendors\(\s*vendorsWithDistance\.filter\([\s\S]*?\),\s*sort,/);
 });
 
 test("MapPage derives location-aware distances only from the session-safe distance origin", () => {
@@ -38,7 +39,7 @@ test("MapPage derives one filtered sorted collection and shares it with both vie
 test("map pins and nearby rows reuse the shared result instead of matching again", () => {
   assert.match(mapPage, /const filteredIds = new Set\(filteredVendors\.map/);
   assert.match(mapPage, /const nearbyVendors = useMemo\(\(\) => \{/);
-  assert.match(mapPage, /sortVendors\(\s*filteredVendors\.filter/);
+  assert.match(mapPage, /filteredVendors\.filter/);
   const sharedPipeline = mapPage.slice(mapPage.indexOf("const filteredIds"));
   assert.doesNotMatch(sharedPipeline, /matchesFilters\(/);
 });
@@ -66,13 +67,19 @@ test("AdvancedFilters exposes every approved control and responsive semantics", 
     "filter-price",
     "filter-hours",
     "filter-rating",
+    "filter-sort",
     "filter-open-now",
     "clear-filters",
   ]) {
     assert.match(source, new RegExp(`data-testid=["']${testId}["']`));
   }
-  assert.doesNotMatch(source, /data-testid=["']filter-sort["']/);
-  assert.doesNotMatch(source, />Sort by</);
+  assert.match(source, /ArrowUpDown/);
+  assert.match(source, /label="Sort by"/);
+  assert.match(source, /xl:grid-cols-6/);
+  assert.match(source, /value: "newest", label: "Newest first"/);
+  assert.match(source, /value: "oldest", label: "Oldest first"/);
+  assert.match(source, /value: "az", label: "A – Z"/);
+  assert.match(source, /value: "za", label: "Z – A"/);
   assert.match(source, /aria-expanded/);
   assert.match(source, /aria-controls/);
   assert.match(source, /role="switch"/);
@@ -94,7 +101,9 @@ test("Dashboard delegates controlled filters to the shared panel and paginates t
   assert.match(dashboard, /paginate\(filteredVendors, page, PAGE_SIZE\)/);
   assert.doesNotMatch(dashboard, /data-testid="discovery-search"/);
   assert.match(dashboard, /onClear=\{onClearFilters\}/);
-  assert.doesNotMatch(dashboard, /onSort/);
+  assert.match(dashboard, /sort=\{sort\}/);
+  assert.match(dashboard, /onSort=\{onSort\}/);
+  assert.match(dashboard, /\}, \[filters, sort\]\);/);
   assert.doesNotMatch(dashboard, /<FilterChips/);
 });
 
@@ -103,6 +112,17 @@ test("VendorPanel delegates search to the compact shared panel", () => {
   assert.match(vendorPanel, /<AdvancedFilters/);
   assert.doesNotMatch(vendorPanel, /resultCount/, "VendorPanel still passes the removed resultCount prop");
   assert.match(vendorPanel, /compact/);
-  assert.doesNotMatch(vendorPanel, /onSort/);
+  assert.match(vendorPanel, /sort=\{sort\}/);
+  assert.match(vendorPanel, /onSort=\{onSort\}/);
   assert.doesNotMatch(vendorPanel, /<FilterChips/);
+});
+
+test("map radius filtering preserves the selected customer order", () => {
+  const nearbyBlock = mapPage.slice(
+    mapPage.indexOf("const nearbyVendors = useMemo"),
+    mapPage.indexOf("// Reordering, adding, or removing stops"),
+  );
+  assert.match(nearbyBlock, /filteredVendors\.filter/);
+  assert.doesNotMatch(nearbyBlock, /sortVendors/);
+  assert.doesNotMatch(nearbyBlock, /"nearest"/);
 });

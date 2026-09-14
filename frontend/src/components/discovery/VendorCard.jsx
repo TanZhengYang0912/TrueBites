@@ -27,7 +27,7 @@ export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAdd
   const [hovered, setHovered] = useState(false);
 
   return (
-    <article className="min-w-0 overflow-hidden rounded border border-sand bg-white transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-forest hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded border border-sand bg-white transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-forest hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div
         className={IMAGE}
         role="button"
@@ -50,15 +50,17 @@ export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAdd
             to the cover when hover/focus ends. On a touch device (no real
             hover) tapping the photo instead advances it one at a time —
             tapToAdvance — since there's no hover to preview the gallery with. */}
-        <VendorGallery
-          images={images}
-          alt={(_, i) => photoAltText(vendor, i)}
-          active={hovered}
-          resetOnInactive
-          interval={2200}
-          objectPosition={FOOD_PHOTO_POSITION}
-          tapToAdvance
-        />
+        <div className="absolute inset-0">
+          <VendorGallery
+            images={images}
+            alt={(_, i) => photoAltText(vendor, i)}
+            active={hovered}
+            resetOnInactive
+            interval={2200}
+            objectPosition={FOOD_PHOTO_POSITION}
+            tapToAdvance
+          />
+        </div>
 
         {/* Unifies photos shot by different creators under different
             lighting into one consistent-looking set (same treatment as the
@@ -76,7 +78,7 @@ export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAdd
         </button>
       </div>
 
-      <div className="flex min-h-[166px] flex-col p-4">
+      <div className="flex min-h-[166px] flex-1 flex-col p-4">
         <div className="flex items-center gap-1.5 text-[10px]">
           <span className="font-bold uppercase tracking-[0.08em] text-terracotta">{categoryLabel(vendor)}</span>
           <span className="text-sand">·</span>
@@ -93,7 +95,7 @@ export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAdd
           {description}
         </p>
 
-        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5 text-[11px] text-muted [&_svg]:shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 pt-2.5 text-[11px] text-muted [&_svg]:shrink-0">
           <MapPin size={12} />
           <span>{area}</span>
           <span className="text-sand">·</span>
@@ -114,7 +116,7 @@ export default function VendorCard({ vendor, bookmarked, onToggleBookmark, onAdd
           )}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px]">
           {hours ? (
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <span className="size-2 shrink-0 rounded-full" style={{ background: hours.isOpen ? OPEN_GREEN : CLOSED_RED }} />

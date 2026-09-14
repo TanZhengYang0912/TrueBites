@@ -258,7 +258,8 @@ test("nearest order uses anchor distance", () => {
 
 test("the map vendor list uses 15-row progressive disclosure", () => {
   assert.match(mapPage, /const \[vendorVisibleCount, setVendorVisibleCount\] = useState\(15\)/);
-  assert.match(mapPage, /sortVendors\([\s\S]*?"nearest"/);
+  assert.match(mapPage, /filteredVendors\.filter/);
+  assert.doesNotMatch(mapPage, /sortVendors\(\s*filteredVendors\.filter/);
   assert.doesNotMatch(mapPage, /\.slice\(0, 12\)/);
   assert.doesNotMatch(mapPage, /!stopIds\.has\(vendor\.id\)/);
   assert.match(vendorPanel, /nearby\.slice\(0, visibleCount\)/);

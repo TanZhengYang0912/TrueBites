@@ -46,7 +46,7 @@ test("exports the complete default filter contract", () => {
     rating: "any",
     openNow: false,
   });
-  assert.equal(DEFAULT_VENDOR_SORT, "relevant");
+  assert.equal(DEFAULT_VENDOR_SORT, "newest");
 });
 
 test("no filters lets every vendor through", () => {
@@ -193,14 +193,18 @@ test("active-state detection includes advanced filters and sorting", () => {
 
 test("sorting is stable and keeps missing values last", () => {
   const rows = [
-    { id: "a", average_rating: 4, review_count: 3, distKm: 3, price_range: "RM20" },
-    { id: "b", average_rating: 5, review_count: 1, distKm: 1, price_range: null },
-    { id: "c", average_rating: 5, review_count: 7, distKm: null, price_range: "RM10" },
-    { id: "d", average_rating: null, review_count: 99, distKm: 1, price_range: "RM10" },
-    { id: "e", average_rating: null, review_count: 1, distKm: 2, price_range: "RM15" },
+    { id: "a", name: "Zebra Cafe", average_rating: 4, review_count: 3, distKm: 3, price_range: "RM20", created_at: "2026-09-13T00:00:00Z", published_at: "2026-09-01T00:00:00Z" },
+    { id: "b", name: "apple Kitchen", average_rating: 5, review_count: 1, distKm: 1, price_range: null, created_at: "2026-07-01T00:00:00Z", published_at: "2026-09-14T00:00:00Z" },
+    { id: "c", name: "Melaka Bites", average_rating: 5, review_count: 7, distKm: null, price_range: "RM10", created_at: "2026-09-10T00:00:00Z", published_at: "2026-09-10T00:00:00Z" },
+    { id: "d", name: "Apple kitchen", average_rating: null, review_count: 99, distKm: 1, price_range: "RM10", created_at: "2026-09-12T00:00:00Z", published_at: null },
+    { id: "e", name: "", average_rating: null, review_count: 1, distKm: 2, price_range: "RM15", created_at: null, published_at: null },
   ];
   assert.deepEqual(sortVendors(rows, "rating").map((vendor) => vendor.id), ["c", "b", "a", "d", "e"]);
   assert.deepEqual(sortVendors(rows, "nearest").map((vendor) => vendor.id), ["b", "d", "e", "a", "c"]);
   assert.deepEqual(sortVendors(rows, "price-low").map((vendor) => vendor.id), ["c", "d", "e", "a", "b"]);
-  assert.deepEqual(sortVendors(rows, "relevant").map((vendor) => vendor.id), ["a", "b", "c", "d", "e"]);
+  assert.deepEqual(sortVendors(rows, "newest").map((vendor) => vendor.id), ["b", "d", "c", "a", "e"]);
+  assert.deepEqual(sortVendors(rows).map((vendor) => vendor.id), ["b", "d", "c", "a", "e"]);
+  assert.deepEqual(sortVendors(rows, "oldest").map((vendor) => vendor.id), ["a", "c", "d", "b", "e"]);
+  assert.deepEqual(sortVendors(rows, "az").map((vendor) => vendor.id), ["b", "d", "c", "a", "e"]);
+  assert.deepEqual(sortVendors(rows, "za").map((vendor) => vendor.id), ["a", "c", "b", "d", "e"]);
 });

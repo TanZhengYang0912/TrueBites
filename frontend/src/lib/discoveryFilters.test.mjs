@@ -39,6 +39,14 @@ test("the row collapses the panel behind one icon", () => {
   assert.match(filters, /activeCount/, "the toggle does not show how many filters are on");
 });
 
+test("the shared filter exposes the same controlled sort on Discover and Map", () => {
+  assert.match(filters, /data-testid="filter-sort"/);
+  assert.match(dashboard, /sort=\{sort\}/);
+  assert.match(dashboard, /onSort=\{onSort\}/);
+  assert.match(vendorPanel, /sort=\{sort\}/);
+  assert.match(vendorPanel, /onSort=\{onSort\}/);
+});
+
 const header = read("../components/discovery/DiscoveryHeader.jsx");
 const guestPrompt = read("../components/discovery/GuestPrompt.jsx");
 

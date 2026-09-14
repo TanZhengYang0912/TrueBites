@@ -29,6 +29,7 @@ import { MAP_COLORS } from "../lib/mapColors";
 import { selectVisibleVendors, haversineKm } from "../lib/mapVisibility";
 import {
   DEFAULT_VENDOR_FILTERS,
+  DEFAULT_VENDOR_SORT,
   matchesFilters,
   sortVendors,
 } from "../lib/vendorFilters";
@@ -149,9 +150,13 @@ export default function MapPage() {
   const [locateTarget, setLocateTarget] = useState(null);
   const [radiusKm, setRadiusKm] = useState(2); // drives the "Nearby to add" list and its displayed radius
   const [filters, setFilters] = useState(DEFAULT_VENDOR_FILTERS);
+  const [sort, setSort] = useState(DEFAULT_VENDOR_SORT);
   const [vendorVisibleCount, setVendorVisibleCount] = useState(15);
   const updateFilters = (partial) => setFilters((current) => ({ ...current, ...partial }));
-  const clearFilters = () => setFilters(DEFAULT_VENDOR_FILTERS);
+  const clearFilters = () => {
+    setFilters(DEFAULT_VENDOR_FILTERS);
+    setSort(DEFAULT_VENDOR_SORT);
+  };
   // Defaults on so arriving from the Dashboard's Map tab isn't an empty map.
   const [showAllVendors, setShowAllVendors] = useState(true);
   const [tripCollapsed, setTripCollapsed] = useState(false);
@@ -835,8 +840,11 @@ export default function MapPage() {
   // may paginate or apply the map's separate visibility radius, but they never
   // repeat discovery matching or sorting.
   const filteredVendors = useMemo(
-    () => sortVendors(vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters))),
-    [vendorsWithDistance, filters],
+    () => sortVendors(
+      vendorsWithDistance.filter((vendor) => matchesFilters(vendor, filters)),
+      sort,
+    ),
+    [vendorsWithDistance, filters, sort],
   );
 
   // Vendor database ids currently on the trip (an occurrence can repeat, so
@@ -849,14 +857,11 @@ export default function MapPage() {
   const nearbyVendors = useMemo(() => {
     if (!distanceOrigin) return [];
     const effectiveRadiusKm = radiusKm === "all" ? Infinity : radiusKm;
-    return sortVendors(
-      filteredVendors.filter((vendor) =>
-        vendor.latitude != null
-        && vendor.longitude != null
-        && Number.isFinite(vendor.distKm)
-        && vendor.distKm <= effectiveRadiusKm),
-      "nearest",
-    );
+    return filteredVendors.filter((vendor) =>
+      vendor.latitude != null
+      && vendor.longitude != null
+      && Number.isFinite(vendor.distKm)
+      && vendor.distKm <= effectiveRadiusKm);
   }, [filteredVendors, distanceOrigin, radiusKm]);
 
   // Reordering, adding, or removing stops must not collapse a list the user
@@ -883,7 +888,9 @@ export default function MapPage() {
           vendors={vendorsWithDistance}
           filteredVendors={filteredVendors}
           filters={filters}
+          sort={sort}
           onFilters={updateFilters}
+          onSort={setSort}
           onClearFilters={clearFilters}
           loading={vendorsLoading}
           loadError={vendorsError}
@@ -1112,7 +1119,9 @@ export default function MapPage() {
                 visibleCount={vendorVisibleCount}
                 onShowMore={() => setVendorVisibleCount((count) => count + 15)}
                 filters={filters}
+                sort={sort}
                 onFilters={updateFilters}
+                onSort={setSort}
                 onClearFilters={clearFilters}
                 radiusKm={radiusKm}
                 onRadiusChange={setRadiusKm}

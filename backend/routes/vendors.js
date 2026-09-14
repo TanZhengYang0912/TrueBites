@@ -4,10 +4,7 @@ import { supabase } from "../supabase.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { logActivity } from "../lib/auditLog.js";
 import { notifyVendorLifecycle } from "../lib/notify.js";
-import {
-  NEW_VENDOR_NOTIFICATION,
-  notificationTypeForActivation,
-} from "../lib/vendorLifecycle.js";
+import { notificationTypeForActivation } from "../lib/vendorLifecycle.js";
 import {
   STORAGE_BUCKET,
   VENDOR_STATUSES,
@@ -302,10 +299,9 @@ router.patch("/vendors/:id/status", adminOnly, async (req, res) => {
     }
   }
 
+  const activatedAt = activationType ? new Date().toISOString() : null;
   const patch = { status };
-  if (activationType === NEW_VENDOR_NOTIFICATION) {
-    patch.published_at = new Date().toISOString();
-  }
+  if (activationType) patch.published_at = activatedAt;
 
   const { data, error } = await supabase
     .from("vendors")

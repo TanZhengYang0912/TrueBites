@@ -6,10 +6,7 @@ import { startProcessingJob, retryJob, createDraftFromJob } from "../lib/ai/pipe
 import { loadJob } from "../lib/ai/jobStore.js";
 import { vendorActivationIssues } from "../lib/vendorValidation.js";
 import { notifyVendorLifecycle } from "../lib/notify.js";
-import {
-  NEW_VENDOR_NOTIFICATION,
-  notificationTypeForActivation,
-} from "../lib/vendorLifecycle.js";
+import { notificationTypeForActivation } from "../lib/vendorLifecycle.js";
 
 const router = Router();
 
@@ -267,7 +264,7 @@ router.post("/suggestions/:id/publish", async (req, res) => {
       publishedAt: vendorRow.published_at,
     });
     const vendorPatch = { status: "active" };
-    if (activationType === NEW_VENDOR_NOTIFICATION) vendorPatch.published_at = reviewedAt;
+    if (activationType) vendorPatch.published_at = reviewedAt;
 
     const { data: vendor, error: vendorError } = await supabase
       .from("vendors")

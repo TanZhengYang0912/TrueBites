@@ -14,10 +14,7 @@ import {
 import { findDuplicatesFor, findAllDuplicateGroups } from "../lib/vendorDuplicates.js";
 import { logActivity } from "../lib/auditLog.js";
 import { notifyVendorLifecycle } from "../lib/notify.js";
-import {
-  NEW_VENDOR_NOTIFICATION,
-  notificationTypeForActivation,
-} from "../lib/vendorLifecycle.js";
+import { notificationTypeForActivation } from "../lib/vendorLifecycle.js";
 import { isSuspended } from "../lib/suspension.js";
 import { startProcessingJob } from "../lib/ai/pipeline.js";
 import { ytDlp } from "../lib/ai/binaries.js";
@@ -474,7 +471,7 @@ router.patch("/vendors/:id", async (req, res) => {
 
   const updatedAt = new Date().toISOString();
   const patch = { ...clean, last_updated: updatedAt };
-  if (activationType === NEW_VENDOR_NOTIFICATION) patch.published_at = updatedAt;
+  if (activationType) patch.published_at = updatedAt;
   // Write both hour columns — operating_hours previously went stale because
   // only operating_hours_raw was updated here while the GET preferred
   // operating_hours.

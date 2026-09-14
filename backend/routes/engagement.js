@@ -6,6 +6,10 @@ import { isSuspended } from "../lib/suspension.js";
 import {
   parseRating, validateFolderName, validateReviewBody, isProfaneLoose,
 } from "../lib/engagementValidation.js";
+import {
+  buildCustomerNotificationFeed,
+  selectFeedVendors,
+} from "../lib/customerNotificationFeed.js";
 
 const router = Router();
 
@@ -657,25 +661,34 @@ router.delete("/engagement/reviews/:id/vote", async (req, res) => {
 });
 
 // ── Notifications ───────────────────────────────────────────────────────────
-// A dedicated event feed (see supabase/migrations/202609040001_notifications.sql)
-// rather than deriving "what's new" from vendors.status — that couldn't tell
-// a fresh activation from a re-save and could only ever mean one thing.
-// Ordered newest-first and capped so a large backfill can never return
-// hundreds of rows to a dropdown that shows fifteen; older events still exist
-// in the table for history, they just fall off the visible queue.
-
-const NOTIFICATION_LIMIT = 15;
+// The visible feed is derived from the current public-vendor population so a
+// Draft, suspended, deleted, or coordinate-less vendor cannot consume one of
+// its fifteen slots. Lifecycle events still supply the wording and stable read
+// identity, but each current vendor appears once in latest-activation order.
 
 router.get("/notifications", async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const { data: events, error } = await supabase
-    .from("notifications")
-    .select("id, type, vendor_id, payload, created_at")
-    .order("created_at", { ascending: false })
-    .limit(NOTIFICATION_LIMIT);
-  if (error) return res.status(500).json({ error: "database query failed", details: error.message });
+  const { data: currentVendors, error: vendorError } = await supabase
+    .from("vendors")
+    .select("id, vendor_name, cuisine_types, status, latitude, longitude, published_at, created_at")
+    .eq("status", "active");
+  if (vendorError) return res.status(500).json({ error: "database query failed", details: vendorError.message });
+
+  const feedVendors = selectFeedVendors(currentVendors);
+  let events = [];
+  if (feedVendors.length > 0) {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id, type, vendor_id, created_at")
+      .in("vendor_id", feedVendors.map((vendor) => vendor.id))
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ error: "database query failed", details: error.message });
+    events = data || [];
+  }
+
+  const notifications = buildCustomerNotificationFeed(feedVendors, events);
 
   const { data: readRow, error: readErr } = await supabase
     .from("notification_reads")
@@ -684,17 +697,8 @@ router.get("/notifications", async (req, res) => {
     .maybeSingle();
   if (readErr) return res.status(500).json({ error: "database query failed", details: readErr.message });
 
-  // published_at kept as the field name so the unread-watermark logic in
-  // lib/notifications.js (frontend) doesn't need to know it's now an event
-  // timestamp rather than a vendor column.
   res.json({
-    notifications: events.map((e) => ({
-      id: e.id,
-      type: e.type,
-      vendor_id: e.vendor_id,
-      ...e.payload,
-      published_at: e.created_at,
-    })),
+    notifications,
     lastSeenAt: readRow?.last_seen_at || null,
     readIds: readRow?.read_ids || [],
   });

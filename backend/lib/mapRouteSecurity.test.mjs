@@ -6,9 +6,9 @@ process.env.SUPABASE_URL ||= "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_KEY ||= "test-service-key";
 delete process.env.DISABLE_AUTH;
 
-test("public nearby vendors expose both current and legacy operating-hours fields", () => {
+test("public nearby vendors expose lifecycle ordering and operating-hours fields", () => {
   const source = readFileSync(new URL("../routes/map.js", import.meta.url), "utf8");
-  assert.match(source, /gallery_image_urls, operating_hours_raw, operating_hours/);
+  assert.match(source, /operating_hours, created_at, published_at/);
 });
 
 test("creating a restaurant requires an admin role before the handler runs", async () => {

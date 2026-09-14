@@ -12,9 +12,9 @@ test("the guest prompt escapes any filtered ancestor", () => {
   assert.match(header, /backdrop-blur/, "the header's blur was removed instead of fixing the prompt");
 });
 
-test("all five filter controls share one row and Clear all sits below them", () => {
+test("all six filter controls share one row and Clear all sits below them", () => {
   const advancedFilters = read("../components/discovery/AdvancedFilters.jsx");
-  assert.match(advancedFilters, /xl:grid-cols-5/, "the panel grid is not five columns wide");
+  assert.match(advancedFilters, /xl:grid-cols-6/, "the panel grid is not six columns wide");
   assert.doesNotMatch(advancedFilters, /xl:col-span-2/, "Availability still spans two columns");
   assert.doesNotMatch(advancedFilters, /places found/, "the result count line is still there");
 });

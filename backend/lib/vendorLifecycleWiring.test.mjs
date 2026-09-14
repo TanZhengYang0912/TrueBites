@@ -13,9 +13,16 @@ for (const route of ["admin.js", "vendors.js", "adminSuggestions.js"]) {
   });
 }
 
-test("first publication is stamped without overwriting an existing date", () => {
-  for (const route of ["admin.js", "vendors.js", "adminSuggestions.js"]) {
+test("every genuine activation stamps the latest publication time", () => {
+  const expectations = [
+    ["admin.js", /if \(activationType\) patch\.published_at = updatedAt/],
+    ["vendors.js", /if \(activationType\) patch\.published_at = activatedAt/],
+    ["adminSuggestions.js", /if \(activationType\) vendorPatch\.published_at = reviewedAt/],
+  ];
+
+  for (const [route, expected] of expectations) {
     const source = readRoute(route);
-    assert.match(source, /activationType === NEW_VENDOR_NOTIFICATION/);
+    assert.match(source, expected);
+    assert.doesNotMatch(source, /activationType === NEW_VENDOR_NOTIFICATION[^\n]*published_at/);
   }
 });
