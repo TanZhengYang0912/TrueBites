@@ -1483,6 +1483,11 @@ export default function AdminVendorManagementPage() {
 
   const handlePageChange = (page) => {
     setData((cur) => ({ ...cur, pagination: { ...cur.pagination, page } }));
+    // App.jsx's <ScrollToTop /> only fires on a route change — switching
+    // pages here is local state on the same /admin/vendors2 URL, so without
+    // this an admin who scrolled down a long list stays scrolled down after
+    // Next/Previous, looking at the bottom of a page they haven't read yet.
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSave = () => {
@@ -2020,22 +2025,22 @@ export default function AdminVendorManagementPage() {
                     </button>
                   </td>
                   <td className="px-4 py-4 text-gray-500">{vendor.category}</td>
-                  <td className="px-4 py-4 text-gray-500">
+                  <td className="max-w-[160px] px-4 py-4 text-gray-500">
                     {vendor.missingAddress ? (
                       <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
                         Missing
                       </span>
                     ) : (
-                      <span className="max-w-[180px] truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
+                      <span className="block truncate" title={vendor.fullAddress}>{vendor.fullAddress || vendor.location}</span>
                     )}
                   </td>
-                  <td className="px-4 py-4 text-gray-500">
+                  <td className="max-w-[130px] px-4 py-4 text-gray-500">
                     {vendor.missingHours ? (
                       <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-red-700">
                         Missing
                       </span>
                     ) : (
-                      vendor.operatingHours
+                      <span className="block truncate" title={vendor.operatingHours}>{vendor.operatingHours}</span>
                     )}
                   </td>
                   <td className="px-4 py-4">
