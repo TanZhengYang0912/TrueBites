@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { APIProvider, Map as GMap, useMap } from "@vis.gl/react-google-maps";
 import { Maximize2, Minimize2 } from "lucide-react";
-import { getRestaurants } from "../api";
+import { getRestaurants, getTrip } from "../api";
 import { useSession } from "../lib/SessionContext";
 import { getBookmarks, getFolders, addBookmark, removeBookmark, createFolder } from "../api/engagement";
 import VendorMarkers from "../components/VendorMarkers";
@@ -53,6 +53,7 @@ import {
   selectRoutingStops,
 } from "../lib/tripRoutingPolicy";
 import {
+  applyFixedEndpointOrder,
   applyWaypointOrder,
   buildArrivalTimeline,
   buildOptimizationComparison,
@@ -169,6 +170,11 @@ export default function MapPage() {
   const [optimizationRequest, setOptimizationRequest] = useState(null);
   const [optimizationComparison, setOptimizationComparison] = useState(null);
   const [travelMode, setTravelMode] = useState("DRIVING");   // "DRIVING" | "TWO_WHEELER" | "TRANSIT" | "WALKING"
+  const travelModeRef = useRef(travelMode);
+  travelModeRef.current = travelMode;
+  const [currentRouteMetrics, setCurrentRouteMetrics] = useState(null);
+  const [carOptimizationLoading, setCarOptimizationLoading] = useState(false);
+  const pendingCarComparisonRef = useRef(null);
   const [hydratedOwner, setHydratedOwner] = useState(null);
   const [dirSummary, setDirSummary] = useState(null);
   const [dirError, setDirError] = useState(null);
@@ -202,6 +208,7 @@ export default function MapPage() {
 
   useEffect(() => {
     if (sessionLoading) return;
+    optimizationIdRef.current += 1;
     const stored = loadTrip(owner);
     const stops = stored?.stops || [];
     const savedOrigin = loadMapOrigin();
@@ -223,6 +230,9 @@ export default function MapPage() {
     setRouteCopyrights("");
     setOptimizationRequest(null);
     setOptimizationComparison(null);
+    setCurrentRouteMetrics(null);
+    setCarOptimizationLoading(false);
+    pendingCarComparisonRef.current = null;
     setRouteOptions([]);
     setTransitLegs([]);
     setHydratedOwner(owner);
@@ -347,10 +357,13 @@ export default function MapPage() {
     name: place.label || "Your current location", lat: place.lat, lng: place.lng,
   });
 
-  function invalidateOptimization() {
+  const invalidateOptimization = useCallback(() => {
     optimizationIdRef.current += 1;
     setOptimizationRequest(null);
     setOptimizationComparison(null);
+    setCurrentRouteMetrics(null);
+    setCarOptimizationLoading(false);
+    pendingCarComparisonRef.current = null;
     setDirSummary(null);
     setDirError(null);
     setArrivalRows([]);
@@ -358,14 +371,70 @@ export default function MapPage() {
     setRouteCopyrights("");
     setRouteOptions([]);
     setTransitLegs([]);
-  }
+  }, []);
 
-  function handleSuggestBestOrder() {
+  async function handleSuggestBestOrder() {
     if (travelMode === "TRANSIT" || routeConstraint) return;
     if (trip.length < 3) {
       setOptimizationComparison({ message: "Your current order is already the best suggestion." });
       return;
     }
+
+    if (travelMode === "DRIVING") {
+      if (!currentRouteMetrics) return;
+      const id = ++optimizationIdRef.current;
+      const requestedFingerprint = tripFingerprint(trip, "DRIVING");
+      const baseline = {
+        meters: currentRouteMetrics.meters,
+        seconds: currentRouteMetrics.seconds,
+      };
+      setOptimizationComparison(null);
+      setCarOptimizationLoading(true);
+
+      try {
+        const result = await getTrip(
+          trip.map(({ lat, lng }) => ({ lat, lng })),
+          true,
+        );
+        if (optimizationIdRef.current !== id
+            || travelModeRef.current !== "DRIVING"
+            || tripFingerprint(tripRef.current, "DRIVING") !== requestedFingerprint) return;
+
+        const ordered = applyFixedEndpointOrder(tripRef.current, result.order);
+        if (!ordered) throw new Error("INVALID_OSRM_ORDER");
+        if (ordered.every((stop, index) => stop.id === tripRef.current[index]?.id)) {
+          setCarOptimizationLoading(false);
+          setOptimizationComparison({ message: "Your current order is already the best suggestion." });
+          return;
+        }
+
+        pendingCarComparisonRef.current = {
+          id,
+          tripFingerprint: tripFingerprint(ordered, "DRIVING"),
+          baseline,
+        };
+        setCurrentRouteMetrics(null);
+        setDirSummary(null);
+        setArrivalRows([]);
+        setRouteWarnings([]);
+        setRouteCopyrights("");
+        setRouteOptions([]);
+        setTransitLegs([]);
+        setRouteIndex(0);
+        setTrip(ordered);
+      } catch {
+        if (optimizationIdRef.current !== id
+            || travelModeRef.current !== "DRIVING"
+            || tripFingerprint(tripRef.current, "DRIVING") !== requestedFingerprint) return;
+        setCarOptimizationLoading(false);
+        setOptimizationComparison({
+          message: "Couldn’t suggest an order for Car. Your current order was kept.",
+          tone: "danger",
+        });
+      }
+      return;
+    }
+
     const id = ++optimizationIdRef.current;
     setOptimizationComparison(null);
     setOptimizationRequest({
@@ -497,12 +566,13 @@ export default function MapPage() {
   }
 
   const handleCustomPlaceDetails = useCallback((stopId, placeId, details) => {
+    invalidateOptimization();
     setTrip((current) => current.map((stop) => (
       stop.id === stopId && stop.type === "custom" && stop.placeId === placeId
         ? customStopFromPlace(stop.id, { ...stop, ...details }, Date.now())
         : stop
     )));
-  }, []);
+  }, [invalidateOptimization]);
 
   function useGpsForRow(id, isDraft) {
     const row = isDraft ? draftStops.find((draft) => draft.id === id) : trip.find((stop) => stop.id === id);
@@ -690,15 +760,52 @@ export default function MapPage() {
     if (!matchesTripIdentity(identity, routingStops, travelMode, routeIndex)) return;
     if (!details) {
       setArrivalRows([]);
+      setCurrentRouteMetrics(null);
       return;
     }
+    setCurrentRouteMetrics({ meters: details.meters, seconds: details.seconds });
     setArrivalRows(buildArrivalTimeline(
       routingStops,
       details.legDurationsSeconds,
       new Date(details.calculatedAt),
       details.legDistancesMeters,
     ));
+
+    const pending = pendingCarComparisonRef.current;
+    if (pending
+        && identity.mode === "DRIVING"
+        && identity.routeIndex === 0
+        && identity.tripFingerprint === pending.tripFingerprint) {
+      pendingCarComparisonRef.current = null;
+      setCarOptimizationLoading(false);
+      setOptimizationComparison(buildOptimizationComparison(pending.baseline, details));
+    }
   }
+
+  function handleDirectionsError(error) {
+    setDirError(error);
+    if (error && pendingCarComparisonRef.current) {
+      pendingCarComparisonRef.current = null;
+      setCarOptimizationLoading(false);
+      setOptimizationComparison(null);
+    }
+  }
+
+  function handleSelectRoute(index) {
+    if (index === routeIndex) return;
+    optimizationIdRef.current += 1;
+    pendingCarComparisonRef.current = null;
+    setCarOptimizationLoading(false);
+    setOptimizationRequest(null);
+    setOptimizationComparison(null);
+    setCurrentRouteMetrics(null);
+    setRouteIndex(index);
+  }
+
+  const handleGoogleMapsOpen = useCallback((remainingCount) => {
+    if (remainingCount <= 0) return;
+    notify(`Opened the first 7 stops in Google Maps. ${remainingCount} stops were not included.`);
+  }, [notify]);
 
   function handleRouteWarnings(warnings, identity) {
     if (matchesTripIdentity(identity, routingStops, travelMode, routeIndex)) setRouteWarnings(warnings);
@@ -906,7 +1013,7 @@ export default function MapPage() {
                   onCopyrights={handleRouteCopyrights}
                   onOptimizationResult={handleOptimizationResult}
                   onOptimizationError={handleOptimizationError}
-                  onError={setDirError}
+                  onError={handleDirectionsError}
                 />
               )}
         </GMap>
@@ -983,12 +1090,14 @@ export default function MapPage() {
                 onTravelMode={changeTravelMode}
                 routeOptions={routeOptions}
                 routeIndex={routeIndex}
-                onSelectRoute={setRouteIndex}
+                onSelectRoute={handleSelectRoute}
                 transitLegs={transitLegs}
                 onSuggestBestOrder={handleSuggestBestOrder}
+                onGoogleMapsOpen={handleGoogleMapsOpen}
                 transitScopeMessage={transitScopeMessage}
                 tripAtLimit={tripAtLimit}
-                optimizationLoading={optimizationRequest != null}
+                bestOrderDisabled={travelMode === "DRIVING" && !currentRouteMetrics}
+                optimizationLoading={optimizationRequest != null || carOptimizationLoading}
                 optimizationComparison={optimizationComparison}
                 arrivalRows={arrivalRows}
                 routeWarnings={routeWarnings}

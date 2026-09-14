@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../supabase.js";
 import { haversine } from "../haversine.js";
 import { fetchDrivingRoute } from "../lib/drivingRoute.js";
+import { fetchOsrmTrip } from "../lib/osrmTrip.js";
 import { requireRole } from "../middleware/requireRole.js";
 
 const router = Router();
@@ -153,8 +154,9 @@ router.get("/route", async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // MODULE 4 — MULTI-STOP TRIP (free OSRM, no key)
 //
-// Routes through several stops. optimize=true suggests the best order
-// (first stop kept as the anchor); optimize=false follows the given order.
+// Routes through several stops. optimize=true suggests the best order; the
+// first and final stops stay fixed, so only intermediate stops may move.
+// optimize=false follows the given order.
 // Powers the Map Visualization trip planner.
 //
 // POST /api/trip   Body: { points: [{lat,lng}, ...], optimize: boolean }
@@ -165,30 +167,10 @@ router.post("/trip", async (req, res) => {
     return res.status(400).json({ error: "need at least 2 points" });
   }
 
-  const coords = points.map((p) => `${p.lng},${p.lat}`).join(";");
-  const isTrip = optimize;
-  const url = optimize
-    ? `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&overview=full&geometries=geojson`
-    : `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
-
   try {
-    const data = await (await fetch(url)).json();
-    if (data.code !== "Ok") {
-      return res.status(502).json({ error: "trip failed", details: data });
-    }
-    const leg = isTrip ? data.trips[0] : data.routes[0];
-
-    let order = points.map((_, i) => i);
-    if (isTrip) data.waypoints.forEach((wp, i) => { order[wp.waypoint_index] = i; });
-
-    res.json({
-      order,
-      path: leg.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
-      distance: (leg.distance / 1000).toFixed(1) + " km",
-      duration: Math.round(leg.duration / 60) + " mins",
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.json(await fetchOsrmTrip(points, optimize));
+  } catch {
+    return res.status(502).json({ error: "trip failed" });
   }
 });
 

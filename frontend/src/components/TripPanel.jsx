@@ -44,8 +44,10 @@ export default function TripPanel({
   routeOptions, routeIndex, onSelectRoute,
   transitLegs,
   onSuggestBestOrder,
+  onGoogleMapsOpen,
   transitScopeMessage,
   tripAtLimit,
+  bestOrderDisabled = false,
   optimizationLoading,
   optimizationComparison,
   arrivalRows = [],
@@ -197,7 +199,7 @@ export default function TripPanel({
       {trip.length >= 2 && (
         <button
           onClick={onSuggestBestOrder}
-          disabled={optimizationLoading || Boolean(routeError) || travelMode === "TRANSIT"}
+          disabled={optimizationLoading || bestOrderDisabled || Boolean(routeError) || travelMode === "TRANSIT"}
           title={travelMode === "TRANSIT" ? "Best order is unavailable for Transit." : undefined}
           className={`${OUTLINE_BTN} disabled:cursor-not-allowed disabled:opacity-50`}
         >
@@ -249,14 +251,19 @@ export default function TripPanel({
           href={gmaps.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => {
+            if (gmaps.truncated) onGoogleMapsOpen?.(gmaps.remainingCount);
+          }}
           className={`${OUTLINE_BTN} mb-0 mt-2`}
         >
           <ExternalLink size={14} /> Open in Google Maps
         </a>
       )}
-      {gmaps?.truncated && (
+      {gmaps && travelMode !== "TRANSIT" && (
         <div className="mt-1 text-center text-[10.5px] text-muted">
-          Google Maps supports up to 9 stops after your start — the rest are left out.
+          {gmaps.truncated
+            ? <>Google Maps will open stops 1–7 only. The remaining {gmaps.remainingCount} stops will stay in your TrueBites trip.</>
+            : "Google Maps can open up to 7 stops at a time."}
         </div>
       )}
 

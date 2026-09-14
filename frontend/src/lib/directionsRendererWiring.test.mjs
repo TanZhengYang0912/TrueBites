@@ -16,9 +16,9 @@ test("renderer publishes identity-safe Google leg details and attribution", () =
   assert.match(source, /onError/);
 });
 
-test("optimization uses Google twice for the exact selected non-transit mode", () => {
+test("optimization uses Google twice only for Motorcycle and Walking", () => {
   assert.match(source, /optimizationRequest/);
-  assert.match(source, /requestedMode === "TRANSIT"/);
+  assert.match(source, /requestedMode === "TRANSIT" \|\| requestedMode === "DRIVING"/);
   assert.match(source, /optimizeWaypoints:\s*true/);
   assert.match(source, /onOptimizationResult/);
   assert.match(source, /onOptimizationError/);

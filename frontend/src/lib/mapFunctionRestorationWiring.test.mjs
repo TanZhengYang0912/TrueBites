@@ -28,10 +28,12 @@ test("restoration is behavioural, not an old component rollback", () => {
 });
 
 test("active trip routing uses Google data for the selected mode", () => {
-  assert.doesNotMatch(mapPage, /\bgetTrip\b/);
+  assert.match(mapPage, /import \{ getRestaurants, getTrip \} from "\.\.\/api"/);
+  assert.match(mapPage, /travelMode === "DRIVING"[\s\S]*getTrip/);
   assert.match(mapPage, /const routingStops = useMemo\([\s\S]*selectRoutingStops\(trip, travelMode\)/);
   assert.match(mapPage, /<DirectionsRenderer[\s\S]*stops=\{routingStops\}/);
   assert.match(directions, /optimizeWaypoints:\s*true/);
+  assert.match(directions, /requestedMode === "TRANSIT" \|\| requestedMode === "DRIVING"/);
   assert.match(tripPanel, /"Suggest Best Order"/);
   assert.match(mapPage, /buildArrivalTimeline/);
   assert.match(mapPage, /matchesTripIdentity/);
